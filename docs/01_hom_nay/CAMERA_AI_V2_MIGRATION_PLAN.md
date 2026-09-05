@@ -56,6 +56,7 @@ Web UI: [Camera & flow] [Metadata search/timeline] [AI agent]
 - [x] Đưa source CameraAI và Cosmos, bỏ runtime data/model/cache.
 - [x] Bỏ API key hard-code và NVR credential mặc định khỏi source.
 - [x] Thêm `.env.example`, `.gitignore`, README và plan.
+- [x] Gắn clone source NVIDIA VSS qua Git submodule, cố định upstream commit.
 - [x] Commit nền tảng sạch đã được chuẩn bị sau khi kiểm tra không còn secret.
 
 ### P1 — Giữ backend/model cũ, chuẩn hóa integration
@@ -64,12 +65,11 @@ Web UI: [Camera & flow] [Metadata search/timeline] [AI agent]
 - [ ] Event schema/migration không làm mất dữ liệu SQLite cũ.
 - [ ] Health, retry, timeout, structured log và smoke test event-to-WebSocket.
 
-### P2 — Giao diện ba cột là trang chính
+### P2 — Dùng trực tiếp giao diện NVIDIA làm trang chính
 
-- [ ] Frontend React/Next tách biệt FastAPI, tham chiếu layout NVIDIA nhưng không phụ thuộc VST/NIM.
-- [ ] Cột trái: stream/clip, overlay `normal/review/abnormal/high`, timeline và flow.
-- [ ] Cột giữa: search + filter + event list; chọn event đồng bộ cả ba cột.
-- [ ] Cột phải: agent hiển thị nguồn metadata/video/audio hoặc trạng thái offline rõ ràng.
+- [x] Clone source tại `vendor/nvidia-video-search-and-summarization/`, không viết lại UI từ đầu.
+- [ ] Cấu hình UI NVIDIA dùng API CameraAI thay cho VST/NIM endpoint.
+- [ ] Nối cột trái với stream/clip CameraAI, cột giữa với event metadata, cột phải với agent hiện có.
 
 ### P3 — Nhãn bất thường từ metadata
 

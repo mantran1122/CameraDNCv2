@@ -1,0 +1,4 @@
+[submodule "vendor/nvidia-video-search-and-summarization"]
+	path = vendor/nvidia-video-search-and-summarization
+	url = https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization.git
+	branch = develop
