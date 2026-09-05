@@ -1,0 +1,20 @@
+[
+  {
+    "name": "crowd_general",
+    "query": "đám đông nhiều người tụ tập",
+    "limit": 5,
+    "min_results": 1
+  },
+  {
+    "name": "people_count",
+    "query": "có nhiều hơn hai người trong khung hình không",
+    "limit": 5,
+    "min_results": 1
+  },
+  {
+    "name": "movement_scene",
+    "query": "người di chuyển trong cảnh",
+    "limit": 5,
+    "min_results": 1
+  }
+]

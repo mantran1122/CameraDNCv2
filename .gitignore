@@ -1,0 +1,71 @@
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+!*.example.env
+**/config.json
+CameraAI/storage/nvr_config.json
+CameraAI/storage/gemini_config.json
+.omo/
+*.pem
+*.key
+id_rsa*
+
+# Python and Node environments/caches
+**/.venv/
+**/venv/
+**/env/
+**/__pycache__/
+*.py[cod]
+**/node_modules/
+**/.next/
+
+# Runtime output and local IDE files
+**/logs/
+*.log
+*.db
+*.db-shm
+*.db-wal
+.vscode/
+.idea/
+
+# Videos, captures and other generated data
+/data_test_cam/
+/data_test_cam_1/
+/data_test_cam_root/
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.webm
+*.wmv
+*.flv
+*.m4v
+*.jpg
+*.jpeg
+*.png
+
+# Build output and vendor runtime binaries (obtain separately under their licenses)
+**/build/
+**/bin/
+**/Bin/
+**/libs/
+*.dll
+*.exe
+*.pdb
+*.obj
+*.o
+*.lib
+*.exp
+*.ninja
+*.7z
+*.zip
+CMakeCache.txt
+CMakeFiles/
+
+# Preserved metadata of the formerly nested Cosmos repository
+.cosmos_code_base.git.backup/
+.cloud_ai_first.git.backup/
+
+# Operator-uploaded prompt profiles stay on the deployed machine, not in Git.
+cosmos_code_base/prompts/profiles/custom_*.txt

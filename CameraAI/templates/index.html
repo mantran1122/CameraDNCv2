@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dahua NVR5832-EI2 - AI Metadata & Anomaly Summarizer (Internet WAN Edition)</title>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <!-- Header Navbar -->
+    <nav class="navbar">
+        <div class="brand">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+                </svg>
+            </div>
+            <div>
+                <div class="brand-title">Dahua WizMind AI Summarizer</div>
+                <div class="brand-subtitle">DHI-NVR5832-EI2 | WAN & Internet Connection Manager</div>
+            </div>
+        </div>
+        <div class="nav-actions">
+            <div class="status-badge demo" id="status-badge">
+                <span class="pulse-dot"></span>
+                <span id="status-text">CHẾ ĐỘ GIẢ LẬP (DEMO)</span>
+            </div>
+            <button class="btn btn-primary" onclick="openConfigModal()">
+                🌐 Cấu hình Kết nối Internet NVR
+            </button>
+        </div>
+    </nav>
+
+    <!-- Internet Connection Status Bar -->
+    <div style="background: rgba(30, 41, 59, 0.7); border-bottom: 1px solid var(--border-color); padding: 0.6rem 2rem; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(10px);">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="color: var(--accent-cyan);">📡 ĐẦU GHI HIỆN TẠI:</span>
+            <strong id="bar-nvr-host" style="color: white;">192.168.1.108</strong>
+            <span style="color: var(--text-muted);" id="bar-nvr-ports">(HTTP: 80 | RTSP: 554)</span>
+        </div>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <span id="bar-nvr-channels" style="color: var(--accent-emerald);">Giám sát: 32 Kênh Camera</span>
+            <button onclick="testActiveConnection()" style="background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: white; padding: 0.25rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">⚡ Kiếm tra Kết nối</button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+    
+        <div class="tabs-container">
+            <button class="tab-btn active" id="btn-tab-overview" onclick="switchTab('tab-overview')">📊 Tổng quan (Overview)</button>
+            <button class="tab-btn" id="btn-tab-live" onclick="switchTab('tab-live')">📹 Xem Camera (Live View)</button>
+        </div>
+
+        <div id="tab-overview" class="tab-content active">
+
+        <!-- Top Metrics Cards -->
+        <div class="grid-top">
+            <div class="metric-card cyan">
+                <div class="metric-header">
+                    <span>Tổng Metadata Hoạt động</span>
+                    <span>📊</span>
+                </div>
+                <div class="metric-value" id="val-total-events">0</div>
+                <div class="metric-footer">Người, phương tiện & chuyển động</div>
+            </div>
+
+            <div class="metric-card red">
+                <div class="metric-header">
+                    <span>Bất thường Âm thanh</span>
+                    <span>🔊</span>
+                </div>
+                <div class="metric-value" id="val-audio-anomalies">0</div>
+                <div class="metric-footer">La gào, cãi vã, tiếng đập phá (dB peak)</div>
+            </div>
+
+            <div class="metric-card amber">
+                <div class="metric-header">
+                    <span>Bất thường Video</span>
+                    <span>⚠️</span>
+                </div>
+                <div class="metric-value" id="val-video-anomalies">0</div>
+                <div class="metric-footer">Đột nhập, vượt hàng rào, vi phạm vùng</div>
+            </div>
+
+            <div class="metric-card emerald">
+                <div class="metric-header">
+                    <span>Metadata Con người</span>
+                    <span>👤</span>
+                </div>
+                <div class="metric-value" id="val-human-count">0</div>
+                <div class="metric-footer">Diện mạo & Thuộc tính nhân dạng</div>
+            </div>
+        </div>
+
+        <!-- AI Executive Daily Summary Box -->
+        <div class="summary-box">
+            <div class="summary-title">
+                <h2>
+                    <span>🤖</span>
+                    <span>Báo cáo Tóm tắt Hoạt động trong Ngày (Video + Audio)</span>
+                </h2>
+                <span class="ai-badge">AI Summary Engine</span>
+            </div>
+            <div class="summary-content" id="summary-text-box">
+                Đang tổng hợp dữ liệu báo cáo từ đầu ghi Dahua DHI-NVR5832-EI2...
+            </div>
+        </div>
+
+        <!-- Main Layout: Chart & Realtime Events Feed -->
+        <div class="main-grid">
+            <!-- Left: Activity Timeline Chart -->
+            <div class="card">
+                <div class="card-title">
+                    <span>📈 Biểu đồ Mốc thời gian Hoạt động & Bất thường (24h)</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="activityChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Right: Anomaly Feed & 10s Clip Playback Trigger -->
+            <div class="card">
+                <div class="card-title">
+                    <span>🚨 Nhật ký Sự kiện & xem lại Video 10s</span>
+                    <div>
+                        <button class="btn btn-glass" style="font-size:0.75rem; padding: 0.3rem 0.6rem;" onclick="fetchEvents(false)">Tất cả</button>
+                        <button class="btn btn-glass" style="font-size:0.75rem; padding: 0.3rem 0.6rem; color: var(--accent-red);" onclick="fetchEvents(true)">Chỉ Bất thường</button>
+                    </div>
+                </div>
+                <div class="events-list" id="events-container">
+                    <!-- Event Cards populated via app.js -->
+                </div>
+            </div>
+        </div>
+        </div> <!-- End tab-overview -->
+
+        <!-- Tab Live View -->
+        <div id="tab-live" class="tab-content">
+            <div class="live-view-box">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.2rem;">Live Camera Stream</h3>
+                    <select id="live-cam-select" style="padding: 0.5rem; border-radius: 8px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border-color); min-width: 200px;">
+                        <!-- Options generated via JS -->
+                    </select>
+                </div>
+                <div class="video-container" style="background: #000; display: flex; align-items: center; justify-content: center; position: relative;">
+                    <img id="live-video-player" src="" style="width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 2;" alt="Đang chờ chọn camera..." />
+                    <div style="text-align: center; color: var(--text-muted); position: absolute; z-index: 1;">
+                        <div>Đang tải luồng dữ liệu...</div>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- End tab-live -->
+
+    </div>
+
+    <!-- Modal 1: 10-Second Video Clip Player -->
+    <div class="modal-overlay" id="videoModal">
+        <div class="modal-box clip-modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-event-title">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-event-title">Trình phát Video 10s Bất thường</div>
+                <button class="close-btn" onclick="closeClipModal()">&times;</button>
+            </div>
+            <div class="modal-body clip-modal-body">
+                <div class="clip-workspace">
+                    <section class="clip-panel clip-video-panel">
+                        <div class="clip-panel-title">Video evidence</div>
+                        <div class="video-container">
+                            <video id="modal-video-player" controls autoplay loop>
+                                <source id="modal-video-source" src="" type="video/mp4">
+                                Trình duyệt của bạn không hỗ trợ thẻ HTML5 Video.
+                            </video>
+                        </div>
+                        <div class="clip-hud-info">
+                            <div><strong>Kênh Camera:</strong> <span id="clip-detail-ch">-</span></div>
+                            <div><strong>Mốc thời gian:</strong> <span id="clip-detail-time">-</span></div>
+                            <div><strong>Loại sự kiện:</strong> <span id="clip-detail-type">-</span></div>
+                            <div><strong>Cường độ âm thanh:</strong> <span id="clip-detail-audio">-</span></div>
+                        </div>
+                    </section>
+                    <section class="audio-analysis-panel clip-panel" aria-live="polite">
+                        <div class="audio-analysis-title">
+                            <span>Phân tích hình ảnh</span>
+                            <button id="analyze-video-btn" class="btn-analyze-video" type="button" onclick="requestVideoAnalysis()">🎬 Phân tích video</button>
+                        </div>
+                        <div id="clip-video-analysis-status" class="video-analysis-status">Chưa có dữ liệu</div>
+                        <div class="audio-analysis-grid">
+                            <div><strong>Tóm tắt video:</strong><p id="clip-video-analysis-summary">-</p></div>
+                            <div><strong>Rủi ro:</strong> <span id="clip-video-analysis-risk">-</span></div>
+                            <div><strong>Đối tượng:</strong><p id="clip-video-analysis-events">-</p></div>
+                            <div><strong>Frame đã đọc:</strong> <span id="clip-video-analysis-frames">-</span></div>
+                        </div>
+                        <div id="clip-video-analysis-error" class="audio-analysis-error"></div>
+                    </section>
+                    <section class="audio-analysis-panel clip-panel audio-panel" aria-live="polite">
+                    <div class="audio-analysis-title">
+                        <span>Phân tích âm thanh</span>
+                        <button id="analyze-audio-btn" class="btn-analyze-audio" type="button" onclick="requestAudioAnalysis()">🎙 Phân tích âm thanh</button>
+                    </div>
+                    <div id="clip-audio-status" class="audio-status">Chưa có dữ liệu</div>
+                    <div class="audio-analysis-grid audio-only-grid">
+                        <div class="audio-result-wide"><strong>Transcript:</strong><p id="clip-audio-transcript">-</p></div>
+                    </div>
+                    <div id="clip-audio-error" class="audio-analysis-error"></div>
+                    </section>
+                    <section class="audio-analysis-panel clip-panel llm-panel" aria-live="polite">
+                        <div class="audio-analysis-title"><span>🤖 LLM gợi ý & hành động</span></div>
+                        <p class="llm-help">Tự tổng hợp metadata NVR và transcript đã phân tích để đưa ra kết luận có căn cứ.</p>
+                        <div class="audio-analysis-grid">
+                            <div class="llm-result-wide"><strong>Kết luận LLM:</strong><p id="clip-audio-summary">-</p></div>
+                            <div><strong>Mức rủi ro:</strong> <span id="clip-audio-risk">-</span></div>
+                            <div><strong>Hành động đề xuất:</strong><p id="clip-audio-action">-</p></div>
+                        </div>
+                        <div><strong>Evidence:</strong><ul id="clip-audio-evidence" class="audio-evidence"></ul></div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: Complete Internet NVR Connection Manager -->
+    <div class="modal-overlay" id="configModal">
+        <div class="modal-box" style="max-width: 650px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(6, 182, 212, 0.2));">
+                <div class="modal-title" style="display:flex; align-items:center; gap:0.5rem;">
+                    <span>🌐</span>
+                    <span>Cấu hình Kết nối Đầu ghi Dahua NVR qua Internet (DDNS / Public IP)</span>
+                </div>
+                <button class="close-btn" onclick="closeConfigModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form onsubmit="saveNVRConfig(event)">
+                    <div style="display:flex; flex-direction:column; gap: 1.1rem;">
+                        
+                        <!-- Connection Test Result Banner -->
+                        <div id="test-result-banner" style="display:none; padding: 0.8rem 1rem; border-radius: 10px; font-size: 0.85rem; line-height: 1.5;"></div>
+
+                        <!-- Host IP / DDNS Domain -->
+                        <div>
+                            <label style="font-size:0.85rem; font-weight:600; color:var(--text-main);">Địa chỉ IP Tĩnh / Tên miền DDNS NVR:</label>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.3rem;">Nhập IP Công cộng (VD: 113.161.45.12) hoặc Tên miền QuickDDNS / DynDNS (VD: camera.dahuaddns.com)</div>
+                            <input type="text" id="cfg-host" placeholder="Ví dụ: 113.161.45.12 hoặc mycam.dahuaddns.com" required style="width:100%; padding:0.65rem 0.8rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.5); color:white;">
+                        </div>
+
+                        <!-- Protocol & Ports -->
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem;">
+                            <div>
+                                <label style="font-size:0.85rem; font-weight:600; color:var(--text-main);">Giao thức:</label>
+                                <select id="cfg-https" style="width:100%; padding:0.65rem 0.5rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(15, 23, 42, 0.9); color:white; margin-top:0.3rem;">
+                                    <option value="false">HTTP (Mặc định)</option>
+                                    <option value="true">HTTPS (SSL Secure)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem; font-weight:600; color:var(--text-main);">Cổng HTTP/HTTPS CGI:</label>
+                                <input type="number" id="cfg-port" value="80" required style="width:100%; padding:0.65rem 0.8rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.5); color:white; margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem; font-weight:600; color:var(--text-main);">Cổng RTSP Media:</label>
+                                <input type="number" id="cfg-rtsp" value="554" required style="width:100%; padding:0.65rem 0.8rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.5); color:white; margin-top:0.3rem;">
+                            </div>
+                        </div>
+
+                        <!-- User & Password -->
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+                            <div>
+                                <label style="font-size:0.85rem; font-weight:600; color:var(--text-main);">Tài khoản đăng nhập (Username):</label>
+                                <input type="text" id="cfg-user" value="admin" required style="width:100%; padding:0.65rem 0.8rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.5); color:white; margin-top:0.3rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.85rem; font-weight:600; color:var(--text-main);">Mật khẩu NVR (Password):</label>
+                                <div style="position:relative; margin-top:0.3rem;">
+                                    <input type="password" id="cfg-pass" required placeholder="Nhập mật khẩu đầu ghi" style="width:100%; padding:0.65rem 0.8rem; padding-right:2.5rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.5); color:white;">
+                                    <button type="button" onclick="togglePasswordVisibility()" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem;">👁️</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Channel Selector (Channels 1 to 32) -->
+                        <div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                                <label style="font-size:0.85rem; font-weight:600; color:var(--text-main);">Chọn Kênh Camera Giám sát (DHI-NVR5832-EI2):</label>
+                                <button type="button" onclick="toggleSelectAllChannels()" style="background:transparent; border:none; color:var(--accent-cyan); font-size:0.75rem; cursor:pointer; text-decoration:underline;">Tất cả 32 Kênh</button>
+                            </div>
+                            <div id="channel-grid" style="display:grid; grid-template-columns: repeat(8, 1fr); gap:0.4rem; max-height:120px; overflow-y:auto; background:rgba(0,0,0,0.3); padding:0.6rem; border-radius:8px; border:1px solid var(--border-color);">
+                                <!-- Checkboxes 1 to 32 populated via JS -->
+                            </div>
+                        </div>
+
+                        <div class="abnormal-behavior-config">
+                            <div class="config-section-title">Hành vi bất thường theo metadata</div>
+                            <div class="config-section-note">Tick hành vi cần giám sát. Khi NVR gửi metadata tương ứng, hệ thống sẽ tự tải clip 10 giây để xem lại và dùng chức năng phân tích.</div>
+                            <div id="abnormal-behavior-grid" class="abnormal-behavior-grid"></div>
+                        </div>
+
+                        <!-- Demo Mode Toggle -->
+                        <div style="background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.3); padding:0.75rem 1rem; border-radius:8px; display:flex; align-items:center; gap:0.75rem;">
+                            <input type="checkbox" id="cfg-demo" style="width:20px; height:20px; cursor:pointer;">
+                            <div>
+                                <label for="cfg-demo" style="font-size:0.875rem; font-weight:600; color:#fbbf24; cursor:pointer;">Kích hoạt Chế độ Giả lập (Demo Mode)</label>
+                                <div style="font-size:0.75rem; color:var(--text-muted);">Bật tính năng này nếu bạn muốn chạy thử nghiệm các tính năng phát lại video 10s và báo cáo khi chưa nối cáp tới NVR thật.</div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-top:0.5rem;">
+                            <button type="button" class="btn btn-glass" onclick="testNVRConnectionUI()" style="justify-content:center; padding:0.75rem;">
+                                ⚡ Kiểm tra Kết nối Đầu ghi
+                            </button>
+                            <button type="submit" class="btn btn-primary" style="justify-content:center; padding:0.75rem;">
+                                💾 Lưu Cấu hình & Bắt đầu Giám sát
+                            </button>
+                        </div>
+
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

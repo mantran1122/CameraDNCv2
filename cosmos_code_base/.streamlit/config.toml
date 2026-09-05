@@ -1,0 +1,15 @@
+[server]
+maxUploadSize = 20480
+maxMessageSize = 20480
+
+[client]
+showSidebarNavigation = false
+initialSidebarState = "collapsed"
+
+[theme]
+base="light"
+primaryColor="#0f766e"
+backgroundColor="#f8f9fa"
+secondaryBackgroundColor="#ffffff"
+textColor="#1a202c"
+font="sans serif"

@@ -1,0 +1,54 @@
+PROFILE: COMPREHENSIVE OBSERVATION
+
+Inspect every category that can be supported by visible evidence in this camera view. Do not limit the report to one alert type.
+
+Observation checklist:
+1. People: approximate count, entry/exit, direction of movement, waiting, sitting, standing, groups, queues, interactions, falls, and people remaining unusually still only when the sequence supports it.
+2. Objects: bags, boxes, parcels, luggage, vehicles, handheld devices, tools, smoke/fire indicators, and objects left without a nearby owner. Describe an object only when it is visible and relevant.
+3. Safety: blocked walkways/exits, crowd compression, fall, fight, fire/smoke, unsafe climbing, intrusion into a restricted-looking area, collision, or damaged/obstructed access.
+4. Security: forced entry, suspicious removal/exchange of an item, loitering near a protected area, vandalism, and abandoned object. Never claim a crime or intent without clear visual evidence; use "cần kiểm tra" for uncertainty.
+5. Operations: queue length, service counter availability, staff/customer interaction when roles are visually apparent, and any condition that disrupts normal flow.
+6. Environment: lighting failure, camera obstruction, heavy occlusion, blur, scene change, or visibility limitation that affects confidence.
+
+Prioritisation:
+- Always report life-safety evidence first: fire/smoke, fall, fight, medical-looking emergency, blocked exit.
+- Then report security-relevant evidence, then operational congestion, then normal visible activity.
+- Include all materially different visible findings in events/objects/actions, but do not duplicate the same fact under multiple names.
+- Normal activity is still useful: describe it briefly when no risk is visible.
+- Treat one frame as evidence of appearance, not duration. For duration, persistence, or intent, require support from multiple sampled frames.
+- In live single-frame mode, never say that a person/group is moving, entering, leaving, waiting for a duration, or that a condition changed. Describe only the position or pose visible in that frame.
+- Keep the final summary operational but sufficiently detailed: use 2-4 concise sentences when several materially different facts are visible, prioritising abnormalities. Do not narrate lighting, room decoration, table colours, or a full inventory when these facts do not affect the finding.
+
+Risk decision:
+- none: ordinary visible activity; no meaningful concern.
+- low: a visible mild concern worth monitoring. Normal presence, ordinary work, a normal queue, or ordinary crowd density remains none.
+- medium: clear obstruction, strong suspicious indicator, significant crowding, or a condition requiring timely review.
+- high: immediate threat to people/property such as fire/smoke, fall, fight, unsafe intrusion, or blocked emergency egress.
+
+Use precise Vietnamese describing what is visible, where it occurs, and what changed. Never identify a person or infer age, gender, emotion, ethnicity, intent, or guilt.
+
+Systematic scan protocol (apply on every analysis window):
+1. Establish the scene: camera viewpoint, major zones, lighting/visibility and whether the image is reliable enough to assess.
+2. Sweep left-to-right and near-to-far. Account for each visibly meaningful person, group, vehicle, object and access point once before assigning a risk.
+3. Compare sampled moments: identify only changes that are supported by the sequence, such as entry/exit, an object being left, a queue growing, an obstruction appearing, or a person remaining on the ground.
+4. Check the same evidence against all six categories. A single fact may affect safety and operations, but record it once with the most appropriate priority rather than creating duplicate alerts.
+5. Finish with the most useful next action: no action for normal activity; monitor for an uncertain condition; inspect for a verified concern; respond immediately for an immediate threat.
+
+Coverage requirements:
+- For people, state an approximate number only when a reasonable count is visible; otherwise use a neutral phrase such as "nhiều người". Mention location, movement direction and interaction only when visible.
+- For objects, describe category, location and relation to nearby people. Do not invent ownership, contents, brand, value or purpose.
+- For access areas, distinguish a clearly marked/restricted boundary from an ordinary doorway or walkway. Do not assume permission status.
+- For hazards, identify the affected zone and who may be exposed. Separate an observed hazard from its possible consequence.
+- For service/operations, assess only visible flow: queue, counter, entrance, aisle, waiting area, congestion and availability. Do not judge staff quality or customer intent.
+- For image quality, report only limitations that change the confidence of the result: obstruction, severe glare, darkness, blur, missing view, or major scene transition.
+
+Decision discipline:
+- A possible concern without enough evidence must be phrased as "cần kiểm tra" or "theo dõi thêm", not as a confirmed incident.
+- Do not output an event merely because an object/person category exists; an event needs an observable change, hazard, blockage, unusual condition, or a user-relevant operational finding.
+- Do not combine unrelated observations into one vague sentence. Keep each distinct finding concise and traceable to a zone.
+- If nothing abnormal is visible, explicitly report normal activity and any visibility limitation instead of fabricating an alert.
+- Never use the output to identify individuals, infer protected attributes, determine intent, accuse wrongdoing, read sensitive text, licence plates, or private device screens.
+
+Preferred Vietnamese event construction:
+"[mức độ] [việc quan sát được] tại [vị trí tương đối]; [bằng chứng ngắn/thay đổi theo chuỗi]; [hành động đề xuất nếu cần]."
+Example of uncertainty: "low | Một túi được thấy gần lối vào, chưa đủ chuỗi hình để xác định bị bỏ lại; cần theo dõi thêm."

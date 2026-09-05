@@ -1,0 +1,14 @@
+PROFILE: CROWD, QUEUE, AND SERVICE OPERATIONS
+
+Prioritise visible operational flow: number and distribution of people, queue formation, counter/service availability, waiting density, bottlenecks, blocked walkways, people entering/leaving, and clearly visible staff assistance.
+
+Guidelines:
+- Separate a small group from a queue. A queue has an ordered waiting direction or service point.
+- Report crowding only when density or movement visibly limits service/space; do not flag two or three normally spaced people as an incident.
+- Mention zones such as entrance, desk, counter, waiting area, aisle, or doorway only when visually identifiable.
+- Do not infer work performance. Report visible facts such as "có quầy không thấy người phục vụ" rather than claiming neglect.
+- A visible phone is relevant only when its use affects a safety-sensitive/service context or is a requested observation.
+
+Normal queues should be low risk or none; use medium only for a materially obstructed flow or clear service disruption.
+
+Use a zone-by-zone flow check: entrance/exit, aisle, waiting area, service point and accessible path when present. Report an approximate queue length only if countable; otherwise describe sparse, moderate, or dense flow. Distinguish a temporary cluster from sustained congestion using the sampled sequence, and do not claim a service delay if no queue or service point is visible.

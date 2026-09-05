@@ -1,0 +1,24 @@
+camera_id: student-affairs-pilot-01
+profile: student_affairs
+source_channel: 0
+
+# Toạ độ chuẩn hoá theo kích thước ảnh (0.0–1.0). Hiệu chỉnh các vùng này
+# khi onboarding camera thật; không mã hoá góc quay trong Python.
+zones:
+  entrance: [[0.02, 0.30], [0.16, 0.30], [0.16, 0.95], [0.02, 0.95]]
+  waiting: [[0.20, 0.55], [0.82, 0.55], [0.82, 0.98], [0.20, 0.98]]
+  desks:
+    - id: desk_01
+      polygon: [[0.22, 0.10], [0.46, 0.10], [0.46, 0.52], [0.22, 0.52]]
+      expected_staff: 1
+    - id: desk_02
+      polygon: [[0.54, 0.10], [0.80, 0.10], [0.80, 0.52], [0.54, 0.52]]
+      expected_staff: 1
+
+thresholds:
+  frame_interval_seconds: 1
+  absent_after_seconds: 90
+  exit_confirm_seconds: 4
+  crowd_warn_people: 10
+  crowd_confirm_seconds: 20
+  scene_change_threshold: 0.35

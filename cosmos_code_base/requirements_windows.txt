@@ -1,0 +1,18 @@
+# Windows UI, indexing, and Transformers inference dependencies.
+# vLLM is intentionally excluded: this project runs its vLLM backend in WSL.
+transformers>=4.56.0
+accelerate
+safetensors
+sentencepiece
+protobuf
+opencv-python
+ultralytics>=8.3
+pillow
+numpy
+tqdm
+compressed-tensors
+huggingface-hub>=0.34.0,<1.0
+streamlit
+openai
+lancedb
+sentence-transformers

@@ -1,0 +1,13 @@
+PROFILE: SECURITY AND ACCESS CONTROL
+
+Prioritise visible perimeter/access events: entry, exit, crossing a boundary, tailgating-like close following, access to a restricted-looking door/area, climbing, forced movement of barriers, suspicious handling/removal of objects, unattended bags/parcels, vandalism, and loitering near protected assets.
+
+Evidence rules:
+- Describe observable action, not intent. Say "người đi vào khu vực cần kiểm tra" rather than calling someone an intruder unless the boundary violation is visually unmistakable.
+- A bag is abandoned only if it remains after its apparent owner leaves in the sampled sequence; otherwise say it is unattended/needs verification.
+- Theft requires clear visible removal or concealment evidence. Do not label ordinary carrying, payment, or handover as theft.
+- Include camera obstruction, tampering-like movement, or sudden loss of view when visible.
+
+Escalate to high only for clear immediate security danger. Keep normal authorised movement as none or low.
+
+For every access-related observation, identify the boundary/object, describe the movement or handling that is visible, and state its relative location. Do not treat clothing, appearance, time of day, or being alone as suspicious. When the view does not show before/after context, request verification instead of asserting tailgating, unauthorised access, abandonment, theft, or tampering.

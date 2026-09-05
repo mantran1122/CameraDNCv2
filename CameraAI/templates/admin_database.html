@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản trị cơ sở dữ liệu | CameraAI</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .admin-wrap { max-width: 1440px; margin: 0 auto; padding: 2rem; }
+        .admin-head { display:flex; justify-content:space-between; gap:1rem; align-items:center; margin-bottom:1.5rem; }
+        .admin-note { color: var(--text-muted); margin-top:.35rem; }
+        .db-meta { display:flex; flex-wrap:wrap; gap:.75rem; margin-bottom:1rem; }
+        .db-chip { background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; padding:.6rem .8rem; color:var(--text-muted); }
+        .db-chip strong { color:var(--text-main); }
+        .db-table { background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; margin:1rem 0; overflow:hidden; }
+        .db-table-title { padding:1rem 1.25rem; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); }
+        .schema { color:var(--text-muted); padding:.75rem 1.25rem; font-size:.82rem; border-bottom:1px solid var(--border-color); overflow-wrap:anywhere; }
+        .table-scroll { overflow:auto; max-height:440px; }
+        table { border-collapse:collapse; width:100%; font-size:.82rem; }
+        th, td { text-align:left; padding:.7rem .8rem; border-bottom:1px solid var(--border-color); vertical-align:top; white-space:pre-wrap; max-width:360px; overflow-wrap:anywhere; }
+        th { position:sticky; top:0; background:#182236; color:#dbeafe; z-index:1; }
+        td { color:var(--text-muted); }
+        .empty { color:var(--text-muted); padding:1rem 1.25rem; }
+        .error { color:#fca5a5; background:rgba(239,68,68,.12); padding:1rem; border-radius:8px; }
+        @media (max-width: 640px) { .admin-wrap { padding:1rem; } .admin-head { align-items:flex-start; flex-direction:column; } }
+    </style>
+</head>
+<body>
+    <main class="admin-wrap">
+        <div class="admin-head">
+            <div>
+                <h1>Quản trị cơ sở dữ liệu</h1>
+                <p class="admin-note">Chỉ đọc: xem cấu trúc, số bản ghi và dữ liệu mẫu. Trang này không cho chạy SQL hoặc sửa/xóa dữ liệu.</p>
+            </div>
+            <div>
+                <label for="sample-limit">Số dòng mẫu</label>
+                <select id="sample-limit"><option>10</option><option selected>20</option><option>50</option><option>100</option></select>
+                <button class="btn btn-primary" id="refresh-btn">Làm mới</button>
+            </div>
+        </div>
+        <div id="db-meta" class="db-meta"></div>
+        <div id="db-content">Đang tải dữ liệu…</div>
+    </main>
+    <script>
+        const content = document.getElementById('db-content');
+        const meta = document.getElementById('db-meta');
+        const limitInput = document.getElementById('sample-limit');
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' })[char]);
+        const cellValue = (value) => typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+        const formatSize = (bytes) => bytes < 1024 ? `${bytes} B` : `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+
+        function renderTable(table) {
+            const columns = table.columns.map(c => c.name);
+            const schema = table.columns.map(c => `${c.name}: ${c.type || 'TEXT'}${c.primary_key ? ' [PK]' : ''}${c.required ? ' [NOT NULL]' : ''}`).join(' · ');
+            const rows = table.rows.length ? `<div class="table-scroll"><table><thead><tr>${columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${table.rows.map(row => `<tr>${columns.map(c => `<td>${escapeHtml(cellValue(row[c]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '<p class="empty">Chưa có bản ghi.</p>';
+            return `<section class="db-table"><div class="db-table-title"><strong>${escapeHtml(table.name)}</strong><span>${table.row_count.toLocaleString('vi-VN')} bản ghi</span></div><div class="schema">${escapeHtml(schema)}</div>${rows}</section>`;
+        }
+
+        async function loadDatabase() {
+            content.textContent = 'Đang tải dữ liệu…';
+            try {
+                const response = await fetch(`/api/admin/database?limit=${limitInput.value}`);
+                if (!response.ok) throw new Error((await response.json()).detail || `HTTP ${response.status}`);
+                const data = await response.json();
+                meta.innerHTML = `<span class="db-chip">Engine: <strong>${escapeHtml(data.engine)}</strong></span><span class="db-chip">File: <strong>${escapeHtml(data.database_file)}</strong></span><span class="db-chip">Dung lượng: <strong>${formatSize(data.database_size_bytes)}</strong></span><span class="db-chip">Cập nhật: <strong>${escapeHtml(data.generated_at)}</strong></span>`;
+                content.innerHTML = data.tables.map(renderTable).join('') || '<p class="empty">Chưa có bảng nào.</p>';
+            } catch (error) {
+                meta.innerHTML = '';
+                content.innerHTML = `<p class="error">Không thể tải dữ liệu: ${escapeHtml(error.message)}</p>`;
+            }
+        }
+        document.getElementById('refresh-btn').addEventListener('click', loadDatabase);
+        limitInput.addEventListener('change', loadDatabase);
+        loadDatabase();
+    </script>
+</body>
+</html>

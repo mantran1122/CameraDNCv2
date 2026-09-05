@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments and local install caches
+.venv/
+venv/
+env/
+local_env/
+pip_cache/
+pip_temp/
+torch_cache/
+hf_cache/
+.cache/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Generated app data
+outputs/**
+!outputs/.keep
+videos/**
+!videos/.keep
+static/**
+!static/.keep
+
+# Large media/model artifacts
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.ckpt
+
+# Logs and OS/editor noise
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
