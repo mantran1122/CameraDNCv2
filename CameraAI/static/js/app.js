@@ -618,15 +618,36 @@ function initWebSocket() {
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
     ws.onmessage = (event) => {
-        const ev = JSON.parse(event.data);
-        console.log('Realtime event received:', ev);
+        try {
+            const ev = JSON.parse(event.data);
+            console.log('Realtime event received:', ev);
 
-        const container = document.getElementById('events-container');
-        const previous = container.querySelector(`[data-event-id="${ev.id}"]`);
-        if (previous) previous.remove();
-        container.insertBefore(createEventCard(ev), container.firstChild);
+            // Update overview tab feed
+            const container = document.getElementById('events-container');
+            if (container) {
+                const previous = container.querySelector(`[data-event-id="${ev.id}"]`);
+                if (previous) previous.remove();
+                container.insertBefore(createEventCard(ev), container.firstChild);
+            }
 
-        fetchDailySummary();
+            // Update VSS Blueprint live feed if event matches current camera channel
+            if (parseInt(ev.channel) === parseInt(currentVssChannel)) {
+                const resultsFeed = document.getElementById('vss-results-feed');
+                const emptyState = document.getElementById('vss-empty-state');
+                if (resultsFeed) {
+                    const prevVss = resultsFeed.querySelector(`[data-vss-id="${ev.id}"]`);
+                    if (prevVss) prevVss.remove();
+                    const newCard = createVssResultCard(ev);
+                    resultsFeed.insertBefore(newCard, resultsFeed.firstChild);
+                    resultsFeed.style.display = 'flex';
+                    if (emptyState) emptyState.style.display = 'none';
+                }
+            }
+
+            fetchDailySummary();
+        } catch (err) {
+            console.error('Error handling WebSocket event:', err);
+        }
     };
 
     ws.onclose = () => {
@@ -765,7 +786,7 @@ function setVssFilterTag(btn, tag) {
 async function executeVssSearch() {
     const queryInput = document.getElementById("vss-search-input");
     const query = (queryInput?.value || "").trim().toLowerCase();
-    const sourceType = document.getElementById("vss-source-type")?.value || "video";
+    const sourceType = document.getElementById("vss-source-type")?.value || "all";
 
     const emptyState = document.getElementById("vss-empty-state");
     const resultsFeed = document.getElementById("vss-results-feed");
@@ -790,17 +811,25 @@ async function executeVssSearch() {
                 }
             } else if (vssFilterTag === 'human') {
                 const desc = (ev.description || '').toLowerCase();
-                if (!desc.includes('người') && !desc.includes('human')) return false;
+                const code = (ev.event_code || '').toLowerCase();
+                if (!desc.includes('người') && !desc.includes('human') && !code.includes('human') && !code.includes('face')) return false;
             } else if (vssFilterTag === 'vehicle') {
                 const desc = (ev.description || '').toLowerCase();
-                if (!desc.includes('xe') && !desc.includes('vehicle') && !desc.includes('car')) return false;
+                const code = (ev.event_code || '').toLowerCase();
+                if (!desc.includes('xe') && !desc.includes('vehicle') && !desc.includes('car') && !code.includes('vehicle')) return false;
             } else if (vssFilterTag === 'audio') {
                 if (ev.event_type !== 'audio_anomaly') return false;
             }
 
             // Filter by source type
-            if (sourceType === 'audio' && ev.event_type !== 'audio_anomaly') return false;
-            if (sourceType === 'video' && !ev.clip_filename && ev.event_type !== 'video_anomaly') return false;
+            if (sourceType === 'audio') {
+                if (ev.event_type !== 'audio_anomaly') return false;
+            } else if (sourceType === 'video') {
+                if (!ev.clip_filename && ev.event_type !== 'video_anomaly') return false;
+            } else if (sourceType === 'metadata') {
+                if (ev.event_type !== 'normal_metadata' && !ev.event_code) return false;
+            }
+            // 'all' shows all events
 
             // Filter by keyword query
             if (query) {
@@ -841,6 +870,7 @@ async function executeVssSearch() {
 function createVssResultCard(ev) {
     const card = document.createElement("div");
     card.className = "vss-result-card";
+    card.dataset.vssId = ev.id;
 
     const isAnomaly = ev.event_type === 'audio_anomaly' || ev.event_type === 'video_anomaly' || ev.severity === 'high';
     const tagClass = isAnomaly ? 'vss-result-tag anomaly' : 'vss-result-tag normal';
