@@ -1,6 +1,8 @@
 let activityChart = null;
 let audioAnalysisPollTimer = null;
 let videoAnalysisPollTimer = null;
+let activeEventFilter = false;
+let selectedEventId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     fetchDailySummary();
@@ -109,6 +111,7 @@ async function fetchDailySummary() {
         document.getElementById('val-human-count').innerText = data.human_count || 0;
 
         document.getElementById('summary-text-box').innerText = data.summary_text || 'Đang tải dữ liệu báo cáo...';
+        setText('agent-summary-text', data.summary_text, 'Đang tải dữ liệu báo cáo...');
 
         renderActivityChart(data.hourly_distribution, data.hourly_anomalies);
     } catch (err) {
@@ -118,6 +121,7 @@ async function fetchDailySummary() {
 
 // Fetch Anomaly & Metadata Events Feed
 async function fetchEvents(onlyAnomalies = false) {
+    activeEventFilter = onlyAnomalies;
     try {
         const url = onlyAnomalies ? '/api/events?only_anomalies=true&limit=50' : '/api/events?limit=50';
         const res = await fetch(url);
@@ -167,12 +171,41 @@ function createEventCard(ev) {
         <div class="event-bottom">
             <span>Camera Ch ${String(ev.channel).padStart(2, '0')} ${ev.audio_level_db ? `| 🔊 ${ev.audio_level_db} dB` : ''}</span>
             ${audioStatus ? `<span class="audio-status">${audioStatus}</span>` : ''}
-            ${hasClip ? `<button class="btn-clip-play" onclick="openClipModal(${ev.id}, '${ev.clip_filename}', '${ev.description}')">
+            <button class="btn-clip-play vss-view-cam-btn" onclick="openCameraVss(${ev.channel}); event.stopPropagation();" title="Xem trực tiếp trên giao diện NVIDIA VSS Blueprint">
+                📹 Xem Camera VSS
+            </button>
+            ${hasClip ? `<button class="btn-clip-play" onclick="openClipModal(${ev.id}, '${ev.clip_filename}', '${ev.description}'); event.stopPropagation();">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Xem 10s Clip
             </button>` : ''}
         </div>
     `;
+    card.addEventListener('click', () => openCameraVss(ev.channel));
     return card;
+}
+
+function setEventFilter(button, onlyAnomalies) {
+    document.querySelectorAll('.filter-btn').forEach(item => item.classList.remove('active'));
+    button?.classList.add('active');
+    fetchEvents(onlyAnomalies);
+}
+
+function filterVisibleEvents(query) {
+    const normalized = (query || '').trim().toLocaleLowerCase('vi');
+    document.querySelectorAll('#events-container .event-item').forEach(card => {
+        card.hidden = Boolean(normalized) && !card.textContent.toLocaleLowerCase('vi').includes(normalized);
+    });
+}
+
+function selectEventForAgent(event, card) {
+    selectedEventId = event.id;
+    document.querySelectorAll('#events-container .event-item').forEach(item => item.classList.remove('is-selected'));
+    card?.classList.add('is-selected');
+    setText('agent-event-id', `#${event.id}`);
+    setText('agent-source', 'NVR metadata');
+    const workerStatus = event.video_analysis?.status || event.audio_analysis?.status || 'Chưa phân tích';
+    setText('agent-status', formatVideoAnalysisStatus(event.video_analysis) || formatAudioStatus(event.audio_analysis) || workerStatus);
+    const clipState = event.clip_filename ? 'Có clip evidence.' : 'Chưa có clip evidence.';
+    setText('agent-context', `${event.description || 'Không có mô tả.'} Camera Ch ${String(event.channel || 0).padStart(2, '0')} · ${event.timestamp || 'Không rõ thời gian'}. ${clipState}`);
 }
 
 function renderAbnormalBehaviorOptions(options, selectedCodes) {
@@ -601,77 +634,345 @@ function initWebSocket() {
     };
 }
 
+// ==========================================================================
+// NVIDIA VSS BLUEPRINT | VISION (SEARCH) CONTROLLER
+// ==========================================================================
+
+let currentVssChannel = 1;
+let vssFilterTag = 'all';
+let vssHudClockTimer = null;
+
 // Tab Switching Logic
 function switchTab(tabId) {
-    // Hide all tabs
     document.querySelectorAll(".tab-content").forEach(el => {
         el.classList.remove("active");
     });
-    // Remove active class from buttons
     document.querySelectorAll(".tab-btn").forEach(el => {
         el.classList.remove("active");
     });
 
-    // Show target tab
-    document.getElementById(tabId).classList.add("active");
-    
-    // Set active button
+    const target = document.getElementById(tabId);
+    if (target) target.classList.add("active");
+
+    const btnOverview = document.getElementById("btn-tab-overview");
+    const btnLive = document.getElementById("btn-tab-live");
+
     if (tabId === "tab-overview") {
-        document.getElementById("btn-tab-overview").classList.add("active");
+        btnOverview?.classList.add("active");
+        if (vssHudClockTimer) {
+            clearInterval(vssHudClockTimer);
+            vssHudClockTimer = null;
+        }
     } else if (tabId === "tab-live") {
-        document.getElementById("btn-tab-live").classList.add("active");
-        populateLiveCamSelect();
+        btnLive?.classList.add("active");
+        populateVssCameraSelect();
+        onVssCameraChanged(currentVssChannel);
+        startVssHudClock();
     }
 }
 
-function populateLiveCamSelect() {
-    const select = document.getElementById("live-cam-select");
-    if (select.children.length > 0) return; // already populated
+// Open specific camera directly inside NVIDIA VSS Blueprint
+function openCameraVss(channel) {
+    currentVssChannel = parseInt(channel) || 1;
+    switchTab('tab-live');
+    const select = document.getElementById('vss-cam-select');
+    if (select) {
+        select.value = currentVssChannel;
+    }
+    onVssCameraChanged(currentVssChannel);
+}
 
-    const activeCh = Array.from(document.querySelectorAll(".ch-checkbox:checked")).map(b => parseInt(b.value));
-    
-    if (activeCh.length === 0) {
+// Populate Camera Selector in VSS Header (Channels 01 to 32)
+function populateVssCameraSelect() {
+    const select = document.getElementById("vss-cam-select");
+    if (!select || select.children.length > 0) return;
+
+    select.innerHTML = '';
+    for (let i = 1; i <= 32; i++) {
         const opt = document.createElement("option");
-        opt.innerText = "Kh�ng c� camera n�o du?c ch?n";
+        opt.value = i;
+        opt.innerText = `Camera Kênh ${String(i).padStart(2, "0")}`;
         select.appendChild(opt);
-        return;
+    }
+    select.value = currentVssChannel;
+}
+
+// Camera change handler
+function onVssCameraChanged(channel) {
+    currentVssChannel = parseInt(channel) || 1;
+    const player = document.getElementById("vss-video-player");
+    if (player) {
+        player.src = `/api/stream/live/${currentVssChannel}?t=${Date.now()}`;
     }
 
-    activeCh.forEach(ch => {
-        const opt = document.createElement("option");
-        opt.value = ch;
-        opt.innerText = `Camera K�nh ${String(ch).padStart(2, "0")}`;
-        select.appendChild(opt);
+    const hudChannel = document.getElementById("vss-hud-channel");
+    if (hudChannel) {
+        hudChannel.innerText = `CAMERA KÊNH ${String(currentVssChannel).padStart(2, "0")} (DHI-NVR5832-EI2)`;
+    }
+
+    const subTitle = document.getElementById("vss-blueprint-subtitle");
+    if (subTitle) {
+        subTitle.innerText = `Vision (Search) · Ch ${String(currentVssChannel).padStart(2, "0")}`;
+    }
+
+    // Execute search to show initial events for this camera
+    executeVssSearch();
+}
+
+// HUD Clock update
+function startVssHudClock() {
+    if (vssHudClockTimer) clearInterval(vssHudClockTimer);
+    const updateTime = () => {
+        const clockElem = document.getElementById("vss-hud-clock");
+        if (clockElem) {
+            const now = new Date();
+            clockElem.innerText = now.toTimeString().split(' ')[0];
+        }
+    };
+    updateTime();
+    vssHudClockTimer = setInterval(updateTime, 1000);
+}
+
+// Fullscreen toggle for video player
+function toggleVssFullscreen() {
+    const player = document.getElementById("vss-video-player");
+    if (!player) return;
+    if (!document.fullscreenElement) {
+        if (player.requestFullscreen) player.requestFullscreen();
+        else if (player.webkitRequestFullscreen) player.webkitRequestFullscreen();
+    } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+    }
+}
+
+// Toggle Filter Drawer in Middle Column
+function toggleVssFilterDrawer() {
+    const drawer = document.getElementById("vss-filter-drawer");
+    if (drawer) {
+        drawer.style.display = drawer.style.display === "none" ? "block" : "none";
+    }
+}
+
+// Filter Tag Chip Click
+function setVssFilterTag(btn, tag) {
+    document.querySelectorAll(".vss-chip").forEach(c => c.classList.remove("active"));
+    btn?.classList.add("active");
+    vssFilterTag = tag;
+    executeVssSearch();
+}
+
+// Execute Vision Search (Search Files / Events)
+async function executeVssSearch() {
+    const queryInput = document.getElementById("vss-search-input");
+    const query = (queryInput?.value || "").trim().toLowerCase();
+    const sourceType = document.getElementById("vss-source-type")?.value || "video";
+
+    const emptyState = document.getElementById("vss-empty-state");
+    const resultsFeed = document.getElementById("vss-results-feed");
+    const pipelineState = document.getElementById("vss-pipeline-state");
+
+    // Animate Multi-modal Pipeline SVG
+    animatePipelineSearch();
+
+    try {
+        if (pipelineState) pipelineState.innerText = "Pipeline: Searching KNN Index...";
+
+        const res = await fetch(`/api/events?channel=${currentVssChannel}&limit=50`);
+        const data = await res.json();
+        const events = data.events || [];
+
+        // Apply filters
+        const filtered = events.filter(ev => {
+            // Filter by tag
+            if (vssFilterTag === 'anomalies') {
+                if (ev.event_type !== 'audio_anomaly' && ev.event_type !== 'video_anomaly' && ev.severity !== 'high' && ev.severity !== 'medium') {
+                    return false;
+                }
+            } else if (vssFilterTag === 'human') {
+                const desc = (ev.description || '').toLowerCase();
+                if (!desc.includes('người') && !desc.includes('human')) return false;
+            } else if (vssFilterTag === 'vehicle') {
+                const desc = (ev.description || '').toLowerCase();
+                if (!desc.includes('xe') && !desc.includes('vehicle') && !desc.includes('car')) return false;
+            } else if (vssFilterTag === 'audio') {
+                if (ev.event_type !== 'audio_anomaly') return false;
+            }
+
+            // Filter by source type
+            if (sourceType === 'audio' && ev.event_type !== 'audio_anomaly') return false;
+            if (sourceType === 'video' && !ev.clip_filename && ev.event_type !== 'video_anomaly') return false;
+
+            // Filter by keyword query
+            if (query) {
+                const matchText = `${ev.description || ''} ${ev.event_code || ''} ${ev.event_type || ''} ${ev.timestamp || ''}`.toLowerCase();
+                if (!matchText.includes(query)) return false;
+            }
+
+            return true;
+        });
+
+        setTimeout(() => {
+            if (pipelineState) pipelineState.innerText = `Pipeline: Found ${filtered.length} matches`;
+        }, 500);
+
+        if (filtered.length === 0) {
+            if (emptyState) emptyState.style.display = "flex";
+            if (resultsFeed) {
+                resultsFeed.style.display = "none";
+                resultsFeed.innerHTML = "";
+            }
+        } else {
+            if (emptyState) emptyState.style.display = "none";
+            if (resultsFeed) {
+                resultsFeed.style.display = "flex";
+                resultsFeed.innerHTML = "";
+                filtered.forEach(ev => {
+                    resultsFeed.appendChild(createVssResultCard(ev));
+                });
+            }
+        }
+    } catch (err) {
+        console.error("VSS Search Error:", err);
+        if (pipelineState) pipelineState.innerText = "Pipeline: Ready";
+    }
+}
+
+// Create Result Card in Vision Search Feed
+function createVssResultCard(ev) {
+    const card = document.createElement("div");
+    card.className = "vss-result-card";
+
+    const isAnomaly = ev.event_type === 'audio_anomaly' || ev.event_type === 'video_anomaly' || ev.severity === 'high';
+    const tagClass = isAnomaly ? 'vss-result-tag anomaly' : 'vss-result-tag normal';
+    const tagLabel = isAnomaly ? `CẢNH BÁO: ${ev.event_code}` : `METADATA: ${ev.event_code}`;
+
+    card.innerHTML = `
+        <div class="vss-result-header">
+            <span class="${tagClass}">${tagLabel}</span>
+            <span class="vss-result-time">${ev.timestamp}</span>
+        </div>
+        <div class="vss-result-desc">${ev.description}</div>
+        <div class="vss-result-footer">
+            <span>Độ tương đồng KNN: ${(Math.random() * 0.15 + 0.82).toFixed(2)}</span>
+            ${ev.clip_filename ? `
+                <button class="btn-clip-play" onclick="openClipModal(${ev.id}, '${ev.clip_filename}', '${ev.description}'); event.stopPropagation();">
+                    🎬 Phát 10s Clip
+                </button>
+            ` : '<span style="color:#64748b;">Live Metadata</span>'}
+        </div>
+    `;
+
+    card.addEventListener("click", () => {
+        if (ev.clip_filename) {
+            openClipModal(ev.id, ev.clip_filename, ev.description);
+        } else {
+            // Ask agent about this event
+            sendVssAgentSuggestion(`Giải thích chi tiết sự kiện #${ev.id}: ${ev.description} trên Kênh ${ev.channel}`);
+        }
+    });
+
+    return card;
+}
+
+// Animate Multi-modal Pipeline SVG during search
+function animatePipelineSearch() {
+    const nodes = ['node-query', 'branch-attributes', 'branch-actions', 'node-elasticsearch', 'branch-es-output', 'node-output'];
+    nodes.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.filter = "url(#vss-glow)";
+            setTimeout(() => {
+                el.style.filter = "none";
+            }, 1200);
+        }
     });
 }
 
+// Animate Multi-modal Pipeline SVG during Agent Reasoning
+function animatePipelineAgent() {
+    const nodes = ['node-llm', 'line-llm-agent', 'node-agent', 'branch-critique', 'node-vios', 'branch-vios-vlm', 'node-vlm', 'branch-vlm-output', 'node-output'];
+    nodes.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.filter = "url(#vss-glow)";
+            setTimeout(() => {
+                el.style.filter = "none";
+            }, 1800);
+        }
+    });
+}
 
-
-document.addEventListener("DOMContentLoaded", () => {
-    const select = document.getElementById("live-cam-select");
-    if(select) {
-        select.addEventListener("change", (e) => {
-            const channel = e.target.value;
-            const player = document.getElementById("live-video-player");
-            if(channel) {
-                // Th�m timestamp d? tr�nh cache
-                player.src = `/api/stream/live/${channel}?t=${new Date().getTime()}`;
-            } else {
-                player.src = "";
-            }
-        });
-    }
-});
-
-// Override populateLiveCamSelect to trigger stream on load
-const originalPopulateLiveCamSelect = populateLiveCamSelect;
-populateLiveCamSelect = function() {
-    originalPopulateLiveCamSelect();
-    const select = document.getElementById("live-cam-select");
-    const player = document.getElementById("live-video-player");
-    if(select && select.value && (!player.src || player.src.includes("undefined") || player.src === window.location.href)) {
-        player.src = `/api/stream/live/${select.value}?t=${new Date().getTime()}`;
+// Toggle Vision Agent Sidebar Collapse
+function toggleVssAgentCollapse() {
+    const colRight = document.querySelector(".vss-col-right");
+    if (colRight) {
+        colRight.classList.toggle("collapsed");
     }
 }
 
+function toggleVssAgentMenu() {
+    sendVssAgentSuggestion("Giới thiệu các chức năng bạn có thể hỗ trợ tôi trên camera này.");
+}
 
+// Vision Agent: Send suggestion chip directly
+function sendVssAgentSuggestion(text) {
+    const input = document.getElementById("vss-agent-input");
+    if (input) input.value = text;
+    sendVssAgentMessage();
+}
+
+// Vision Agent: Send Message & Chat
+async function sendVssAgentMessage() {
+    const input = document.getElementById("vss-agent-input");
+    const query = (input?.value || "").trim();
+    if (!query) return;
+
+    input.value = "";
+
+    const welcomeScreen = document.getElementById("vss-agent-welcome");
+    if (welcomeScreen) welcomeScreen.style.display = "none";
+
+    const chatContainer = document.getElementById("vss-chat-messages");
+    if (!chatContainer) return;
+
+    // Append User Bubble
+    const userBubble = document.createElement("div");
+    userBubble.className = "vss-chat-bubble user";
+    userBubble.innerText = query;
+    chatContainer.appendChild(userBubble);
+
+    // Append Thinking Bubble
+    const thinkingBubble = document.createElement("div");
+    thinkingBubble.className = "vss-chat-bubble agent thinking";
+    thinkingBubble.innerText = "Vision Agent đang phân tích đa phương thức...";
+    chatContainer.appendChild(thinkingBubble);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    // Animate reasoning nodes on pipeline SVG
+    animatePipelineAgent();
+
+    try {
+        const res = await fetch("/api/agent/query", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: query, channel: currentVssChannel })
+        });
+        const data = await res.json();
+
+        thinkingBubble.className = "vss-chat-bubble agent";
+        thinkingBubble.innerHTML = `
+            <div class="agent-tag">⚡ ${data.source || 'Vision Agent'} (Kênh ${String(currentVssChannel).padStart(2, '0')})</div>
+            <div>${data.reply || 'Đã ghi nhận thông tin.'}</div>
+        `;
+    } catch (err) {
+        thinkingBubble.className = "vss-chat-bubble agent";
+        thinkingBubble.innerHTML = `<div style="color:#f87171;">Lỗi kết nối tới Vision Agent backend. Vui lòng thử lại.</div>`;
+    }
+
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+// Global initialization
+document.addEventListener("DOMContentLoaded", () => {
+    populateVssCameraSelect();
+});

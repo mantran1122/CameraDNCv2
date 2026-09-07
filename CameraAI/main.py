@@ -443,6 +443,77 @@ async def get_daily_summary_api(date_str: Optional[str] = None):
     summary = summary_engine.generate_daily_summary(date_str)
     return summary
 
+class AgentQueryModel(BaseModel):
+    query: str
+    channel: Optional[int] = 1
+    event_id: Optional[int] = None
+
+@app.post("/api/agent/query")
+async def agent_query_api(req: AgentQueryModel):
+    """Vision Agent conversational AI endpoint tailored for the selected camera."""
+    query_text = req.query.strip()
+    ch = req.channel or 1
+    if not query_text:
+        return {"reply": f"Xin chào! Tôi là Vision Agent đang giám sát Camera Kênh {ch:02d}. Tôi có thể hỗ trợ gì cho bạn?", "channel": ch}
+
+    recent_events = database.get_events(channel=ch, limit=10)
+    daily_summary = summary_engine.generate_daily_summary()
+
+    # If Gemini is configured, use it for contextual reasoning
+    try:
+        gemini_key, gemini_model, _ = get_gemini_settings()
+        if gemini_key:
+            context_lines = [
+                f"Kênh Camera đang giám sát: Kênh {ch:02d}.",
+                f"Tóm tắt hệ thống: {daily_summary.get('summary_text', 'Bình thường')}",
+                f"Sự kiện gần nhất trên Kênh {ch:02d}:"
+            ]
+            for ev in recent_events[:6]:
+                context_lines.append(f"- [{ev.get('timestamp')}] {ev.get('event_type')}: {ev.get('description')} (mức {ev.get('severity')})")
+            
+            prompt = (
+                "Bạn là 'Vision Agent' - trợ lý AI chuyên gia thị giác máy tính và an ninh camera thông minh trong hệ thống VSS Blueprint.\n"
+                "Nhiệm vụ: Trả lời ngắn gọn, chuyên nghiệp, chính xác bằng tiếng Việt cho người vận hành camera.\n\n"
+                f"DỮ LIỆU THỰC TẾ TỪ CAMERA:\n" + "\n".join(context_lines) + f"\n\nCÂU HỎI: {query_text}\n"
+                "Trả lời trực diện, không dài dòng, nêu rõ thời gian và chi tiết nếu có."
+            )
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={gemini_key}"
+            resp = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                return {"reply": text.strip(), "source": f"Vision Agent (Gemini {gemini_model})", "channel": ch}
+    except Exception as exc:
+        print(f"[Agent Query LLM Error]: {exc}")
+
+    # Fallback to local intelligent knowledge engine
+    lowered = query_text.lower()
+    anomalies = [e for e in recent_events if e.get("event_type") in ("audio_anomaly", "video_anomaly") or e.get("severity") in ("high", "medium")]
+    
+    if any(k in lowered for k in ["bất thường", "nguy hiểm", "cảnh báo", "alarm", "anomaly"]):
+        if anomalies:
+            ev_descs = "; ".join([f"{e.get('description')} ({e.get('timestamp')})" for e in anomalies[:3]])
+            reply = f"Hệ thống phát hiện {len(anomalies)} sự kiện bất thường trên Camera Kênh {ch:02d}: {ev_descs}. Bạn có thể xem lại clip ở danh sách giữa."
+        else:
+            reply = f"Chưa ghi nhận sự kiện bất thường nào đáng chú ý trên Camera Kênh {ch:02d}. Trạng thái giám sát an toàn."
+    elif any(k in lowered for k in ["tóm tắt", "tổng quan", "summary", "báo cáo", "tình hình"]):
+        reply = f"Camera Kênh {ch:02d} đang hoạt động ổn định. Tổng cộng ghi nhận {len(recent_events)} sự kiện gần nhất. {daily_summary.get('summary_text', '')}"
+    elif any(k in lowered for k in ["người", "nhân viên", "khách", "human", "ai"]):
+        human_events = [e for e in recent_events if "người" in (e.get("description") or "").lower() or "human" in (e.get("event_code") or "").lower()]
+        if human_events:
+            reply = f"Phát hiện {len(human_events)} hoạt động liên quan đến người trên Camera Kênh {ch:02d}. Sự kiện gần nhất: {human_events[0].get('description')} lúc {human_events[0].get('timestamp')}."
+        else:
+            reply = f"Chưa phát hiện hoạt động nhận dạng người đáng kể trên Camera Kênh {ch:02d} trong các sự kiện gần đây."
+    elif any(k in lowered for k in ["chào", "hello", "hi", "bạn là ai"]):
+        reply = f"Xin chào! Tôi là Vision Agent trong hệ thống VSS Blueprint. Tôi đang giám sát Camera Kênh {ch:02d}. Tôi có thể hỗ trợ tìm kiếm đối tượng/hành động, phân tích clip bất thường và tổng hợp báo cáo."
+    else:
+        latest = recent_events[0] if recent_events else None
+        latest_info = f"Sự kiện gần nhất ghi nhận lúc {latest.get('timestamp')}: '{latest.get('description')}'." if latest else "Chưa có sự kiện mới."
+        reply = f"Vision Agent đã nhận câu hỏi về Camera Kênh {ch:02d}. {latest_info} Bạn có thể sử dụng thanh tìm kiếm ở cột giữa để lọc nhanh video clip hoặc hỏi tôi về các tình huống cụ thể."
+
+    return {"reply": reply, "source": "Vision Agent Core", "channel": ch}
+
+
 def generate_frames(channel: int):
     rtsp_user = quote(str(config.NVR_USER), safe="")
     rtsp_password = quote(str(config.NVR_PASSWORD), safe="")

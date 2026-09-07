@@ -588,14 +588,847 @@ body {
     display: block;
 }
 
-/* Live View Container */
-.live-view-box {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+
+/* ==========================================================================
+   NVIDIA VSS BLUEPRINT | VISION (SEARCH) STYLES (CLONE FOR LIVE CAMERA VIEW)
+   ========================================================================== */
+
+/* Overview 2-Column Grid Layout */
+.main-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
 }
 
+.timeline-workspace .chart-container {
+    height: 310px;
+}
+
+.timeline-caption {
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.vss-view-cam-btn {
+    background: rgba(6, 182, 212, 0.15) !important;
+    border: 1px solid rgba(6, 182, 212, 0.4) !important;
+    color: #38bdf8 !important;
+}
+
+.vss-view-cam-btn:hover {
+    background: rgba(6, 182, 212, 0.3) !important;
+    color: #fff !important;
+}
+
+/* VSS Blueprint Root Container */
+.vss-blueprint-root {
+    display: flex;
+    flex-direction: column;
+    background: #080c16;
+    border: 1px solid #1a2233;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.6);
+}
+
+/* VSS Header */
+.vss-header {
+    background: #0d121f;
+    border-bottom: 1px solid #1b2438;
+    padding: 0.65rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.vss-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.vss-brand-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.vss-nvidia-badge {
+    font-weight: 900;
+    font-size: 1.15rem;
+    letter-spacing: -0.05em;
+    color: #76b900;
+}
+
+.vss-brand-divider {
+    color: #475569;
+    font-weight: 300;
+}
+
+.vss-blueprint-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: #f8fafc;
+}
+
+.vss-blueprint-subtitle {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #94a3b8;
+}
+
+.vss-camera-dropdown-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #111827;
+    border: 1px solid #283548;
+    border-radius: 8px;
+    padding: 0.25rem 0.65rem;
+}
+
+.vss-cam-icon {
+    font-size: 0.85rem;
+}
+
+.vss-camera-select {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #f1f5f9;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.vss-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.vss-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: #22c55e;
+    border-radius: 999px;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.vss-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    animation: vss-pulse 1.8s infinite;
+}
+
+@keyframes vss-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.vss-stream-meta {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.vss-nav-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid #283548;
+    color: #cbd5e1;
+    border-radius: 6px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.vss-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border-color: #38bdf8;
+}
+
+/* 3-Column Split View Layout matching NVIDIA VSS Blueprint */
+.vss-main-grid {
+    display: grid;
+    grid-template-columns: minmax(460px, 1.25fr) minmax(310px, 0.88fr) minmax(310px, 0.88fr);
+    gap: 0.85rem;
+    padding: 0.85rem;
+    min-height: 640px;
+}
+
+/* COLUMN 1: Live Stream & Pipeline Flowchart */
+.vss-col-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-width: 0;
+}
+
+.vss-video-card {
+    background: #000;
+    border: 1px solid #1f2a3e;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    aspect-ratio: 16 / 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+}
+
+.vss-video-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background: #050811;
+}
+
+#vss-video-player {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    position: relative;
+    z-index: 1;
+}
+
+.vss-video-overlay-top {
+    position: absolute;
+    top: 0.65rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.vss-hud-channel {
+    background: rgba(11, 16, 26, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f1f5f9;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+}
+
+.vss-hud-clock {
+    background: rgba(11, 16, 26, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #38bdf8;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: monospace;
+    padding: 0.25rem 0.55rem;
+    border-radius: 6px;
+}
+
+.vss-video-overlay-bottom {
+    position: absolute;
+    bottom: 0.65rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    z-index: 5;
+}
+
+.vss-hud-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    letter-spacing: 0.03em;
+}
+
+.vss-hud-tag.live {
+    background: rgba(239, 68, 68, 0.85);
+    color: #fff;
+}
+
+.vss-hud-tag.ai {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #38bdf8;
+    backdrop-filter: blur(8px);
+}
+
+.vss-hud-btn {
+    margin-left: auto;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border-radius: 5px;
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+/* AI Pipeline Flowchart Card */
+.vss-flowchart-card {
+    background: #0c111e;
+    border: 1px solid #1e283c;
+    border-radius: 10px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+.vss-flowchart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid #192233;
+    padding-bottom: 0.4rem;
+}
+
+.vss-flowchart-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: #cbd5e1;
+}
+
+.vss-flowchart-icon {
+    color: #38bdf8;
+}
+
+.vss-flowchart-state {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #22c55e;
+}
+
+.vss-svg-container {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vss-svg {
+    width: 100%;
+    height: auto;
+    max-height: 250px;
+}
+
+.vss-node {
+    cursor: pointer;
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.vss-node:hover {
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.4));
+}
+
+.vss-node rect {
+    transition: all 0.2s ease;
+}
+
+.vss-node:hover rect {
+    stroke-width: 1.8;
+}
+
+/* COLUMN 2: Vision Search */
+.vss-col-mid {
+    background: #0c111e;
+    border: 1px solid #1e283c;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+.vss-search-toolbar {
+    background: #0f1627;
+    border-bottom: 1px solid #1c263a;
+    padding: 0.65rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.vss-search-input-box {
+    flex: 1;
+    min-width: 140px;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #080c16;
+    border: 1px solid #222d42;
+    border-radius: 6px;
+    padding: 0.35rem 0.6rem;
+}
+
+.vss-search-icon {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+#vss-search-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #f1f5f9;
+    font-size: 0.8rem;
+    width: 100%;
+}
+
+.vss-search-btn {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #f8fafc;
+    padding: 0.38rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.vss-search-btn:hover {
+    background: #334155;
+    border-color: #38bdf8;
+    color: #fff;
+}
+
+.vss-source-type-box {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.vss-source-label {
+    white-space: nowrap;
+    font-size: 0.72rem;
+}
+
+.vss-source-select {
+    background: #080c16;
+    border: 1px solid #222d42;
+    color: #e2e8f0;
+    border-radius: 6px;
+    padding: 0.3rem 0.45rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.vss-filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: #111827;
+    border: 1px solid #283548;
+    color: #cbd5e1;
+    padding: 0.38rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.vss-filter-btn:hover {
+    background: #1e293b;
+    border-color: #475569;
+}
+
+.vss-filter-drawer {
+    background: #0f1626;
+    border-bottom: 1px solid #1c263a;
+    padding: 0.6rem 0.8rem;
+}
+
+.vss-filter-title {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+}
+
+.vss-filter-chips {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.vss-chip {
+    background: #090d18;
+    border: 1px solid #232e44;
+    color: #94a3b8;
+    border-radius: 6px;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.72rem;
+    cursor: pointer;
+}
+
+.vss-chip.active {
+    background: rgba(56, 189, 248, 0.12);
+    border-color: #38bdf8;
+    color: #38bdf8;
+    font-weight: 600;
+}
+
+.vss-results-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    position: relative;
+    min-height: 250px;
+}
+
+.vss-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 280px;
+    color: #64748b;
+    text-align: center;
+    gap: 0.85rem;
+}
+
+.vss-empty-icon-wrap {
+    color: #475569;
+    opacity: 0.8;
+}
+
+.vss-empty-text {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #94a3b8;
+}
+
+.vss-empty-subtext {
+    font-size: 0.75rem;
+    color: #64748b;
+    max-width: 260px;
+    line-height: 1.4;
+}
+
+.vss-results-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.vss-result-card {
+    background: #090d18;
+    border: 1px solid #1c263a;
+    border-radius: 8px;
+    padding: 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.vss-result-card:hover {
+    border-color: #38bdf8;
+    background: #0f1627;
+}
+
+.vss-result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.vss-result-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+}
+
+.vss-result-tag.anomaly {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.vss-result-tag.normal {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.vss-result-time {
+    font-size: 0.72rem;
+    color: #94a3b8;
+}
+
+.vss-result-desc {
+    font-size: 0.8rem;
+    color: #e2e8f0;
+    line-height: 1.4;
+}
+
+.vss-result-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #182233;
+    padding-top: 0.4rem;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+/* COLUMN 3: Vision Agent Chatbot */
+.vss-col-right {
+    background: #0c111e;
+    border: 1px solid #1e283c;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+.vss-agent-header {
+    background: #0f1627;
+    border-bottom: 1px solid #1c263a;
+    padding: 0.65rem 0.85rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.vss-agent-icon-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    padding: 0.2rem;
+    border-radius: 4px;
+}
+
+.vss-agent-icon-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.vss-agent-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    letter-spacing: 0.02em;
+}
+
+.vss-agent-conversation {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.vss-agent-welcome {
+    margin: auto 0;
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.vss-welcome-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.4rem;
+    letter-spacing: -0.02em;
+}
+
+.vss-welcome-subtitle {
+    font-size: 0.88rem;
+    color: #94a3b8;
+    margin-bottom: 1.5rem;
+}
+
+.vss-suggestions-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 320px;
+    margin: 0 auto;
+}
+
+.vss-suggestion-item {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid #1f293d;
+    color: #cbd5e1;
+    border-radius: 8px;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.78rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.vss-suggestion-item:hover {
+    background: rgba(56, 189, 248, 0.1);
+    border-color: #38bdf8;
+    color: #fff;
+}
+
+.vss-chat-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.vss-chat-bubble {
+    max-width: 90%;
+    padding: 0.65rem 0.85rem;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.vss-chat-bubble.user {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #f1f5f9;
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+}
+
+.vss-chat-bubble.agent {
+    background: #101726;
+    border: 1px solid #1f2d45;
+    color: #e2e8f0;
+    align-self: flex-start;
+    border-bottom-left-radius: 2px;
+}
+
+.vss-chat-bubble.agent .agent-tag {
+    display: inline-block;
+    color: #38bdf8;
+    font-size: 0.68rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.vss-chat-bubble.thinking {
+    font-style: italic;
+    color: #94a3b8;
+}
+
+.vss-agent-input-container {
+    padding: 0.75rem;
+    border-top: 1px solid #1c263a;
+    background: #0f1627;
+}
+
+.vss-agent-input-bar {
+    display: flex;
+    align-items: center;
+    background: #080c16;
+    border: 1px solid #222d42;
+    border-radius: 8px;
+    padding: 0.45rem 0.7rem;
+    gap: 0.4rem;
+}
+
+#vss-agent-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-size: 0.82rem;
+}
+
+#vss-agent-input::placeholder {
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+.vss-agent-send-btn {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #38bdf8;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.vss-agent-send-btn:hover {
+    background: #38bdf8;
+    color: #0b101c;
+}
+
+.vss-footer-brand {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 0.45rem;
+}
+
+.vss-agent-footer-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #64748b;
+}
+
+/* Responsive VSS Layout */
+@media (max-width: 1200px) {
+    .vss-main-grid {
+        grid-template-columns: 1.2fr 1fr;
+    }
+    .vss-col-right {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 800px) {
+    .vss-main-grid {
+        grid-template-columns: 1fr;
+    }
+    .vss-col-left, .vss-col-mid, .vss-col-right {
+        grid-column: span 1;
+    }
+}
