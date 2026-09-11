@@ -1,4 +1,23 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: camera-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: camera_ai
+      POSTGRES_USER: camera_user
+      POSTGRES_PASSWORD: camera_secure_pass168
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./CameraAI/postgres_schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U camera_user -d camera_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   camera-ai:
     build:
       context: ./CameraAI
@@ -6,14 +25,22 @@ services:
     image: camera-ai:latest
     container_name: camera-ai-service
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:
       # Mount host storage directory to persist SQLite DB, clips, and NVR config
       - ./CameraAI/storage:/app/storage
+      # (Tuy chon) Mount o dia NAS truc tiep de luu tru video khong ton dung luong may chu:
+      # - /mnt/nas_camera_clips:/app/storage/clips
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=Asia/Ho_Chi_Minh
+      # Tu dong dong bo thoi gian thuc tu SQLite sang PostgreSQL
+      - CAMERAAI_POSTGRES_DUAL_WRITE=true
+      - CAMERAAI_POSTGRES_URL=postgresql://camera_user:camera_secure_pass168@postgres:5432/camera_ai
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/search || exit 1"]
       interval: 30s
@@ -21,3 +48,5 @@ services:
       retries: 3
       start_period: 15s
 
+volumes:
+  postgres_data:
