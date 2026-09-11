@@ -1,8 +1,10 @@
 import os
 import json
 from pathlib import Path
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
 STORAGE_DIR = BASE_DIR / "storage"
 # Keep database/config local; video evidence can be redirected to a mounted
 # NAS share without changing code.  The value must be writable by the account
@@ -61,6 +63,7 @@ RTSP_PORT = _current_cfg.get("rtsp_port", 554)
 NVR_USER = _current_cfg.get("nvr_user", os.getenv("NVR_USER", ""))
 NVR_PASSWORD = _current_cfg.get("nvr_password", os.getenv("NVR_PASSWORD", ""))
 ACTIVE_CHANNELS = _current_cfg.get("active_channels", list(range(1, 33)))
+CAMERA_NAMES = _current_cfg.get("camera_names", {})
 DEMO_MODE = _current_cfg.get("demo_mode", False)
 ABNORMAL_EVENT_CODES = _current_cfg.get("abnormal_event_codes", DEFAULT_CONFIG["abnormal_event_codes"])
 PRE_BUFFER_SEC = _current_cfg.get("pre_buffer_sec", 5)
@@ -68,9 +71,29 @@ POST_BUFFER_SEC = _current_cfg.get("post_buffer_sec", 5)
 CLIP_DURATION_SEC = PRE_BUFFER_SEC + POST_BUFFER_SEC
 CLIP_READY_DELAY_SEC = _current_cfg.get("clip_ready_delay_sec", 2)
 METADATA_RETENTION_DAYS = max(1, int(_current_cfg.get("metadata_retention_days", 3)))
+# Local Edge Denoising & Legacy local models
+USE_DEEPFILTER = os.getenv("USE_DEEPFILTER", "true").strip().lower() in {"1", "true", "yes", "on"}
 COSMOS_AUDIO_URL = os.getenv("COSMOS_AUDIO_URL", "http://127.0.0.1:8765/transcribe")
+COSMOS_AUDIO_MODEL = os.getenv("COSMOS_AUDIO_MODEL", "whisper-large-v3-turbo")
 COSMOS_VIDEO_URL = os.getenv("COSMOS_VIDEO_URL", "http://127.0.0.1:8765/analyze")
 COSMOS_PROMPT_PROFILE = _current_cfg.get("cosmos_prompt_profile", "comprehensive")
+
+# Internal AI Server (4x NVIDIA H200 - Qwen3.8-27B SGLang)
+QWEN_SERVER_URL = os.getenv("QWEN_SERVER_URL", "https://llm.ttpmsandbox.us.kg/v1")
+QWEN_API_KEY = os.getenv("QWEN_API_KEY", "")
+QWEN_MODEL_NAME = os.getenv("QWEN_MODEL_NAME", "Qwen3.8-27B")
+QWEN_USER_AGENT = os.getenv(
+    "QWEN_USER_AGENT",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+DENSE_FRAMES_COUNT = int(os.getenv("DENSE_FRAMES_COUNT", "32"))
+
+# Internal Audio AI Server (Speech-to-Text & Sound Anomaly Detection)
+INTERNAL_AUDIO_SERVER_URL = os.getenv("INTERNAL_AUDIO_SERVER_URL", "https://llm.ttpmsandbox.us.kg/v1/audio").rstrip("/")
+INTERNAL_AUDIO_SERVER_API_KEY = os.getenv("INTERNAL_AUDIO_SERVER_API_KEY", QWEN_API_KEY).strip()
+INTERNAL_AUDIO_MODEL_NAME = os.getenv("INTERNAL_AUDIO_MODEL_NAME", "Internal Audio AI (Server H200)")
+
+
 # Video analysis is performed as ordered short sequences, rather than three
 # unrelated still frames.  Keeping each sequence bounded protects the 2B VLM
 # context while allowing longer playback clips to be processed window by window.
@@ -134,7 +157,7 @@ ABNORMAL_BEHAVIOR_OPTIONS = [
 AUDIO_EVENT_CODES = {"AudioAnomaly", "SoundDetection", "FightSound"}
 
 def update_global_config(new_cfg: dict):
-    global NVR_HOST, USE_HTTPS, NVR_PORT, RTSP_PORT, NVR_USER, NVR_PASSWORD, ACTIVE_CHANNELS, DEMO_MODE, ABNORMAL_EVENT_CODES
+    global NVR_HOST, USE_HTTPS, NVR_PORT, RTSP_PORT, NVR_USER, NVR_PASSWORD, ACTIVE_CHANNELS, DEMO_MODE, ABNORMAL_EVENT_CODES, CAMERA_NAMES
     save_config(new_cfg)
     NVR_HOST = new_cfg.get("nvr_host", NVR_HOST)
     USE_HTTPS = new_cfg.get("use_https", USE_HTTPS)
@@ -145,6 +168,8 @@ def update_global_config(new_cfg: dict):
     ACTIVE_CHANNELS = new_cfg.get("active_channels", ACTIVE_CHANNELS)
     DEMO_MODE = new_cfg.get("demo_mode", DEMO_MODE)
     ABNORMAL_EVENT_CODES = new_cfg.get("abnormal_event_codes", ABNORMAL_EVENT_CODES)
+    if "camera_names" in new_cfg:
+        CAMERA_NAMES = new_cfg["camera_names"]
 
 def set_cosmos_prompt_profile(profile: str):
     global COSMOS_PROMPT_PROFILE

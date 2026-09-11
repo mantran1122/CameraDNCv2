@@ -1,0 +1,23 @@
+services:
+  camera-ai:
+    build:
+      context: ./CameraAI
+      dockerfile: Dockerfile
+    image: camera-ai:latest
+    container_name: camera-ai-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount host storage directory to persist SQLite DB, clips, and NVR config
+      - ./CameraAI/storage:/app/storage
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Ho_Chi_Minh
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/search || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+

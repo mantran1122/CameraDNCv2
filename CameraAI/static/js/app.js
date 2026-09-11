@@ -567,8 +567,17 @@ async function openClipModal(eventId, clipFilename, description) {
         sourceElem.src = clipUrl;
     }
     videoElem.src = clipUrl;
+    videoElem.muted = false;
+    videoElem.volume = 1.0;
     videoElem.load();
-    videoElem.play().catch(e => console.log('Autoplay prevented:', e));
+    const playPromise = videoElem.play();
+    if (playPromise !== undefined) {
+        playPromise.catch(e => {
+            console.log('Unmuted autoplay prevented by browser policy, muting for preview:', e);
+            videoElem.muted = true;
+            videoElem.play().catch(err => console.log('Playback error:', err));
+        });
+    }
 
     try {
         const res = await fetch(`/api/events/${eventId}`);
@@ -630,20 +639,7 @@ function initWebSocket() {
                 container.insertBefore(createEventCard(ev), container.firstChild);
             }
 
-            // Update VSS Blueprint live feed if event matches current camera channel
-            if (parseInt(ev.channel) === parseInt(currentVssChannel)) {
-                const resultsFeed = document.getElementById('vss-results-feed');
-                const emptyState = document.getElementById('vss-empty-state');
-                if (resultsFeed) {
-                    const prevVss = resultsFeed.querySelector(`[data-vss-id="${ev.id}"]`);
-                    if (prevVss) prevVss.remove();
-                    const newCard = createVssResultCard(ev);
-                    resultsFeed.insertBefore(newCard, resultsFeed.firstChild);
-                    resultsFeed.style.display = 'flex';
-                    if (emptyState) emptyState.style.display = 'none';
-                }
-            }
-
+            // Keep VSS middle column clean: do NOT auto-insert realtime metadata unless requested by user or Vision Agent
             fetchDailySummary();
         } catch (err) {
             console.error('Error handling WebSocket event:', err);
@@ -656,21 +652,25 @@ function initWebSocket() {
 }
 
 // ==========================================================================
-// NVIDIA VSS BLUEPRINT | VISION (SEARCH) CONTROLLER
+// NVIDIA VSS BLUEPRINT | VISION SEARCH INTERFACE CONTROLLER
+// Direct clone of vendor/nvidia-video-search-and-summarization
 // ==========================================================================
 
-let currentVssChannel = 1;
-let vssFilterTag = 'all';
-let vssHudClockTimer = null;
+let currentVssChannel = 11;
+let vssSourceType = 'video_file'; // 'video_file' or 'rtsp'
+let vssSelectedChannels = [];     // Array of channel numbers selected in filter
+let vssStartDate = null;
+let vssEndDate = null;
+let vssMinSimilarity = 0.70;
+let vssTopK = 24;
+let vssQuickFilter = 'all';        // 'all', 'confirmed', 'anomalies', 'human', 'vehicle', 'audio'
+let vssChatSidebarCollapsed = false;
+let vssChatContextItems = [];     // Injected via '+ Chat' button
 
 // Tab Switching Logic
 function switchTab(tabId) {
-    document.querySelectorAll(".tab-content").forEach(el => {
-        el.classList.remove("active");
-    });
-    document.querySelectorAll(".tab-btn").forEach(el => {
-        el.classList.remove("active");
-    });
+    document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
 
     const target = document.getElementById(tabId);
     if (target) target.classList.add("active");
@@ -680,83 +680,460 @@ function switchTab(tabId) {
 
     if (tabId === "tab-overview") {
         btnOverview?.classList.add("active");
-        if (vssHudClockTimer) {
-            clearInterval(vssHudClockTimer);
-            vssHudClockTimer = null;
-        }
     } else if (tabId === "tab-live") {
         btnLive?.classList.add("active");
-        populateVssCameraSelect();
-        onVssCameraChanged(currentVssChannel);
-        startVssHudClock();
+        initVssVisionSearch();
+        executeVssSearch();
     }
 }
 
-// Open specific camera directly inside NVIDIA VSS Blueprint
-function openCameraVss(channel) {
-    currentVssChannel = parseInt(channel) || 1;
-    switchTab('tab-live');
-    const select = document.getElementById('vss-cam-select');
-    if (select) {
-        select.value = currentVssChannel;
+// Initialize Vision Search Component & Populate Channel Selectors
+function initVssVisionSearch() {
+    const channelSelect = document.getElementById("vss-filter-channels");
+    const quickSelect = document.getElementById("vss-quick-cam-select");
+
+    if (channelSelect && channelSelect.options.length === 0) {
+        channelSelect.innerHTML = '';
+        for (let i = 1; i <= 32; i++) {
+            const opt = document.createElement("option");
+            opt.value = i;
+            opt.innerText = `Camera Kênh ${String(i).padStart(2, '0')}${i === 11 || i === 18 ? ' (🟢 Online)' : ''}`;
+            channelSelect.appendChild(opt);
+        }
     }
-    onVssCameraChanged(currentVssChannel);
+
+    if (quickSelect && quickSelect.options.length === 0) {
+        quickSelect.innerHTML = '';
+        for (let i = 1; i <= 32; i++) {
+            const opt = document.createElement("option");
+            opt.value = i;
+            opt.innerText = `Kênh ${String(i).padStart(2, '0')}`;
+            quickSelect.appendChild(opt);
+        }
+        quickSelect.value = currentVssChannel;
+    }
 }
 
-// Populate Camera Selector in VSS Header (Channels 01 to 32)
-function populateVssCameraSelect() {
-    const select = document.getElementById("vss-cam-select");
-    if (!select || select.children.length > 0) return;
+// Source Type Selection (Video vs RTSP)
+function setVssSourceType(type) {
+    vssSourceType = type;
+    document.getElementById("btn-source-video")?.classList.toggle("active", type === 'video_file');
+    document.getElementById("btn-source-rtsp")?.classList.toggle("active", type === 'rtsp');
 
-    select.innerHTML = '';
-    for (let i = 1; i <= 32; i++) {
-        const opt = document.createElement("option");
-        opt.value = i;
-        opt.innerText = `Camera Kênh ${String(i).padStart(2, "0")}`;
-        select.appendChild(opt);
-    }
-    select.value = currentVssChannel;
-}
+    const liveBadge = document.getElementById("vss-header-live-badge");
+    const liveLabel = document.getElementById("vss-header-live-label");
+    const rtspPreview = document.getElementById("vss-rtsp-preview-box");
 
-// Camera change handler
-function onVssCameraChanged(channel) {
-    currentVssChannel = parseInt(channel) || 1;
-    const player = document.getElementById("vss-video-player");
-    if (player) {
-        player.src = `/api/stream/live/${currentVssChannel}?t=${Date.now()}`;
+    if (type === 'rtsp') {
+        if (liveLabel) liveLabel.innerText = "RTSP STREAMING ACTIVE";
+        if (rtspPreview) rtspPreview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+        if (liveLabel) liveLabel.innerText = "RECORDED CLIPS SEARCH";
     }
 
-    const hudChannel = document.getElementById("vss-hud-channel");
-    if (hudChannel) {
-        hudChannel.innerText = `CAMERA KÊNH ${String(currentVssChannel).padStart(2, "0")} (DHI-NVR5832-EI2)`;
-    }
-
-    const subTitle = document.getElementById("vss-blueprint-subtitle");
-    if (subTitle) {
-        subTitle.innerText = `Vision (Search) · Ch ${String(currentVssChannel).padStart(2, "0")}`;
-    }
-
-    // Execute search to show initial events for this camera
+    renderVssActiveChips();
     executeVssSearch();
 }
 
-// HUD Clock update
-function startVssHudClock() {
-    if (vssHudClockTimer) clearInterval(vssHudClockTimer);
-    const updateTime = () => {
-        const clockElem = document.getElementById("vss-hud-clock");
-        if (clockElem) {
-            const now = new Date();
-            clockElem.innerText = now.toTimeString().split(' ')[0];
-        }
-    };
-    updateTime();
-    vssHudClockTimer = setInterval(updateTime, 1000);
+// Toggle Filter Popover Dialog
+function toggleVssFilterPopover() {
+    const popover = document.getElementById("vss-filter-popover");
+    if (!popover) return;
+    const isHidden = popover.style.display === "none" || !popover.style.display;
+    popover.style.display = isHidden ? "flex" : "none";
 }
 
-// Fullscreen toggle for video player
-function toggleVssFullscreen() {
-    const player = document.getElementById("vss-video-player");
+// Apply Filters from Popover
+function applyVssFilters() {
+    const channelSelect = document.getElementById("vss-filter-channels");
+    if (channelSelect) {
+        vssSelectedChannels = Array.from(channelSelect.selectedOptions).map(o => parseInt(o.value));
+    }
+
+    const startInput = document.getElementById("vss-filter-start-date");
+    vssStartDate = startInput?.value || null;
+
+    const endInput = document.getElementById("vss-filter-end-date");
+    vssEndDate = endInput?.value || null;
+
+    const simInput = document.getElementById("vss-filter-similarity");
+    vssMinSimilarity = parseFloat(simInput?.value || 0.70);
+
+    const topKSelect = document.getElementById("vss-filter-topk");
+    vssTopK = parseInt(topKSelect?.value || 24);
+
+    toggleVssFilterPopover();
+    renderVssActiveChips();
+    executeVssSearch();
+}
+
+// Reset Filters
+function resetVssFilters() {
+    vssSelectedChannels = [];
+    vssStartDate = null;
+    vssEndDate = null;
+    vssMinSimilarity = 0.70;
+    vssTopK = 24;
+
+    const channelSelect = document.getElementById("vss-filter-channels");
+    if (channelSelect) {
+        Array.from(channelSelect.options).forEach(o => o.selected = false);
+    }
+    const startInput = document.getElementById("vss-filter-start-date");
+    if (startInput) startInput.value = "";
+    const endInput = document.getElementById("vss-filter-end-date");
+    if (endInput) endInput.value = "";
+    const simInput = document.getElementById("vss-filter-similarity");
+    if (simInput) simInput.value = 0.70;
+    const simVal = document.getElementById("vss-filter-sim-val");
+    if (simVal) simVal.innerText = "0.70";
+    const topKSelect = document.getElementById("vss-filter-topk");
+    if (topKSelect) topKSelect.value = "24";
+
+    toggleVssFilterPopover();
+    renderVssActiveChips();
+    executeVssSearch();
+}
+
+// Render Active Filter Chips
+function renderVssActiveChips() {
+    const container = document.getElementById("vss-active-chips-container");
+    const countBadge = document.getElementById("vss-filter-badge-count");
+    if (!container) return;
+
+    let chips = [];
+
+    if (vssSourceType === 'rtsp') {
+        chips.push({ key: 'source', label: 'Nguồn: RTSP', val: 'rtsp' });
+    }
+
+    if (vssSelectedChannels.length > 0) {
+        chips.push({
+            key: 'channels',
+            label: `Kênh: ${vssSelectedChannels.map(c => `Ch ${String(c).padStart(2, '0')}`).join(', ')}`,
+            val: 'channels'
+        });
+    }
+
+    if (vssStartDate) {
+        chips.push({ key: 'start', label: `Từ: ${vssStartDate.replace('T', ' ')}`, val: 'start' });
+    }
+
+    if (vssEndDate) {
+        chips.push({ key: 'end', label: `Đến: ${vssEndDate.replace('T', ' ')}`, val: 'end' });
+    }
+
+    if (vssMinSimilarity > 0.70) {
+        chips.push({ key: 'sim', label: `Sim ≥ ${vssMinSimilarity.toFixed(2)}`, val: 'sim' });
+    }
+
+    if (countBadge) {
+        if (chips.length > 0) {
+            countBadge.style.display = "inline-block";
+            countBadge.innerText = chips.length;
+        } else {
+            countBadge.style.display = "none";
+        }
+    }
+
+    if (chips.length === 0) {
+        container.innerHTML = '<div class="vss-chip-placeholder">Chưa áp dụng bộ lọc</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    chips.forEach(chip => {
+        const div = document.createElement("div");
+        div.className = "vss-active-tag";
+        div.innerHTML = `
+            <span>${chip.label}</span>
+            <button type="button" class="vss-active-tag-remove" onclick="removeVssFilterTag('${chip.key}'); event.stopPropagation();">×</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Remove single filter tag
+function removeVssFilterTag(key) {
+    if (key === 'source') {
+        setVssSourceType('video_file');
+        return;
+    }
+    if (key === 'channels') {
+        vssSelectedChannels = [];
+        const sel = document.getElementById("vss-filter-channels");
+        if (sel) Array.from(sel.options).forEach(o => o.selected = false);
+    }
+    if (key === 'start') {
+        vssStartDate = null;
+        const inp = document.getElementById("vss-filter-start-date");
+        if (inp) inp.value = "";
+    }
+    if (key === 'end') {
+        vssEndDate = null;
+        const inp = document.getElementById("vss-filter-end-date");
+        if (inp) inp.value = "";
+    }
+    if (key === 'sim') {
+        vssMinSimilarity = 0.70;
+        const inp = document.getElementById("vss-filter-similarity");
+        if (inp) inp.value = 0.70;
+        const val = document.getElementById("vss-filter-sim-val");
+        if (val) val.innerText = "0.70";
+    }
+    renderVssActiveChips();
+    executeVssSearch();
+}
+
+// Quick filter shortcuts bar
+function setVssQuickFilter(btn, filter) {
+    document.querySelectorAll(".vss-qchip").forEach(c => c.classList.remove("active"));
+    btn?.classList.add("active");
+    vssQuickFilter = filter;
+    executeVssSearch();
+}
+
+// Execute Vision Search
+async function executeVssSearch() {
+    const queryInput = document.getElementById("vss-search-input");
+    const query = (queryInput?.value || "").trim().toLowerCase();
+
+    const emptyState = document.getElementById("vss-empty-state");
+    const resultsGrid = document.getElementById("vss-results-grid");
+    const searchBtn = document.getElementById("vss-search-btn");
+
+    if (searchBtn) {
+        searchBtn.disabled = true;
+        searchBtn.innerText = "Searching...";
+    }
+
+    try {
+        let apiUrl = `/api/events?limit=${vssTopK}`;
+        if (vssSelectedChannels.length === 1) {
+            apiUrl += `&channel=${vssSelectedChannels[0]}`;
+        }
+        if (vssQuickFilter === 'anomalies') {
+            apiUrl += `&only_anomalies=true`;
+        }
+
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+        const events = data.events || [];
+
+        // Client-side filtering matching vendor SearchComponent
+        const filtered = events.filter(ev => {
+            const ch = ev.channel;
+            if (vssSelectedChannels.length > 1 && !vssSelectedChannels.includes(ch)) {
+                return false;
+            }
+
+            const sim = Number(ev.similarity) || 0.85;
+            if (sim < vssMinSimilarity) return false;
+
+            const critic = ev.critic_result?.result || 'unverified';
+            if (vssQuickFilter === 'confirmed' && critic !== 'confirmed') {
+                return false;
+            }
+
+            if (vssQuickFilter === 'human') {
+                const desc = (ev.description || '').toLowerCase();
+                const code = (ev.event_code || '').toLowerCase();
+                if (!desc.includes('người') && !desc.includes('human') && !code.includes('human')) return false;
+            } else if (vssQuickFilter === 'vehicle') {
+                const desc = (ev.description || '').toLowerCase();
+                const code = (ev.event_code || '').toLowerCase();
+                if (!desc.includes('xe') && !desc.includes('vehicle') && !code.includes('vehicle')) return false;
+            } else if (vssQuickFilter === 'audio') {
+                if (ev.event_type !== 'audio_anomaly') return false;
+            }
+
+            if (query) {
+                const matchStr = `${ev.description || ''} ${ev.event_code || ''} ${ev.video_name || ''} ${ev.timestamp || ''}`.toLowerCase();
+                if (!matchStr.includes(query)) return false;
+            }
+
+            return true;
+        });
+
+        renderVideoSearchList(filtered);
+    } catch (err) {
+        console.error("VSS Vision Search Error:", err);
+        if (emptyState) emptyState.style.display = "flex";
+        if (resultsGrid) {
+            resultsGrid.style.display = "none";
+            resultsGrid.innerHTML = "";
+        }
+    } finally {
+        if (searchBtn) {
+            searchBtn.disabled = false;
+            searchBtn.innerText = "Search";
+        }
+    }
+}
+
+// Render Video Search Results Grid (matching VideoSearchList.tsx)
+function renderVideoSearchList(events) {
+    const emptyState = document.getElementById("vss-empty-state");
+    const resultsGrid = document.getElementById("vss-results-grid");
+
+    if (!events || events.length === 0) {
+        if (emptyState) emptyState.style.display = "flex";
+        if (resultsGrid) {
+            resultsGrid.style.display = "none";
+            resultsGrid.innerHTML = "";
+        }
+        return;
+    }
+
+    if (emptyState) emptyState.style.display = "none";
+    if (resultsGrid) {
+        resultsGrid.style.display = "grid";
+        resultsGrid.innerHTML = "";
+        events.forEach((ev, idx) => {
+            resultsGrid.appendChild(createVssVideoCard(ev, idx));
+        });
+    }
+}
+
+// Create 280px Video Card matching vendor VideoSearchList.tsx
+function createVssVideoCard(ev, idx) {
+    const card = document.createElement("div");
+    const critic = ev.critic_result?.result || 'unverified';
+    card.className = `vss-card critic-${critic}`;
+    card.dataset.eventId = ev.id;
+
+    const videoName = ev.video_name || `Camera Kênh ${String(ev.channel || 1).padStart(2, '0')}`;
+    const timestamp = ev.timestamp || '--:--:--';
+    const timeOnly = timestamp.split(' ')[1] || timestamp;
+    const similarity = (Number(ev.similarity) || 0.85).toFixed(2);
+
+    const criticBadgeText = critic === 'confirmed' ? '✓ Confirmed' : critic === 'rejected' ? '✗ Rejected' : '? Unverified';
+    const criticBadgeClass = `vss-critic-badge ${critic}`;
+
+    // Criteria chips
+    const criteriaMet = ev.critic_result?.criteria_met || {};
+    let criteriaHtml = '';
+    const entries = Object.entries(criteriaMet);
+    if (entries.length > 0) {
+        criteriaHtml = `
+            <div class="vss-criteria-list">
+                ${entries.map(([crit, met]) => `
+                    <span class="vss-criteria-pill ${met ? 'met' : ''}">${met ? '✓' : '✗'} ${crit}</span>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    // Video Thumbnail URL (use live frame or fallback snapshot)
+    const thumbUrl = `/api/stream/live/${ev.channel || 11}?t=${Date.now()}`;
+
+    card.innerHTML = `
+        <div class="vss-card-header">
+            <h3 class="vss-card-title" title="${videoName}">${videoName}</h3>
+            <button type="button" class="vss-card-chat-btn" id="btn-chat-${ev.id}" onclick="addVssCardToChat(${JSON.stringify(ev).replace(/"/g, '&quot;')}, this); event.stopPropagation();">
+                + Chat
+            </button>
+        </div>
+        <div class="vss-card-thumb-wrap" onclick="handleVssCardPlay(${JSON.stringify(ev).replace(/"/g, '&quot;')})">
+            <img src="${thumbUrl}" class="vss-card-thumb-img" alt="${videoName}" onerror="this.src='/static/img/cam_placeholder.jpg'; this.onerror=null;" />
+            <div class="vss-card-play-btn" title="Phát video evidence 10s">
+                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+            <div class="vss-card-thumb-meta">
+                <span>${timeOnly}</span>
+                <span title="${ev.description || ''}">ⓘ</span>
+            </div>
+        </div>
+        <div class="vss-card-body">
+            <div class="vss-card-desc" title="${ev.description || ''}">
+                ${ev.description || 'Sự kiện ghi nhận từ camera Dahua'}
+            </div>
+            <div class="vss-card-score-row">
+                <span>Similarity:</span>
+                <span class="vss-card-similarity">${similarity}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="${criticBadgeClass}">${criticBadgeText}</span>
+            </div>
+            ${criteriaHtml}
+        </div>
+    `;
+
+    return card;
+}
+
+// Handle Play Video on Card
+function handleVssCardPlay(ev) {
+    if (ev.clip_filename) {
+        openClipModal(ev.id, ev.clip_filename, `${ev.video_name || 'Camera'} - ${ev.description || ''}`);
+    } else {
+        // Switch quick preview to this channel and notify user
+        onVssQuickCamChanged(ev.channel || 11);
+        sendVssAgentSuggestion(`Phân tích video clip cho Sự kiện #${ev.id} trên Kênh ${ev.channel || 11}`);
+    }
+}
+
+// Add Card Context into Vision Agent Chat (matching AddContextButton in vendor VideoSearchList.tsx)
+function addVssCardToChat(ev, btn) {
+    if (btn) {
+        btn.innerHTML = `✓ Added`;
+        btn.classList.add("added");
+        setTimeout(() => {
+            btn.innerHTML = `+ Chat`;
+            btn.classList.remove("added");
+        }, 2000);
+    }
+
+    // Ensure chat sidebar is open
+    if (vssChatSidebarCollapsed) {
+        toggleVssChatSidebar();
+    }
+
+    // Add context to input
+    const input = document.getElementById("vss-agent-input");
+    if (input) {
+        input.value = `Giải thích sự kiện #${ev.id} (${ev.description}) trên ${ev.video_name}: `;
+        input.focus();
+    }
+
+    // Add context notification bubble in chat
+    const chatContainer = document.getElementById("vss-chat-messages");
+    const welcomeScreen = document.getElementById("vss-agent-welcome");
+    if (welcomeScreen) welcomeScreen.style.display = "none";
+
+    if (chatContainer) {
+        const notice = document.createElement("div");
+        notice.className = "vss-chat-bubble agent thinking";
+        notice.style.fontSize = "0.76rem";
+        notice.style.borderColor = "#76b900";
+        notice.innerHTML = `📎 <strong>Đã gắn ngữ cảnh:</strong> ${ev.video_name} · [#${ev.id}] ${ev.description} (${ev.timestamp})`;
+        chatContainer.appendChild(notice);
+
+        const conv = document.getElementById("vss-agent-conversation");
+        if (conv) conv.scrollTop = conv.scrollHeight;
+    }
+}
+
+// Quick RTSP Preview Camera Change
+function onVssQuickCamChanged(channel) {
+    currentVssChannel = parseInt(channel) || 11;
+    const player = document.getElementById("vss-quick-player");
+    if (player) {
+        player.src = `/api/stream/live/${currentVssChannel}?t=${Date.now()}`;
+    }
+    const label = document.getElementById("vss-quick-live-label");
+    if (label) {
+        label.innerText = `Ch ${String(currentVssChannel).padStart(2, '0')}`;
+    }
+    const quickSelect = document.getElementById("vss-quick-cam-select");
+    if (quickSelect) {
+        quickSelect.value = currentVssChannel;
+    }
+}
+
+// Toggle Quick Player Fullscreen
+function toggleQuickPlayerFullscreen() {
+    const player = document.getElementById("vss-quick-player");
     if (!player) return;
     if (!document.fullscreenElement) {
         if (player.requestFullscreen) player.requestFullscreen();
@@ -765,183 +1142,23 @@ function toggleVssFullscreen() {
         if (document.exitFullscreen) document.exitFullscreen();
     }
 }
+// Toggle Vision Agent Sidebar Collapse (matching TabWithChatSidebarLayout.tsx)
+function toggleVssChatSidebar() {
+    const sidebar = document.getElementById("vss-chat-sidebar");
+    const floatBtn = document.getElementById("vss-floating-chat-btn");
+    const chevron = document.getElementById("vss-agent-chevron-icon");
 
-// Toggle Filter Drawer in Middle Column
-function toggleVssFilterDrawer() {
-    const drawer = document.getElementById("vss-filter-drawer");
-    if (drawer) {
-        drawer.style.display = drawer.style.display === "none" ? "block" : "none";
+    vssChatSidebarCollapsed = !vssChatSidebarCollapsed;
+
+    if (sidebar) {
+        sidebar.classList.toggle("collapsed", vssChatSidebarCollapsed);
     }
-}
-
-// Filter Tag Chip Click
-function setVssFilterTag(btn, tag) {
-    document.querySelectorAll(".vss-chip").forEach(c => c.classList.remove("active"));
-    btn?.classList.add("active");
-    vssFilterTag = tag;
-    executeVssSearch();
-}
-
-// Execute Vision Search (Search Files / Events)
-async function executeVssSearch() {
-    const queryInput = document.getElementById("vss-search-input");
-    const query = (queryInput?.value || "").trim().toLowerCase();
-    const sourceType = document.getElementById("vss-source-type")?.value || "all";
-
-    const emptyState = document.getElementById("vss-empty-state");
-    const resultsFeed = document.getElementById("vss-results-feed");
-    const pipelineState = document.getElementById("vss-pipeline-state");
-
-    // Animate Multi-modal Pipeline SVG
-    animatePipelineSearch();
-
-    try {
-        if (pipelineState) pipelineState.innerText = "Pipeline: Searching KNN Index...";
-
-        const res = await fetch(`/api/events?channel=${currentVssChannel}&limit=50`);
-        const data = await res.json();
-        const events = data.events || [];
-
-        // Apply filters
-        const filtered = events.filter(ev => {
-            // Filter by tag
-            if (vssFilterTag === 'anomalies') {
-                if (ev.event_type !== 'audio_anomaly' && ev.event_type !== 'video_anomaly' && ev.severity !== 'high' && ev.severity !== 'medium') {
-                    return false;
-                }
-            } else if (vssFilterTag === 'human') {
-                const desc = (ev.description || '').toLowerCase();
-                const code = (ev.event_code || '').toLowerCase();
-                if (!desc.includes('người') && !desc.includes('human') && !code.includes('human') && !code.includes('face')) return false;
-            } else if (vssFilterTag === 'vehicle') {
-                const desc = (ev.description || '').toLowerCase();
-                const code = (ev.event_code || '').toLowerCase();
-                if (!desc.includes('xe') && !desc.includes('vehicle') && !desc.includes('car') && !code.includes('vehicle')) return false;
-            } else if (vssFilterTag === 'audio') {
-                if (ev.event_type !== 'audio_anomaly') return false;
-            }
-
-            // Filter by source type
-            if (sourceType === 'audio') {
-                if (ev.event_type !== 'audio_anomaly') return false;
-            } else if (sourceType === 'video') {
-                if (!ev.clip_filename && ev.event_type !== 'video_anomaly') return false;
-            } else if (sourceType === 'metadata') {
-                if (ev.event_type !== 'normal_metadata' && !ev.event_code) return false;
-            }
-            // 'all' shows all events
-
-            // Filter by keyword query
-            if (query) {
-                const matchText = `${ev.description || ''} ${ev.event_code || ''} ${ev.event_type || ''} ${ev.timestamp || ''}`.toLowerCase();
-                if (!matchText.includes(query)) return false;
-            }
-
-            return true;
-        });
-
-        setTimeout(() => {
-            if (pipelineState) pipelineState.innerText = `Pipeline: Found ${filtered.length} matches`;
-        }, 500);
-
-        if (filtered.length === 0) {
-            if (emptyState) emptyState.style.display = "flex";
-            if (resultsFeed) {
-                resultsFeed.style.display = "none";
-                resultsFeed.innerHTML = "";
-            }
-        } else {
-            if (emptyState) emptyState.style.display = "none";
-            if (resultsFeed) {
-                resultsFeed.style.display = "flex";
-                resultsFeed.innerHTML = "";
-                filtered.forEach(ev => {
-                    resultsFeed.appendChild(createVssResultCard(ev));
-                });
-            }
-        }
-    } catch (err) {
-        console.error("VSS Search Error:", err);
-        if (pipelineState) pipelineState.innerText = "Pipeline: Ready";
+    if (floatBtn) {
+        floatBtn.style.display = vssChatSidebarCollapsed ? "flex" : "none";
     }
-}
-
-// Create Result Card in Vision Search Feed
-function createVssResultCard(ev) {
-    const card = document.createElement("div");
-    card.className = "vss-result-card";
-    card.dataset.vssId = ev.id;
-
-    const isAnomaly = ev.event_type === 'audio_anomaly' || ev.event_type === 'video_anomaly' || ev.severity === 'high';
-    const tagClass = isAnomaly ? 'vss-result-tag anomaly' : 'vss-result-tag normal';
-    const tagLabel = isAnomaly ? `CẢNH BÁO: ${ev.event_code}` : `METADATA: ${ev.event_code}`;
-
-    card.innerHTML = `
-        <div class="vss-result-header">
-            <span class="${tagClass}">${tagLabel}</span>
-            <span class="vss-result-time">${ev.timestamp}</span>
-        </div>
-        <div class="vss-result-desc">${ev.description}</div>
-        <div class="vss-result-footer">
-            <span>Độ tương đồng KNN: ${(Math.random() * 0.15 + 0.82).toFixed(2)}</span>
-            ${ev.clip_filename ? `
-                <button class="btn-clip-play" onclick="openClipModal(${ev.id}, '${ev.clip_filename}', '${ev.description}'); event.stopPropagation();">
-                    🎬 Phát 10s Clip
-                </button>
-            ` : '<span style="color:#64748b;">Live Metadata</span>'}
-        </div>
-    `;
-
-    card.addEventListener("click", () => {
-        if (ev.clip_filename) {
-            openClipModal(ev.id, ev.clip_filename, ev.description);
-        } else {
-            // Ask agent about this event
-            sendVssAgentSuggestion(`Giải thích chi tiết sự kiện #${ev.id}: ${ev.description} trên Kênh ${ev.channel}`);
-        }
-    });
-
-    return card;
-}
-
-// Animate Multi-modal Pipeline SVG during search
-function animatePipelineSearch() {
-    const nodes = ['node-query', 'branch-attributes', 'branch-actions', 'node-elasticsearch', 'branch-es-output', 'node-output'];
-    nodes.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.style.filter = "url(#vss-glow)";
-            setTimeout(() => {
-                el.style.filter = "none";
-            }, 1200);
-        }
-    });
-}
-
-// Animate Multi-modal Pipeline SVG during Agent Reasoning
-function animatePipelineAgent() {
-    const nodes = ['node-llm', 'line-llm-agent', 'node-agent', 'branch-critique', 'node-vios', 'branch-vios-vlm', 'node-vlm', 'branch-vlm-output', 'node-output'];
-    nodes.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.style.filter = "url(#vss-glow)";
-            setTimeout(() => {
-                el.style.filter = "none";
-            }, 1800);
-        }
-    });
-}
-
-// Toggle Vision Agent Sidebar Collapse
-function toggleVssAgentCollapse() {
-    const colRight = document.querySelector(".vss-col-right");
-    if (colRight) {
-        colRight.classList.toggle("collapsed");
+    if (chevron) {
+        chevron.style.transform = vssChatSidebarCollapsed ? "rotate(180deg)" : "rotate(0deg)";
     }
-}
-
-function toggleVssAgentMenu() {
-    sendVssAgentSuggestion("Giới thiệu các chức năng bạn có thể hỗ trợ tôi trên camera này.");
 }
 
 // Vision Agent: Send suggestion chip directly
@@ -949,6 +1166,18 @@ function sendVssAgentSuggestion(text) {
     const input = document.getElementById("vss-agent-input");
     if (input) input.value = text;
     sendVssAgentMessage();
+}
+
+function formatVssAgentReply(text) {
+    if (!text) return 'Đã ghi nhận thông tin.';
+    const escaped = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    return escaped
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
 }
 
 // Vision Agent: Send Message & Chat
@@ -963,6 +1192,7 @@ async function sendVssAgentMessage() {
     if (welcomeScreen) welcomeScreen.style.display = "none";
 
     const chatContainer = document.getElementById("vss-chat-messages");
+    const conversationArea = document.getElementById("vss-agent-conversation");
     if (!chatContainer) return;
 
     // Append User Bubble
@@ -974,12 +1204,11 @@ async function sendVssAgentMessage() {
     // Append Thinking Bubble
     const thinkingBubble = document.createElement("div");
     thinkingBubble.className = "vss-chat-bubble agent thinking";
-    thinkingBubble.innerText = "Vision Agent đang phân tích đa phương thức...";
+    thinkingBubble.innerText = "Vision Agent đang truy vấn CSDL và phân tích...";
     chatContainer.appendChild(thinkingBubble);
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-
-    // Animate reasoning nodes on pipeline SVG
-    animatePipelineAgent();
+    if (conversationArea) {
+        conversationArea.scrollTop = conversationArea.scrollHeight;
+    }
 
     try {
         const res = await fetch("/api/agent/query", {
@@ -991,18 +1220,28 @@ async function sendVssAgentMessage() {
 
         thinkingBubble.className = "vss-chat-bubble agent";
         thinkingBubble.innerHTML = `
-            <div class="agent-tag">⚡ ${data.source || 'Vision Agent'} (Kênh ${String(currentVssChannel).padStart(2, '0')})</div>
-            <div>${data.reply || 'Đã ghi nhận thông tin.'}</div>
+            <div class="agent-tag">⚡ ${data.source || 'Vision Agent'} (Kênh ${String(data.channel || currentVssChannel).padStart(2, '0')})</div>
+            <div>${formatVssAgentReply(data.reply)}</div>
         `;
+
+        // Synchronize matched events to the VideoSearchList grid!
+        if (data.matched_events && data.matched_events.length > 0) {
+            renderVideoSearchList(data.matched_events);
+        }
     } catch (err) {
         thinkingBubble.className = "vss-chat-bubble agent";
         thinkingBubble.innerHTML = `<div style="color:#f87171;">Lỗi kết nối tới Vision Agent backend. Vui lòng thử lại.</div>`;
     }
 
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    if (conversationArea) {
+        conversationArea.scrollTo({
+            top: conversationArea.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
 }
 
 // Global initialization
 document.addEventListener("DOMContentLoaded", () => {
-    populateVssCameraSelect();
+    initVssVisionSearch();
 });

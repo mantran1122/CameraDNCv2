@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.2">
 </head>
 <body>
 
@@ -56,7 +56,7 @@
     
         <div class="tabs-container">
             <button class="tab-btn active" id="btn-tab-overview" onclick="switchTab('tab-overview')">📊 Tổng quan (Overview)</button>
-            <button class="tab-btn" id="btn-tab-live" onclick="switchTab('tab-live')">📹 Xem Camera (Live View)</button>
+            <button class="tab-btn" id="btn-tab-live" onclick="switchTab('tab-live')">🔍 Tìm kiếm Video AI (Vision Search)</button>
         </div>
 
         <div id="tab-overview" class="tab-content active">
@@ -142,7 +142,7 @@
         </div>
         </div> <!-- End tab-overview -->
 
-        <!-- Tab Live View: Full Clone of NVIDIA VSS Blueprint | Vision (Search) -->
+        <!-- Tab: Full NVIDIA VSS Blueprint | Vision Search Interface -->
         <div id="tab-live" class="tab-content">
             <div class="vss-blueprint-root">
                 <!-- VSS Top Navigation Bar -->
@@ -153,19 +153,17 @@
                             <span class="vss-brand-divider">|</span>
                             <span class="vss-blueprint-subtitle" id="vss-blueprint-subtitle">Vision (Search)</span>
                         </div>
-                        <div class="vss-camera-dropdown-wrap">
-                            <span class="vss-cam-icon">📹</span>
-                            <select id="vss-cam-select" class="vss-camera-select" aria-label="Chọn Camera Kênh" onchange="onVssCameraChanged(this.value)">
-                                <!-- Populated dynamically with Ch 01 - Ch 32 -->
-                            </select>
+                        <div class="vss-badge-nvidia">
+                            <span class="vss-nvidia-icon">⚡</span>
+                            <span>Metropolis AI Workflow</span>
                         </div>
                     </div>
                     <div class="vss-header-right">
-                        <div class="vss-live-badge">
+                        <div class="vss-live-badge" id="vss-header-live-badge">
                             <span class="vss-live-dot"></span>
-                            <span>LIVE</span>
+                            <span id="vss-header-live-label">LIVE STREAM READY</span>
                         </div>
-                        <span class="vss-stream-meta" id="vss-stream-meta">1080p · 25 FPS · Dahua RTSP</span>
+                        <span class="vss-stream-meta" id="vss-stream-meta">Dahua NVR5832-EI2 · 32 Kênh</span>
                         <button class="vss-nav-btn" onclick="switchTab('tab-overview')" title="Quay lại Tổng quan Dashboard">
                             📊 Tổng quan
                         </button>
@@ -175,240 +173,160 @@
                     </div>
                 </header>
 
-                <!-- 3-Column Split View Layout matching NVIDIA VSS Blueprint -->
-                <div class="vss-main-grid">
-                    
-                    <!-- COLUMN 1 (LEFT): Live Camera Stream (Top) + Pipeline Architecture Diagram (Bottom) -->
-                    <div class="vss-col-left">
-                        <!-- Upper: Camera Live Video Player -->
-                        <div class="vss-video-card">
-                            <div class="vss-video-container">
-                                <img id="vss-video-player" src="/api/stream/live/1" alt="Luồng trực tiếp Camera" />
-                                <div class="vss-video-overlay-top">
-                                    <div class="vss-hud-channel" id="vss-hud-channel">CAMERA KÊNH 01 (Dahua DHI-NVR5832-EI2)</div>
-                                    <div class="vss-hud-clock" id="vss-hud-clock">--:--:--</div>
-                                </div>
-                                <div class="vss-video-overlay-bottom">
-                                    <span class="vss-hud-tag live">● TRỰC TIẾP</span>
-                                    <span class="vss-hud-tag ai">Qwen 3.5 + Cosmos Vector</span>
-                                    <button class="vss-hud-btn" onclick="toggleVssFullscreen()" title="Toàn màn hình">⛶</button>
+                <!-- VSS Vision Search Main Layout (SearchSidebarControls + SearchComponent + TabWithChatSidebarLayout) -->
+                <div class="vss-search-layout" id="vss-search-layout">
+
+                    <!-- 1. LEFT SIDEBAR: SearchSidebarControls (Source Type + Filter Popover + Active Filter Chips) -->
+                    <aside class="vss-sidebar-controls" id="vss-sidebar-controls">
+                        <div class="vss-sidebar-section">
+                            <div class="vss-section-label">Source Type</div>
+                            <div class="vss-source-toggle-group">
+                                <button type="button" class="vss-source-btn active" id="btn-source-video" onclick="setVssSourceType('video_file')">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                                    <span>Video</span>
+                                </button>
+                                <button type="button" class="vss-source-btn" id="btn-source-rtsp" onclick="setVssSourceType('rtsp')">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                                    <span>RTSP</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filter Dialog Trigger Button -->
+                        <div class="vss-sidebar-section">
+                            <div class="vss-filter-trigger-wrap" id="vss-filter-trigger-wrap">
+                                <button type="button" class="vss-filter-trigger-btn" id="vss-filter-trigger-btn" onclick="toggleVssFilterPopover()">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                                    <span>Filter</span>
+                                    <span class="vss-filter-badge-count" id="vss-filter-badge-count" style="display:none;">0</span>
+                                    <svg class="vss-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+
+                                <!-- Popover Dialog (matching FilterPopover.tsx) -->
+                                <div class="vss-filter-popover" id="vss-filter-popover" style="display:none;">
+                                    <div class="vss-popover-header">
+                                        <span>Bộ lọc tìm kiếm nâng cao</span>
+                                        <button class="vss-popover-close" onclick="toggleVssFilterPopover()">✕</button>
+                                    </div>
+                                    <div class="vss-popover-body">
+                                        <div class="vss-popover-field">
+                                            <label>Kênh Camera (Video Sources):</label>
+                                            <select id="vss-filter-channels" class="vss-popover-select" multiple size="4">
+                                                <!-- Dynamic channels Ch 01 - Ch 32 -->
+                                            </select>
+                                            <div class="vss-field-hint">Giữ phím Ctrl để chọn nhiều kênh</div>
+                                        </div>
+                                        <div class="vss-popover-field">
+                                            <label>Từ ngày (Start Date):</label>
+                                            <input type="datetime-local" id="vss-filter-start-date" class="vss-popover-input" />
+                                        </div>
+                                        <div class="vss-popover-field">
+                                            <label>Đến ngày (End Date):</label>
+                                            <input type="datetime-local" id="vss-filter-end-date" class="vss-popover-input" />
+                                        </div>
+                                        <div class="vss-popover-field">
+                                            <label>Độ tương đồng tối thiểu (Similarity): <span id="vss-filter-sim-val">0.70</span></label>
+                                            <input type="range" id="vss-filter-similarity" min="0.5" max="1.0" step="0.05" value="0.70" oninput="document.getElementById('vss-filter-sim-val').innerText = this.value" />
+                                        </div>
+                                        <div class="vss-popover-field">
+                                            <label>Số kết quả tối đa (Top-K):</label>
+                                            <select id="vss-filter-topk" class="vss-popover-select">
+                                                <option value="12">12 kết quả</option>
+                                                <option value="24" selected>24 kết quả</option>
+                                                <option value="48">48 kết quả</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="vss-popover-footer">
+                                        <button class="vss-btn-secondary" onclick="resetVssFilters()">Đặt lại</button>
+                                        <button class="vss-btn-primary" onclick="applyVssFilters()">Áp dụng</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Lower: Multimodal AI Architecture & Pipeline Flowchart -->
-                        <div class="vss-flowchart-card">
-                            <div class="vss-flowchart-header">
-                                <div class="vss-flowchart-title">
-                                    <span class="vss-flowchart-icon">⚡</span>
-                                    <span>MULTI-MODAL PIPELINE ARCHITECTURE</span>
-                                </div>
-                                <div class="vss-flowchart-state" id="vss-pipeline-state">Pipeline: Ready</div>
+                        <!-- Active Filter Tags / Chips -->
+                        <div class="vss-sidebar-section">
+                            <div class="vss-section-label">Active Filters</div>
+                            <div class="vss-active-chips-container" id="vss-active-chips-container">
+                                <div class="vss-chip-placeholder">Chưa áp dụng bộ lọc</div>
                             </div>
-                            <div class="vss-svg-container">
-                                <svg id="vss-pipeline-svg" viewBox="0 0 760 280" class="vss-svg" preserveAspectRatio="xMidYMid meet">
-                                    <defs>
-                                        <marker id="vss-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                                            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748b" />
-                                        </marker>
-                                        <marker id="vss-arrow-orange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                                            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#f97316" />
-                                        </marker>
-                                        <marker id="vss-arrow-purple" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                                            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#a855f7" />
-                                        </marker>
-                                        <marker id="vss-arrow-pink" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                                            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ec4899" />
-                                        </marker>
-                                        <marker id="vss-arrow-cyan" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                                            <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#06b6d4" />
-                                        </marker>
-                                        <filter id="vss-glow" x="-20%" y="-20%" width="140%" height="140%">
-                                            <feGaussianBlur stdDeviation="3" result="blur" />
-                                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                                        </filter>
-                                    </defs>
+                        </div>
 
-                                    <!-- Connecting Lines / Branches -->
-                                    <!-- Query to Video Agent -->
-                                    <line id="line-query-agent" x1="85" y1="140" x2="135" y2="140" stroke="#475569" stroke-width="1.8" marker-end="url(#vss-arrow)" />
+                        <!-- Live RTSP Preview Box (Quick Look for operator) -->
+                        <div class="vss-sidebar-section vss-live-preview-section" id="vss-rtsp-preview-box">
+                            <div class="vss-section-label" style="display:flex; justify-content:space-between;">
+                                <span>RTSP Quick Live</span>
+                                <span id="vss-quick-live-label" style="color:var(--accent-emerald);">Ch 11</span>
+                            </div>
+                            <div class="vss-quick-player-wrap">
+                                <img id="vss-quick-player" src="/api/stream/live/11" alt="RTSP Live Stream" />
+                                <div class="vss-quick-player-bar">
+                                    <select id="vss-quick-cam-select" onchange="onVssQuickCamChanged(this.value)">
+                                        <!-- Ch 01 - Ch 32 -->
+                                    </select>
+                                    <button onclick="toggleQuickPlayerFullscreen()" title="Toàn màn hình">⛶</button>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
 
-                                    <!-- LLM to Video Agent -->
-                                    <line id="line-llm-agent" x1="188" y1="72" x2="188" y2="110" stroke="#22c55e" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#vss-arrow)" />
-
-                                    <!-- Top Branch: Attributes (Search) (Orange) -->
-                                    <path id="branch-attributes" d="M 235 130 C 270 130, 275 48, 315 48" fill="none" stroke="#ea580c" stroke-width="1.8" marker-end="url(#vss-arrow-orange)" />
-                                    <text x="238" y="112" fill="#fb923c" font-size="9" font-weight="700" letter-spacing="0.3">Attributes (Search)</text>
-
-                                    <!-- Attributes to Elasticsearch -->
-                                    <path id="branch-attr-es" d="M 415 48 C 455 48, 455 125, 485 125" fill="none" stroke="#ea580c" stroke-width="1.8" marker-end="url(#vss-arrow-orange)" />
-
-                                    <!-- Middle Branch: Actions (Search) (Purple) -->
-                                    <line id="branch-actions" x1="235" y1="140" x2="315" y2="140" stroke="#9333ea" stroke-width="1.8" marker-end="url(#vss-arrow-purple)" />
-                                    <text x="248" y="134" fill="#c084fc" font-size="9" font-weight="700" letter-spacing="0.3">Actions (Search)</text>
-
-                                    <!-- Actions to Elasticsearch -->
-                                    <line id="branch-actions-es" x1="415" y1="140" x2="485" y2="140" stroke="#9333ea" stroke-width="1.8" marker-end="url(#vss-arrow-purple)" />
-
-                                    <!-- Elasticsearch to Output -->
-                                    <line id="branch-es-output" x1="590" y1="140" x2="665" y2="140" stroke="#06b6d4" stroke-width="1.8" marker-end="url(#vss-arrow-cyan)" />
-
-                                    <!-- Bottom Branch: Critique / Video Understanding (Pink) -->
-                                    <path id="branch-critique" d="M 235 150 C 265 150, 270 230, 315 230" fill="none" stroke="#e11d48" stroke-width="1.8" marker-end="url(#vss-arrow-pink)" />
-                                    <text x="210" y="215" fill="#f43f5e" font-size="9" font-weight="700" letter-spacing="0.2">Critique / Video Understanding</text>
-
-                                    <!-- VIOS to VLM -->
-                                    <line id="branch-vios-vlm" x1="415" y1="230" x2="485" y2="230" stroke="#e11d48" stroke-width="1.8" marker-end="url(#vss-arrow-pink)" />
-
-                                    <!-- VLM to Output -->
-                                    <path id="branch-vlm-output" d="M 585 230 C 625 230, 635 155, 665 148" fill="none" stroke="#e11d48" stroke-width="1.8" marker-end="url(#vss-arrow-pink)" />
-
-                                    <!-- NODES -->
-                                    <!-- 1. Query Node -->
-                                    <g id="node-query" class="vss-node">
-                                        <rect x="15" y="115" width="70" height="50" rx="8" fill="#111827" stroke="#374151" stroke-width="1.2" />
-                                        <text x="50" y="137" fill="#f3f4f6" font-size="12" font-weight="700" text-anchor="middle">Query</text>
-                                        <text x="50" y="152" fill="#9ca3af" font-size="8.5" text-anchor="middle">User Input</text>
-                                    </g>
-
-                                    <!-- 2. Video Agent Node -->
-                                    <g id="node-agent" class="vss-node">
-                                        <rect x="135" y="110" width="100" height="60" rx="8" fill="#111827" stroke="#374151" stroke-width="1.2" />
-                                        <text x="185" y="134" fill="#f3f4f6" font-size="12" font-weight="700" text-anchor="middle">Video Agent</text>
-                                        <text x="185" y="152" fill="#22c55e" font-size="8.5" font-weight="600" text-anchor="middle">Plan → Act → Reflect</text>
-                                    </g>
-
-                                    <!-- 3. LLM Node (Above Agent) -->
-                                    <g id="node-llm" class="vss-node">
-                                        <rect x="142" y="18" width="86" height="54" rx="8" fill="#111827" stroke="#22c55e" stroke-width="1.2" stroke-opacity="0.8" />
-                                        <text x="185" y="38" fill="#f3f4f6" font-size="12" font-weight="700" text-anchor="middle">LLM</text>
-                                        <text x="185" y="52" fill="#22c55e" font-size="8.5" font-weight="600" text-anchor="middle">Qwen 3.5</text>
-                                        <text x="185" y="64" fill="#38bdf8" font-size="7.5" text-anchor="middle">Planning</text>
-                                    </g>
-
-                                    <!-- 4. Attributes Node -->
-                                    <g id="node-attributes" class="vss-node">
-                                        <rect x="315" y="20" width="100" height="56" rx="8" fill="#111827" stroke="#ea580c" stroke-width="1.2" stroke-opacity="0.8" />
-                                        <text x="365" y="40" fill="#f3f4f6" font-size="11.5" font-weight="700" text-anchor="middle">Attributes</text>
-                                        <text x="365" y="54" fill="#9ca3af" font-size="8" text-anchor="middle">C-RADIO</text>
-                                        <text x="365" y="66" fill="#fb923c" font-size="8" font-weight="600" text-anchor="middle">SigLIP2</text>
-                                    </g>
-
-                                    <!-- 5. Actions Node -->
-                                    <g id="node-actions" class="vss-node">
-                                        <rect x="315" y="112" width="100" height="56" rx="8" fill="#111827" stroke="#9333ea" stroke-width="1.2" stroke-opacity="0.8" />
-                                        <text x="365" y="132" fill="#f3f4f6" font-size="11.5" font-weight="700" text-anchor="middle">Actions</text>
-                                        <text x="365" y="146" fill="#c084fc" font-size="8" font-weight="600" text-anchor="middle">Cosmos Embed</text>
-                                        <text x="365" y="158" fill="#9ca3af" font-size="7.5" text-anchor="middle">Vectorization</text>
-                                    </g>
-
-                                    <!-- 6. VIOS Node -->
-                                    <g id="node-vios" class="vss-node">
-                                        <rect x="315" y="202" width="100" height="56" rx="8" fill="#111827" stroke="#e11d48" stroke-width="1.2" stroke-opacity="0.8" />
-                                        <text x="365" y="222" fill="#f3f4f6" font-size="11.5" font-weight="700" text-anchor="middle">VIOS</text>
-                                        <text x="365" y="236" fill="#9ca3af" font-size="8" text-anchor="middle">Video IO &amp; Storage</text>
-                                        <text x="365" y="248" fill="#cbd5e1" font-size="7.5" text-anchor="middle">Clip Retrieval</text>
-                                    </g>
-
-                                    <!-- 7. Elasticsearch Node -->
-                                    <g id="node-elasticsearch" class="vss-node">
-                                        <rect x="485" y="110" width="105" height="60" rx="8" fill="#111827" stroke="#06b6d4" stroke-width="1.2" stroke-opacity="0.8" />
-                                        <text x="537" y="130" fill="#f3f4f6" font-size="11" font-weight="700" text-anchor="middle">Elasticsearch</text>
-                                        <text x="537" y="145" fill="#38bdf8" font-size="8.5" font-weight="600" text-anchor="middle">KNN Search</text>
-                                        <text x="537" y="158" fill="#0ea5e9" font-size="8" text-anchor="middle">Vector DB</text>
-                                    </g>
-
-                                    <!-- 8. VLM Node -->
-                                    <g id="node-vlm" class="vss-node">
-                                        <rect x="485" y="202" width="100" height="56" rx="8" fill="#111827" stroke="#e11d48" stroke-width="1.2" stroke-opacity="0.8" />
-                                        <text x="535" y="223" fill="#f3f4f6" font-size="12" font-weight="700" text-anchor="middle">VLM</text>
-                                        <text x="535" y="238" fill="#f43f5e" font-size="8.5" font-weight="600" text-anchor="middle">Qwen 3.5</text>
-                                        <text x="535" y="250" fill="#fb7185" font-size="7.5" text-anchor="middle">Critique</text>
-                                    </g>
-
-                                    <!-- 9. Output Node -->
-                                    <g id="node-output" class="vss-node">
-                                        <rect x="665" y="118" width="75" height="46" rx="8" fill="#111827" stroke="#06b6d4" stroke-width="1.2" />
-                                        <text x="702" y="138" fill="#f3f4f6" font-size="11.5" font-weight="700" text-anchor="middle">Output</text>
-                                        <text x="702" y="152" fill="#38bdf8" font-size="8.5" font-weight="600" text-anchor="middle">Results</text>
-                                    </g>
+                    <!-- 2. CENTER / MAIN CANVAS: SearchHeader + VideoSearchList (Results Grid) -->
+                    <main class="vss-main-content">
+                        <!-- Search Header Toolbar -->
+                        <div class="vss-search-header-bar">
+                            <div class="vss-search-box-large">
+                                <svg class="vss-search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                                 </svg>
+                                <input type="text" id="vss-search-input" placeholder="Search video events, objects, actions (e.g., 'người áo đỏ', 'vượt rào', 'đột nhập', 'xô xát')..." onkeydown="if(event.key==='Enter') executeVssSearch()" />
+                                <button class="vss-search-submit-btn" id="vss-search-btn" onclick="executeVssSearch()">
+                                    <span>Search</span>
+                                </button>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- COLUMN 2 (MIDDLE): Vision Search Files & Results -->
-                    <div class="vss-col-mid">
-                        <!-- Search Files Toolbar -->
-                        <div class="vss-search-toolbar">
-                            <div class="vss-search-input-box">
-                                <span class="vss-search-icon">🔍</span>
-                                <input type="text" id="vss-search-input" placeholder="Search Files" onkeydown="if(event.key==='Enter') executeVssSearch()" />
-                            </div>
-                            <button class="vss-search-btn" id="vss-search-btn" onclick="executeVssSearch()">Search</button>
-                            <div class="vss-source-type-box">
-                                <span class="vss-source-label">Source Type:</span>
-                                <select id="vss-source-type" class="vss-source-select" onchange="executeVssSearch()">
-                                    <option value="all" selected>Tất cả</option>
-                                    <option value="metadata">Metadata</option>
-                                    <option value="video">Video Clips</option>
-                                    <option value="audio">Audio</option>
-                                </select>
-                            </div>
-                            <button class="vss-filter-btn" id="vss-filter-btn" onclick="toggleVssFilterDrawer()" title="Lọc thêm">
-                                <span>Filter</span>
-                                <span class="vss-filter-icon">⏚</span>
-                            </button>
-                        </div>
-
-                        <!-- Filter Options Drawer -->
-                        <div class="vss-filter-drawer" id="vss-filter-drawer" style="display:none;">
-                            <div class="vss-filter-title">Bộ lọc sự kiện camera:</div>
-                            <div class="vss-filter-chips">
-                                <button class="vss-chip active" onclick="setVssFilterTag(this, 'all')">Tất cả</button>
-                                <button class="vss-chip" onclick="setVssFilterTag(this, 'anomalies')">Chỉ Bất thường</button>
-                                <button class="vss-chip" onclick="setVssFilterTag(this, 'human')">Người</button>
-                                <button class="vss-chip" onclick="setVssFilterTag(this, 'vehicle')">Phương tiện</button>
-                                <button class="vss-chip" onclick="setVssFilterTag(this, 'audio')">Âm thanh</button>
+                            <div class="vss-quick-chips-bar">
+                                <button class="vss-qchip active" data-filter="all" onclick="setVssQuickFilter(this, 'all')">Tất cả</button>
+                                <button class="vss-qchip" data-filter="confirmed" onclick="setVssQuickFilter(this, 'confirmed')">✓ AI Confirmed</button>
+                                <button class="vss-qchip" data-filter="anomalies" onclick="setVssQuickFilter(this, 'anomalies')">Cảnh báo bất thường</button>
+                                <button class="vss-qchip" data-filter="human" onclick="setVssQuickFilter(this, 'human')">Người</button>
+                                <button class="vss-qchip" data-filter="vehicle" onclick="setVssQuickFilter(this, 'vehicle')">Phương tiện</button>
+                                <button class="vss-qchip" data-filter="audio" onclick="setVssQuickFilter(this, 'audio')">Âm thanh</button>
                             </div>
                         </div>
 
-                        <!-- Search Content / Results Area -->
-                        <div class="vss-results-area" id="vss-results-area">
-                            <!-- Default Empty State matching screenshot -->
+                        <!-- Search Content & Results Grid (matching VideoSearchList.tsx) -->
+                        <div class="vss-results-container" id="vss-results-container">
+                            <!-- Empty State (matching EmptyState in VideoSearchList.tsx) -->
                             <div class="vss-empty-state" id="vss-empty-state">
                                 <div class="vss-empty-icon-wrap">
-                                    <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.3">
-                                        <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/>
-                                        <path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/>
-                                        <path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/>
+                                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.2">
+                                        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+                                        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
                                     </svg>
                                 </div>
-                                <div class="vss-empty-text">Results will update here</div>
-                                <div class="vss-empty-subtext">Nhập từ khóa tìm kiếm hoặc bấm Search để xem danh sách clip &amp; sự kiện của camera.</div>
+                                <div class="vss-empty-title">Results will update here</div>
+                                <div class="vss-empty-desc">Hỏi Vision Agent ở bảng bên phải hoặc nhập từ khóa tìm kiếm để trích xuất sự kiện từ CSDL.</div>
                             </div>
 
-                            <!-- Populated Results Feed -->
-                            <div class="vss-results-feed" id="vss-results-feed" style="display:none;">
-                                <!-- Dynamic result cards will be rendered here -->
+                            <!-- Populated Results Grid (280px cards matching VideoSearchList.tsx) -->
+                            <div class="vss-results-grid" id="vss-results-grid" style="display:none;">
+                                <!-- Populated dynamically by app.js -->
                             </div>
                         </div>
-                    </div>
+                    </main>
 
-                    <!-- COLUMN 3 (RIGHT): Vision Agent Chatbot -->
-                    <div class="vss-col-right">
-                        <!-- Agent Header with Hamburger & Collapse Chevron -->
+                    <!-- 3. RIGHT SIDEBAR: TabWithChatSidebarLayout (Vision Agent Chat Panel) -->
+                    <aside class="vss-chat-sidebar" id="vss-chat-sidebar">
                         <div class="vss-agent-header">
-                            <button class="vss-agent-icon-btn" title="Menu trợ lý" onclick="toggleVssAgentMenu()">
-                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
-                                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                            <div class="vss-agent-title-wrap">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                                 </svg>
-                            </button>
-                            <span class="vss-agent-title">Vision Agent</span>
-                            <button class="vss-agent-icon-btn" title="Thu gọn / Mở rộng" onclick="toggleVssAgentCollapse()">
-                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                                <span class="vss-agent-title">Vision Agent</span>
+                            </div>
+                            <button class="vss-agent-collapse-btn" onclick="toggleVssChatSidebar()" title="Thu gọn / Mở rộng bảng Chat">
+                                <svg id="vss-agent-chevron-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="9 18 15 12 9 6"></polyline>
                                 </svg>
                             </button>
@@ -416,18 +334,19 @@
 
                         <!-- Conversation Area -->
                         <div class="vss-agent-conversation" id="vss-agent-conversation">
-                            <!-- Welcome Screen matching screenshot -->
+                            <!-- Welcome Screen -->
                             <div class="vss-agent-welcome" id="vss-agent-welcome">
-                                <h1 class="vss-welcome-title">Hi, I'm Vision Agent</h1>
+                                <div class="vss-welcome-icon">🤖</div>
+                                <h2 class="vss-welcome-title">Hi, I'm Vision Agent</h2>
                                 <p class="vss-welcome-subtitle">How can I assist you today?</p>
                                 <div class="vss-suggestions-box">
                                     <div class="vss-suggestion-item" onclick="sendVssAgentSuggestion('Hôm nay camera này có cảnh báo bất thường nào không?')">
                                         🚨 Có cảnh báo bất thường nào hôm nay không?
                                     </div>
-                                    <div class="vss-suggestion-item" onclick="sendVssAgentSuggestion('Tóm tắt hoạt động gần nhất trên kênh camera này.')">
-                                        📋 Tóm tắt hoạt động gần nhất trên kênh này
+                                    <div class="vss-suggestion-item" onclick="sendVssAgentSuggestion('Tóm tắt hoạt động gần nhất trên các kênh camera')">
+                                        📋 Tóm tắt hoạt động gần nhất trên hệ thống
                                     </div>
-                                    <div class="vss-suggestion-item" onclick="sendVssAgentSuggestion('Kiểm tra nhận dạng người và phương tiện.')">
+                                    <div class="vss-suggestion-item" onclick="sendVssAgentSuggestion('Tìm các sự kiện nhận dạng người và phương tiện')">
                                         👤 Nhận dạng người &amp; phương tiện
                                     </div>
                                 </div>
@@ -439,21 +358,28 @@
                             </div>
                         </div>
 
-                        <!-- Input Bar & NVIDIA Branding Footer -->
+                        <!-- Input Bar -->
                         <div class="vss-agent-input-container">
                             <div class="vss-agent-input-bar">
-                                <input type="text" id="vss-agent-input" placeholder="Unlock Vision Agent knowledge and expertise" onkeydown="if(event.key==='Enter') sendVssAgentMessage()" />
+                                <input type="text" id="vss-agent-input" placeholder="Unlock Vision Agent knowledge and expertise..." onkeydown="if(event.key==='Enter') sendVssAgentMessage()" />
                                 <button class="vss-agent-send-btn" id="vss-agent-send-btn" onclick="sendVssAgentMessage()" title="Gửi câu hỏi">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                                         <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                                     </svg>
                                 </button>
                             </div>
                             <div class="vss-footer-brand">
-                                <span class="vss-agent-footer-label">AI Vision Assistant</span>
+                                <span>NVIDIA Metropolis Blueprint · Vision Agent</span>
                             </div>
                         </div>
-                    </div>
+                    </aside>
+
+                    <!-- Floating Chat Icon (when sidebar is collapsed) -->
+                    <button class="vss-floating-chat-btn" id="vss-floating-chat-btn" style="display:none;" onclick="toggleVssChatSidebar()" title="Mở Vision Agent Chat">
+                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </button>
 
                 </div>
             </div>
@@ -473,7 +399,7 @@
                     <section class="clip-panel clip-video-panel">
                         <div class="clip-panel-title">Video evidence</div>
                         <div class="video-container">
-                            <video id="modal-video-player" controls autoplay loop>
+                            <video id="modal-video-player" controls loop>
                                 <source id="modal-video-source" src="" type="video/mp4">
                                 Trình duyệt của bạn không hỗ trợ thẻ HTML5 Video.
                             </video>
@@ -625,6 +551,6 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=2.2"></script>
 </body>
 </html>

@@ -107,7 +107,8 @@ class AudioAnalysisWorkerTest(unittest.TestCase):
             "choices": [{"message": {"content": '{"summary":"Có tiếng nói ngắn.","risk_level":"low","recommended_action":"Kiểm tra clip.","evidence":[{"source":"audio transcript","detail":"Xin chào"}]}'}}]
         }
         try:
-            with patch.object(audio_analysis_worker.requests, "post", return_value=response) as post:
+            with patch.object(audio_analysis_worker, "get_gemini_public_config", return_value={"configured": False, "model": "gemini-2.5-flash", "source": "none"}), \
+                 patch.object(audio_analysis_worker.requests, "post", return_value=response) as post:
                 suggestion, error = worker._create_suggestion(
                     {"event_code": "SoundDetection", "description": "Sound", "metadata": {"Code": "SoundDetection"}},
                     {"transcript": "Xin chào", "speech_detected": 1, "ignored_reason": None},
@@ -143,3 +144,29 @@ class AudioAnalysisWorkerTest(unittest.TestCase):
         self.assertEqual(suggestion, expected)
         self.assertEqual(generate.call_args.args[1], video["frames"])
         self.assertEqual(generate.call_args.args[2]["status"], "completed")
+
+    def test_internal_server_transcribe_flow(self):
+        event_id = database.save_event("SoundDetection", "audio_anomaly", 2, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Alert", clip_filename="alert.mp4")
+        database.create_audio_analysis(event_id)
+        worker = audio_analysis_worker.AudioAnalysisWorker()
+        server_mock = {
+            "status": "ok",
+            "transcript": "Ai đang ở đó?",
+            "speech_detected": 1,
+            "detected_sounds": ["tiếng bước chân"],
+            "risk_level": "medium",
+            "summary": "Phát hiện giọng nói và bước chân.",
+            "audio_model": "Internal Audio AI (Server H200)",
+            "ignored_reason": None,
+        }
+        with patch("audio_analysis_worker.send_clean_audio_to_server", return_value=server_mock):
+            worker._transcribe(event_id, database.get_event_by_id(event_id), "dummy.wav")
+
+        analysis = database.get_audio_analysis(event_id)
+        self.assertEqual(analysis["status"], "completed")
+        self.assertEqual(analysis["transcript"], "Ai đang ở đó?")
+        self.assertEqual(analysis["audio_model"], "Internal Audio AI (Server H200)")
+        self.assertEqual(analysis["speech_detected"], 1)
+        self.assertIsNotNone(analysis["suggestion"])
+        self.assertEqual(analysis["suggestion"]["risk_level"], "medium")
+

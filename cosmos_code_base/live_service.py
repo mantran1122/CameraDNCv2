@@ -301,6 +301,23 @@ def _active_audio_model_id() -> str:
     return os.getenv("COSMOS_AUDIO_MODEL", "vinai/PhoWhisper-small").strip() or "vinai/PhoWhisper-small"
 
 
+def _use_deepfilter() -> bool:
+    """Return whether DeepFilterNet3 background noise suppression is enabled."""
+    return os.getenv("USE_DEEPFILTER", "true").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_whisper_model(model_id: str) -> bool:
+    """Check if model_id refers to an OpenAI or Faster-Whisper model."""
+    clean = (model_id or "").lower()
+    if "phowhisper" in clean:
+        return False
+    return any(k in clean for k in ["large-v3", "whisper-large", "large_v3", "whisper-base", "whisper-small", "whisper-turbo"]) or (
+        "whisper" in clean
+    )
+
+
+
+
 def _audio_beam_size() -> int:
     """Use real beam search for speech decoding while keeping configuration bounded."""
     try:
@@ -1066,6 +1083,7 @@ def transcribe(
         return JSONResponse({"status": "error", "detail": "audio busy"}, status_code=429)
 
     wav_path = None
+    clean_wav_path = None
     try:
         with tempfile.NamedTemporaryFile(prefix="cosmos_audio_", suffix=".wav", delete=False) as output:
             output.write(body)
@@ -1090,52 +1108,83 @@ def transcribe(
                 "audio_sha256": audio_sha256,
                 "audio_model": _active_audio_model_id(),
             }
-        language = os.getenv("COSMOS_AUDIO_LANGUAGE", "vi").strip() or None
-        generate_kwargs = {
-            "task": "transcribe",
-            "do_sample": False,
-            "num_beams": _audio_beam_size(),
-            # Do not let a weak/noisy chunk inherit words from a preceding
-            # chunk. This notably reduces Whisper's silence hallucinations.
-            "condition_on_prev_tokens": False,
-        }
-        if language and language != "auto":
-            generate_kwargs["language"] = language
-        import torch
 
-        with torch.inference_mode():
-            # Manually keep every model call below 30 seconds. This avoids the
-            # Transformers long-form timestamp path and remains stable across
-            # PhoWhisper/Transformers versions.
-            result = _transcribe_short_wav_chunks(wav_path, generate_kwargs)
-            text = " ".join(str(result.get("text", "")).split())
-            repetitive = _is_repetitive_transcript(text)
-            hallucination = _is_known_audio_hallucination(text)
-            excessive_rate = False
-            if text:
-                words = re.findall(r"\w+", text.lower(), flags=re.UNICODE)
-                if words and (len(words) / max(active_seconds, 0.2)) > 5.0:
-                    excessive_rate = True
-            decoder_disagreement = False
-            if text and _audio_requires_decoder_agreement():
-                # A beam-search sentence that the greedy decoder cannot reproduce
-                # is commonly language-model completion from weak audio. Reject it
-                # rather than replacing it with a guessed alternative.
-                verifier_kwargs = dict(generate_kwargs)
-                verifier_kwargs["num_beams"] = 1
-                verifier = _transcribe_short_wav_chunks(wav_path, verifier_kwargs)
-                verifier_text = " ".join(str(verifier.get("text", "")).split())
-                decoder_disagreement = not _audio_transcripts_agree(text, verifier_text)
+        target_wav_path = wav_path
+        if _use_deepfilter():
+            try:
+                from audio_enhancer import enhance_audio_file
+                clean_wav_path = enhance_audio_file(wav_path, target_sr=16000)
+                target_wav_path = clean_wav_path
+            except Exception as df_exc:
+                logger.warning("DeepFilterNet enhancement error: %s", df_exc)
+
+        language = os.getenv("COSMOS_AUDIO_LANGUAGE", "vi").strip() or None
+        active_model = _active_audio_model_id()
+        text = ""
+
+        if _is_whisper_model(active_model):
+            try:
+                from audio_enhancer import transcribe_with_faster_whisper
+                whisper_res = transcribe_with_faster_whisper(
+                    target_wav_path,
+                    model_name=active_model,
+                    language=language,
+                    beam_size=_audio_beam_size(),
+                    vad_filter=True,
+                )
+                text = whisper_res.get("text", "")
+                if whisper_res.get("active_speech_seconds"):
+                    active_seconds = whisper_res["active_speech_seconds"]
+            except Exception as fw_exc:
+                logger.warning("Faster-whisper transcription notice: %s; falling back to PhoWhisper", fw_exc)
+                text = ""
+
+        if not _is_whisper_model(active_model) or (not text and "fw_exc" in locals()):
+            generate_kwargs = {
+                "task": "transcribe",
+                "do_sample": False,
+                "num_beams": _audio_beam_size(),
+                # Do not let a weak/noisy chunk inherit words from a preceding
+                # chunk. This notably reduces Whisper's silence hallucinations.
+                "condition_on_prev_tokens": False,
+            }
+            if language and language != "auto":
+                generate_kwargs["language"] = language
+            import torch
+
+            with torch.inference_mode():
+                # Manually keep every model call below 30 seconds. This avoids the
+                # Transformers long-form timestamp path and remains stable across
+                # PhoWhisper/Transformers versions.
+                result = _transcribe_short_wav_chunks(target_wav_path, generate_kwargs)
+                text = " ".join(str(result.get("text", "")).split())
+                if text and _audio_requires_decoder_agreement():
+                    # A beam-search sentence that the greedy decoder cannot reproduce
+                    # is commonly language-model completion from weak audio. Reject it
+                    # rather than replacing it with a guessed alternative.
+                    verifier_kwargs = dict(generate_kwargs)
+                    verifier_kwargs["num_beams"] = 1
+                    verifier = _transcribe_short_wav_chunks(target_wav_path, verifier_kwargs)
+                    verifier_text = " ".join(str(verifier.get("text", "")).split())
+                    if not _audio_transcripts_agree(text, verifier_text):
+                        text = ""
+                        ignored_reason = "decoder_disagreement"
+
+        repetitive = _is_repetitive_transcript(text)
+        hallucination = _is_known_audio_hallucination(text)
+        excessive_rate = False
+        if text:
+            words = re.findall(r"\w+", text.lower(), flags=re.UNICODE)
+            if words and (len(words) / max(active_seconds, 0.2)) > 5.0:
+                excessive_rate = True
         duplicate = _is_duplicate_audio_transcript(text, x_cosmos_device_id or "unknown", x_cosmos_channel)
-        ignored_reason = None
+        ignored_reason = locals().get("ignored_reason", None)
         if repetitive:
             ignored_reason = "repetitive_transcript"
         elif hallucination:
             ignored_reason = "known_hallucination"
         elif excessive_rate:
             ignored_reason = "hallucination_speech_rate"
-        elif decoder_disagreement:
-            ignored_reason = "decoder_disagreement"
         elif duplicate:
             ignored_reason = "duplicate_transcript"
         if ignored_reason:
@@ -1169,7 +1218,13 @@ def transcribe(
                 Path(wav_path).unlink(missing_ok=True)
             except OSError:
                 pass
+        if clean_wav_path:
+            try:
+                Path(clean_wav_path).unlink(missing_ok=True)
+            except OSError:
+                pass
         _audio_inference_lock.release()
+
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────

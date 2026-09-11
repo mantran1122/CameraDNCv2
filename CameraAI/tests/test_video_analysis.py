@@ -66,27 +66,21 @@ class VideoAnalysisTest(unittest.TestCase):
         event_id = self._event("reviewable.mp4")
         (config.CLIPS_DIR / "reviewable.mp4").write_bytes(b"placeholder")
         worker = video_analysis_worker.VideoAnalysisWorker()
-        health = Mock(ok=True, status_code=200)
-        health.json.return_value = {"status": "ready", "video_model": "nvidia/Cosmos-Reason2-2B"}
-        sequence_results = [
-            {"status": "ok", "inference_ms": 100, "result": {"summary": "Khung cảnh bình thường.", "risk_level": "none", "events": []}},
-            {"status": "ok", "inference_ms": 120, "result": {"summary": "Có một người.", "risk_level": "low", "events": [{"label": "nguoi", "count": 1}]}},
-        ]
         sequences = [
             {"start_seconds": 0.0, "end_seconds": 10.0, "frames": [(0.0, b"one"), (5.0, b"two")]},
-            {"start_seconds": 10.0, "end_seconds": 20.0, "frames": [(10.0, b"three"), (15.0, b"four")]},
         ]
+        fake_qwen_result = {
+            "reply": "Phát hiện có một người di chuyển, mức độ rủi ro nhẹ, vi phạm nhỏ.",
+            "duration": 5.0,
+        }
         with patch.object(worker, "_extract_adaptive_sequences", return_value=sequences), \
-             patch.object(worker, "_analyze_sequence", side_effect=sequence_results), \
-             patch.object(video_analysis_worker.requests, "get", return_value=health):
+             patch("qwen_vision_client.analyze_video_dense", return_value=fake_qwen_result):
             worker._process(event_id)
 
         analysis = database.get_video_analysis(event_id)
         self.assertEqual(analysis["status"], "completed")
         self.assertEqual(analysis["risk_level"], "low")
-        self.assertEqual(len(analysis["frames"]), 2)
-        self.assertEqual(analysis["frames"][1]["window_start_seconds"], 10.0)
-        self.assertEqual(analysis["video_model"], "nvidia/Cosmos-Reason2-2B")
+        self.assertIn("Qwen3.8-27B", analysis["video_model"])
 
     def test_missing_clip_is_terminal(self):
         event_id = self._event("missing.mp4")

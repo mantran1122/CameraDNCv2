@@ -12,7 +12,8 @@ class DahuaEventParserTest(unittest.TestCase):
         listener = dahua_client.DahuaNVRListener()
         with patch.object(dahua_client.config, "ACTIVE_CHANNELS", [5]), \
              patch.object(dahua_client.database, "save_event", return_value=42) as save_event, \
-             patch.object(dahua_client.database, "get_event_by_id", return_value=None):
+             patch.object(dahua_client.database, "get_event_by_id", return_value=None), \
+             patch.object(dahua_client.database, "create_audio_analysis"):
             listener.process_event_block("Code=HumanTrait;action=Start;index=4")
 
         self.assertEqual(save_event.call_count, 1)
@@ -24,7 +25,8 @@ class DahuaEventParserTest(unittest.TestCase):
         listener = dahua_client.DahuaNVRListener()
         with patch.object(dahua_client.config, "ACTIVE_CHANNELS", [1]), \
              patch.object(dahua_client.database, "save_event", return_value=43) as save_event, \
-             patch.object(dahua_client.database, "get_event_by_id", return_value=None):
+             patch.object(dahua_client.database, "get_event_by_id", return_value=None), \
+             patch.object(dahua_client.database, "create_audio_analysis"):
             listener.process_event_block("code=HumanTrait;Action=START;Index=0")
         self.assertEqual(save_event.call_args.kwargs["event_code"], "HumanTrait")
 

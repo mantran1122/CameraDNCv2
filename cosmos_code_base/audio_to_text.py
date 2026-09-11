@@ -1,14 +1,14 @@
 import argparse
+import os
+import subprocess
 import sys
 from pathlib import Path
 
 import torch
 
 
-def extract_audio(video_path: str, audio_path: str = None) -> str:
-    import subprocess
-    import os
-
+def extract_audio(video_path: str, audio_path: str = None, sample_rate: int = 16000) -> str:
+    """Extract mono PCM WAV from video file at specified sample rate."""
     if audio_path is None:
         temp_dir = os.path.join(os.path.dirname(video_path), "temp_audio")
         os.makedirs(temp_dir, exist_ok=True)
@@ -17,8 +17,8 @@ def extract_audio(video_path: str, audio_path: str = None) -> str:
     cmd = [
         "ffmpeg", "-y", "-i", video_path,
         "-vn", "-acodec", "pcm_s16le",
-        "-ar", "16000", "-ac", "1",
-        "-f", "wav", audio_path
+        "-ar", str(sample_rate), "-ac", "1",
+        "-f", "wav", audio_path,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -28,27 +28,61 @@ def extract_audio(video_path: str, audio_path: str = None) -> str:
 
 def transcribe_video(
     video_path: str,
-    model_id: str = "openai/whisper-base",
+    model_id: str = "whisper-large-v3-turbo",
     device: str = None,
     translate: bool = False,
-    language: str | None = None,
+    language: str | None = "vi",
     max_new_tokens: int = 512,
     chunk_length_s: int = 30,
     stride_length_s: int = 5,
     no_repeat_ngram_size: int = 3,
+    use_deepfilter: bool = True,
 ) -> dict:
     """Extract audio from video and transcribe.
 
-    Parameters added to reduce hallucination:
-    - translate: if True, will attempt to translate to English (avoid for fidelity)
-    - language: if provided (e.g., 'vi'), forces language for transcription
-    - deterministic generation settings (do_sample=False, temperature=0.0)
-    - chunk_length_s/stride_length_s: chunking to keep generation focused
+    Integrates DeepFilterNet3 for noise reduction and Faster-Whisper Large-v3
+    for accurate, low-hallucination Vietnamese speech-to-text.
     """
+    # 1. Check if we should use the new DeepFilterNet + Faster-Whisper pipeline
+    is_whisper = any(k in model_id.lower() for k in ["whisper", "large-v3", "base", "small", "medium", "tiny"])
+    has_custom_hf = "vinai/" in model_id or "/" in model_id and not any(k in model_id.lower() for k in ["openai/whisper", "systran/faster-whisper", "mobiuslabsgmbh/"])
+
+    if is_whisper and not has_custom_hf:
+        try:
+            from audio_enhancer import full_audio_pipeline
+            # When using DeepFilterNet, extract at 48000 Hz for optimal filtering
+            sr = 48000 if use_deepfilter else 16000
+            extracted_path = extract_audio(video_path, sample_rate=sr)
+            try:
+                return full_audio_pipeline(
+                    extracted_path,
+                    use_deepfilter=use_deepfilter,
+                    model_name=model_id,
+                    language=language or "vi",
+                )
+            finally:
+                if os.path.exists(extracted_path):
+                    try:
+                        os.unlink(extracted_path)
+                    except OSError:
+                        pass
+        except Exception as exc:
+            print(f"Faster-Whisper/DeepFilter pipeline notice: {exc}, falling back to transformers pipeline...", file=sys.stderr)
+
+    # 2. Fallback to HuggingFace Transformers pipeline
     from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
-    audio_path = extract_audio(video_path)
+    extracted_path = extract_audio(video_path, sample_rate=16000)
     try:
+        if use_deepfilter:
+            try:
+                from audio_enhancer import enhance_audio_file
+                cleaned_path = enhance_audio_file(extracted_path, target_sr=16000)
+                os.unlink(extracted_path)
+                extracted_path = cleaned_path
+            except Exception as df_err:
+                print(f"DeepFilterNet fallback notice: {df_err}", file=sys.stderr)
+
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         torch_dtype = torch.float16 if device == "cuda" else torch.float32
@@ -62,7 +96,6 @@ def transcribe_video(
         )
         processor = AutoProcessor.from_pretrained(model_id)
 
-        # Generation settings favoring fidelity and determinism
         generate_kwargs = {
             "do_sample": False,
             "temperature": 0.0,
@@ -70,7 +103,6 @@ def transcribe_video(
             "max_new_tokens": max_new_tokens,
         }
 
-        # Build pipeline with explicit generation kwargs and chunking where supported.
         pipe = pipeline(
             "automatic-speech-recognition",
             model=model,
@@ -81,43 +113,39 @@ def transcribe_video(
 
         transcribe_call_kwargs = {
             "return_timestamps": True,
-            # Whisper-style models often support chunking params in the pipeline call
             "chunk_length_s": chunk_length_s,
             "stride_length_s": stride_length_s,
-            # reduce hallucination by providing deterministic generation options
             "generate_kwargs": generate_kwargs,
         }
         if language:
             transcribe_call_kwargs["language"] = language
-        # If translate True, some models will translate into English; default is transcription in source language
         if translate:
             transcribe_call_kwargs["task"] = "translate"
         else:
             transcribe_call_kwargs["task"] = "transcribe"
 
         print("Transcribing video (fidelity-first settings)...", file=sys.stderr, flush=True)
-        # Call pipeline; many ASR pipelines accept these kwargs — if not supported, pipeline will ignore extras.
-        result = pipe(audio_path, **transcribe_call_kwargs)
+        result = pipe(extracted_path, **transcribe_call_kwargs)
 
-        # Basic post-check: if pipeline returned a single string without timestamps, wrap it
         if isinstance(result, str):
             return {"text": result}
 
         return result
     finally:
-        import os
-        try:
-            os.unlink(audio_path)
-        except Exception:
-            pass
+        if os.path.exists(extracted_path):
+            try:
+                os.unlink(extracted_path)
+            except Exception:
+                pass
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Transcribe audio from camera video")
+    parser = argparse.ArgumentParser(description="Transcribe audio from camera video using DeepFilterNet & Whisper Large-v3")
     parser.add_argument("--video", required=True, help="Path to input MP4 video")
     parser.add_argument("--output", default="outputs/transcription.txt", help="Output text file")
-    parser.add_argument("--model", default="openai/whisper-base", help="Hugging Face Whisper model")
+    parser.add_argument("--model", default="whisper-large-v3-turbo", help="Whisper model (e.g. whisper-large-v3-turbo, whisper-large-v3)")
     parser.add_argument("--device", default=None, choices=["cuda", "cpu"], help="Device to use")
+    parser.add_argument("--no-deepfilter", action="store_true", help="Disable DeepFilterNet noise reduction")
     args = parser.parse_args()
 
     video_path = Path(args.video)
@@ -128,7 +156,12 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Transcribing: {video_path}", file=sys.stderr, flush=True)
-    result = transcribe_video(str(video_path), model_id=args.model, device=args.device)
+    result = transcribe_video(
+        str(video_path),
+        model_id=args.model,
+        device=args.device,
+        use_deepfilter=not args.no_deepfilter,
+    )
 
     text = result.get("text", "")
     if isinstance(result.get("chunks"), list):

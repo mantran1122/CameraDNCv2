@@ -195,6 +195,10 @@ def clip_event_video(
         "-t", str(config.CLIP_DURATION_SEC),
         "-c:v", "libx264",
         "-c:a", "aac",
+        "-ar", "44100",
+        "-ac", "2",
+        "-b:a", "128k",
+        "-af", "volume=2.0",
         "-preset", "ultrafast",
         "-movflags", "+faststart",
         full_output_path

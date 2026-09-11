@@ -6,7 +6,7 @@
 
 | Thư mục | Ý nghĩa | Cách dùng |
 |---|---|---|
-| `01_hom_nay/` | Việc đang chốt và làm trong hôm nay | Đọc đầu tiên, cập nhật thường xuyên |
+| `01_hom_nay/` | Việc đang chốt và làm trong hôm nay (Gồm cả kế hoạch nâng cấp Audio, Video, LLM tại `01_hom_nay/KE_HOACH_NANG_CAP_AI_AUDIO_VIDEO_LLM.md`) | Đọc đầu tiên, cập nhật thường xuyên |
 | `02_dang_lam/` | Việc từ các ngày trước nhưng chưa hoàn tất | Chỉ mở khi bước hiện tại cần đến |
 | `99_tam_dung_xem_lai/` | Hướng cũ/tạm dừng, chưa xóa | Không code theo các file này nếu chưa chủ động mở lại |
 

@@ -86,52 +86,44 @@ class VideoAnalysisWorker:
             self._set_status(event_id, "failed", error_message="Không đọc được frame nào từ video evidence.")
             return
 
-        health_url = config.COSMOS_VIDEO_URL.rsplit("/", 1)[0] + "/health"
-        try:
-            health = requests.get(health_url, timeout=5)
-            health_data = health.json() if health.ok else {}
-        except requests.RequestException as exc:
-            self._set_status(event_id, "failed", error_message=f"Cosmos chưa sẵn sàng: {exc}")
-            return
-        if health_data.get("status") != "ready":
-            self._set_status(event_id, "failed", error_message=f"Cosmos chưa sẵn sàng: {health_data.get('status', health.status_code)}")
-            return
-
         self._set_status(event_id, "analyzing_sequences")
-        event_time = datetime.strptime(event["timestamp"], "%Y-%m-%d %H:%M:%S")
-        results = []
-        for sequence in sequences:
-            window_start = sequence["start_seconds"]
-            window_end = sequence["end_seconds"]
-            captured_at = (event_time - timedelta(seconds=config.PRE_BUFFER_SEC) + timedelta(seconds=window_start)).astimezone()
-            payload = self._analyze_sequence(sequence["frames"], event, captured_at, window_start, window_end)
-            results.append({
-                "window_start_seconds": window_start,
-                "window_end_seconds": window_end,
-                "frame_offsets_seconds": [offset for offset, _ in sequence["frames"]],
-                "captured_at": captured_at.isoformat(timespec="seconds"),
-                "inference_ms": payload.get("inference_ms"),
-                "result": payload["result"],
-            })
-
-        aggregate = self._aggregate(results)
-        audio_analysis = database.get_audio_analysis(event_id)
-        gemini_report, gemini_model = generate_final_video_report(event, results, audio_analysis)
-        final_report = gemini_report or build_vietnamese_fallback(results)
-        aggregate["summary"] = final_report["summary"]
-        aggregate["risk_level"] = final_report["risk_level"]
-        if final_report["recommended_action"]:
-            aggregate["summary"] += "\nKhuyến nghị: " + final_report["recommended_action"]
-        self._set_status(
-            event_id,
-            "completed",
-            summary=aggregate["summary"],
-            risk_level=aggregate["risk_level"],
-            events=aggregate["events"],
-            frames=results,
-            video_model=" + ".join(part for part in [health_data.get("video_model"), gemini_model] if part),
-            analyzed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+        prompt = (
+            f"Phân tích sự kiện camera an ninh {event.get('event_code', '')} (Sự kiện #{event_id}) "
+            f"lúc {event.get('timestamp', '')}: {event.get('description', '')}. "
+            f"Hãy tóm tắt hoạt động, diễn biến đối tượng theo mốc giây, đánh giá rủi ro an ninh và khuyến nghị hành động."
         )
+
+        try:
+            from qwen_vision_client import analyze_video_dense
+            res = analyze_video_dense(clip_path, prompt=prompt, num_frames=config.DENSE_FRAMES_COUNT)
+            reply_text = res["reply"]
+
+            # Parse approximate risk level
+            lowered = reply_text.lower()
+            if any(k in lowered for k in ["nguy hiểm", "đột nhập", "xô xát", "đánh nhau", "cháy", "khẩn cấp"]):
+                risk_level = "high"
+            elif any(k in lowered for k in ["nghi vấn", "bất thường", "chú ý", "cảnh báo"]):
+                risk_level = "medium"
+            elif any(k in lowered for k in ["nhẹ", "vi phạm nhỏ"]):
+                risk_level = "low"
+            else:
+                risk_level = "none"
+
+            self._set_status(
+                event_id,
+                "completed",
+                summary=reply_text,
+                risk_level=risk_level,
+                events=[{"event": event.get("event_code"), "detail": reply_text[:120]}],
+                frames=[],
+                video_model=f"Qwen3.8-27B (4x NVIDIA H200 SGLang)",
+                analyzed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+            )
+            return
+        except Exception as exc:
+            print(f"[VIDEO AI] Qwen dense analysis failed for event #{event_id}: {exc}")
+            self._set_status(event_id, "failed", error_message=f"Lỗi phân tích AI Server H200: {exc}")
+            return
         # Keep the report in the existing suggestion field so both the main
         # event modal and /test-ai display the same Gemini conclusion.
         if gemini_report:

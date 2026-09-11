@@ -5,8 +5,10 @@ optional transcript.  Gemini receives only that structured text evidence, not
 the original surveillance video or frames.
 """
 
+import base64
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -21,7 +23,7 @@ _VIETNAMESE_WORDS = {
     "không", "có", "người", "video", "đoạn", "hình", "ảnh", "mức", "rủi",
     "ro", "cần", "kiểm", "tra", "phát", "hiện", "khuyến", "nghị", "thời", "gian",
 }
-_DEFAULT_MODEL = "gemini-2.0-flash"
+_DEFAULT_MODEL = "gemini-2.5-flash"
 _LOCAL_CONFIG_FILE = Path(
     os.getenv(
         "CAMERAAI_GEMINI_CONFIG_FILE",
@@ -166,36 +168,81 @@ def generate_final_video_report(event: dict[str, Any], windows: list[dict[str, A
             "cosmos_events": result.get("events", []),
         })
     transcript = ""
-    # A valid transcript remains usable when a previous LLM attempt left the
-    # audio row in ``transcribed`` instead of ``completed``.
+    audio_rms = None
     if audio_analysis:
         transcript = str(audio_analysis.get("transcript") or "")[:6000]
+        audio_rms = audio_analysis.get("audio_rms")
 
     evidence = {
-        "event": {"code": event.get("event_code"), "channel": event.get("channel"), "timestamp": event.get("timestamp")},
+        "event": {
+            "id": event.get("id"),
+            "code": event.get("event_code"),
+            "channel": event.get("channel"),
+            "timestamp": event.get("timestamp"),
+            "description": event.get("description"),
+            "severity": event.get("severity"),
+        },
         "visual_windows_from_cosmos": visual_evidence,
-        "audio_transcript_from_phowhisper": transcript or None,
+        "audio_from_phowhisper": {
+            "transcript": transcript or None,
+            "audio_level_dbfs": audio_rms,
+            "has_audio_track": bool(audio_analysis.get("status") != "no_audio_track") if audio_analysis else None,
+        } if audio_analysis else None,
     }
-    instruction = """Bạn là lớp tổng hợp cuối cho hệ thống camera an ninh. Hãy viết hoàn toàn bằng tiếng Việt có dấu.
-Cosmos và PhoWhisper chỉ là bằng chứng không hoàn hảo, có thể sai. Không được bịa, không suy luận danh tính, ý định, nguyên nhân, thương tích hay hành vi không có trong bằng chứng. Chỉ tăng mức rủi ro khi nhiều bằng chứng hỗ trợ rõ ràng. Nếu video không đủ rõ để kết luận đánh nhau/ngã/xâm nhập, ghi rõ 'cần kiểm tra clip gốc'.
-Trả về đúng JSON, không markdown:
+    instruction = """Bạn là chuyên gia thẩm định an ninh thị giác & âm thanh đa phương thức cho hệ thống camera giám sát. Hãy viết hoàn toàn bằng tiếng Việt có dấu.
+
+QUY TẮC ĐỐI CHIẾU MÔI TRƯỜNG & CHỐNG ẢO GIÁC BẮT BUỘC:
+1. Mô hình Cosmos (thị giác) và PhoWhisper (âm thanh) là mô hình chạy cục bộ, ĐỘ TIN CẬY KHÔNG TUYỆT ĐỐI và thường xuyên hiểu sai bối cảnh (false positive):
+   - Người đi lại nhanh hoặc cử chỉ tay bình thường có thể bị Cosmos phán đoán nhầm là đánh nhau/đuổi bắt.
+   - Tiếng ồn nền, tiếng xe cộ hoặc quạt gió có thể bị PhoWhisper dịch nhầm thành tiếng la hét/cãi vã.
+2. PHẢI ĐỐI CHIẾU CHÉO (CROSS-CHECK):
+   - Nếu Cosmos nghi ngờ 'đánh nhau/xô xát' nhưng âm thanh bình thường (dBFS thấp < -40dBFS, không có tiếng thét/la) -> KHÔNG KẾT LUẬN ĐÁNH NHAU, chỉ ghi nhận là 'có chuyển động nhanh/tương tác gần, âm thanh bình thường, nghi vấn cử chỉ thông thường, cần người kiểm tra clip gốc'.
+   - Nếu PhoWhisper sinh từ ngữ tiêu cực nhưng mức dBFS rất thấp hoặc không có người trong video -> coi đó là nhiễu âm thanh nền.
+   - Chỉ xác nhận rủi ro 'high' hoặc 'medium' khi cả hình ảnh lẫn âm thanh đều đồng nhất bằng chứng rõ ràng.
+3. Tuyệt đối không bịa đặt, không suy đoán danh tính, động cơ, thương tích không có trong dữ liệu.
+
+Trả về đúng định dạng JSON (không dùng markdown):
 {
-  "summary": "kết luận nghiệp vụ ngắn có mốc thời gian nếu có",
+  "summary": "Đoạn kết luận ngắn gọn, chuẩn xác, nêu rõ tình hình thực tế và mốc thời gian nếu có",
   "risk_level": "none|low|medium|high",
-  "recommended_action": "hành động thực tế",
-  "evidence": [{"source":"Cosmos hoặc PhoWhisper","detail":"bằng chứng có mốc thời gian"}]
+  "recommended_action": "Hành động thực tế cho người vận hành (ví dụ: Tiếp tục giám sát / Kiểm tra trực tiếp tại hiện trường / Xem lại clip gốc)",
+  "evidence": [{"source": "Cosmos Video / PhoWhisper Audio / Metadata NVR", "detail": "Chi tiết bằng chứng thực tế"}]
 }
 
 Dữ liệu bằng chứng:
 """ + json.dumps(evidence, ensure_ascii=False)
     payload = {
         "contents": [{"role": "user", "parts": [{"text": instruction}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 900, "responseMimeType": "application/json"},
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 4096,
+            "thinkingConfig": {"thinkingBudget": 0},
+            "responseMimeType": "application/json",
+        },
     }
     endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent".format(quote(model, safe=""))
+    response = None
+    for attempt in range(3):
+        try:
+            response = requests.post(endpoint, headers={"x-goog-api-key": api_key}, json=payload, timeout=75)
+            if response.status_code == 400 and "thinkingConfig" in response.text:
+                payload["generationConfig"].pop("thinkingConfig", None)
+                response = requests.post(endpoint, headers={"x-goog-api-key": api_key}, json=payload, timeout=75)
+            if response.status_code == 429:
+                time.sleep(2.0 * (attempt + 1))
+                continue
+            response.raise_for_status()
+            break
+        except requests.RequestException as exc:
+            if attempt == 2:
+                print(f"[GEMINI] Final video report failed: {exc}")
+                return None, None
+            time.sleep(1.5)
+
+    if not response or not response.ok:
+        return None, None
+
     try:
-        response = requests.post(endpoint, headers={"x-goog-api-key": api_key}, json=payload, timeout=75)
-        response.raise_for_status()
         payload = response.json()
         parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
         text = "".join(str(part.get("text", "")) for part in parts if isinstance(part, dict))
@@ -204,6 +251,93 @@ Dữ liệu bằng chứng:
             print("[GEMINI] No usable JSON report returned")
             return None, None
         return report, model
-    except (requests.RequestException, ValueError, IndexError, KeyError) as exc:
-        print(f"[GEMINI] Final video report failed: {exc}")
+    except (ValueError, IndexError, KeyError) as exc:
+        print(f"[GEMINI] Final video report parsing failed: {exc}")
         return None, None
+
+
+def transcribe_and_analyze_audio_with_gemini(wav_path: str) -> dict[str, Any] | None:
+    """Listen to extracted audio using Gemini multimodal to accurately transcribe and classify sounds."""
+    api_key, model, _ = get_gemini_settings()
+    if not api_key:
+        return None
+
+    path_obj = Path(wav_path)
+    if not path_obj.is_file() or path_obj.stat().st_size == 0:
+        return None
+
+    try:
+        audio_bytes = path_obj.read_bytes()
+        b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+        prompt = (
+            "Bạn là chuyên gia an ninh thẩm định âm thanh camera giám sát. Hãy lắng nghe đoạn âm thanh trích xuất từ camera:\n"
+            "1. Lắng nghe và bóc tách CHÍNH XÁC lời nói (tiếng Việt) nếu có người nói chuyện.\n"
+            "2. Nhận diện các loại âm thanh môi trường xung quanh (tiếng bước chân, tiếng gõ, tiếng cười, nói chuyện, cãi vã, la hét, im lặng, tiếng quạt/xe cộ...).\n"
+            "3. Đánh giá mức độ rủi ro an ninh (none/low/medium/high).\n"
+            "Trả về đúng định dạng JSON (không dùng markdown):\n"
+            "{\n"
+            '  "transcript": "nội dung bóc băng chính xác hoặc chuỗi rỗng nếu không có ai nói",\n'
+            '  "detected_sounds": ["danh sách các âm thanh nghe được"],\n'
+            '  "summary": "Tóm tắt ngắn gọn và trung thực những gì nghe thấy được bằng tiếng Việt",\n'
+            '  "speech_detected": true/false,\n'
+            '  "risk_level": "none/low/medium/high"\n'
+            "}"
+        )
+        payload = {
+            "contents": [{
+                "role": "user",
+                "parts": [
+                    {"text": prompt},
+                    {"inline_data": {"mime_type": "audio/wav", "data": b64_audio}}
+                ]
+            }],
+            "generationConfig": {
+                "temperature": 0.1,
+                "maxOutputTokens": 2048,
+                "thinkingConfig": {"thinkingBudget": 0},
+                "responseMimeType": "application/json",
+            }
+        }
+        endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent".format(quote(model, safe=""))
+        response = None
+        for attempt in range(3):
+            try:
+                response = requests.post(endpoint, headers={"x-goog-api-key": api_key}, json=payload, timeout=45)
+                if response.status_code == 400 and "thinkingConfig" in response.text:
+                    payload["generationConfig"].pop("thinkingConfig", None)
+                    response = requests.post(endpoint, headers={"x-goog-api-key": api_key}, json=payload, timeout=45)
+                if response.status_code == 429:
+                    time.sleep(2.0 * (attempt + 1))
+                    continue
+                response.raise_for_status()
+                break
+            except requests.RequestException as exc:
+                if attempt == 2:
+                    print(f"[GEMINI AUDIO] Network error: {exc}")
+                    return None
+                time.sleep(1.5)
+
+        if not response or not response.ok:
+            return None
+        parts = response.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
+        text = "".join(str(part.get("text", "")) for part in parts if isinstance(part, dict))
+        extracted = _extract_json(text)
+        if not extracted or not isinstance(extracted, dict):
+            return None
+        transcript = str(extracted.get("transcript") or "").strip()
+        speech_detected = bool(extracted.get("speech_detected") or transcript)
+        detected_sounds = extracted.get("detected_sounds", [])
+        if not isinstance(detected_sounds, list):
+            detected_sounds = []
+        return {
+            "transcript": transcript,
+            "speech_detected": int(speech_detected),
+            "detected_sounds": [str(s) for s in detected_sounds],
+            "summary": str(extracted.get("summary") or "").strip(),
+            "risk_level": str(extracted.get("risk_level", "none")).lower(),
+            "audio_model": f"Gemini ({model})",
+        }
+    except Exception as exc:
+        print(f"[GEMINI AUDIO] Audio transcription error: {exc}")
+        return None
+

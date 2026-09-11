@@ -4,8 +4,8 @@
 !.env.example
 !*.example.env
 **/config.json
-CameraAI/storage/nvr_config.json
-CameraAI/storage/gemini_config.json
+CameraAI/storage/*
+!CameraAI/storage/.gitkeep
 .omo/
 *.pem
 *.key

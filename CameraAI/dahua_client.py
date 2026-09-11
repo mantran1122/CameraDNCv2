@@ -106,15 +106,26 @@ class DahuaNVRListener(threading.Thread):
             event_type = "audio_anomaly"
             severity = "high"
             audio_db = float(event_data.get("AudioValue", 85.0))
-            description = f"BẤT THƯỜNG ĐÃ CHỌN: {code} ({audio_db} dB) tại Cam {channel:02d}"
+            description = f"Cảnh Báo Âm Thanh: {code} ({audio_db} dB) tại Cam {channel:02d}"
         elif is_selected_abnormal:
             event_type = "video_anomaly"
             severity = "high"
-            description = f"BẤT THƯỜNG ĐÃ CHỌN TỪ METADATA: {code} tại Cam {channel:02d}"
+            code_vn_map = {
+                "Intrusion": "Xâm nhập trái phép",
+                "CrossLine": "Vượt vạch cấm",
+                "Fight": "Ẩu đả / Xô xát",
+                "VideoMotion": "Chuyển động bất thường",
+                "SoundDetection": "Âm thanh bất thường",
+                "AudioAnomaly": "Âm thanh đột biến",
+            }
+            vn_code = code_vn_map.get(code, code)
+            description = f"Cảnh Báo An Ninh ({vn_code}) tại Cam {channel:02d}"
         elif code in ["FaceDetection", "HumanTrait"]:
-            description = f"Metadata Người: Phát hiện đối tượng tại Cam {channel:02d}"
+            description = f"Phát hiện người (Human Trait) tại Cam {channel:02d}"
         elif code in ["VehicleTrait"]:
-            description = f"Metadata Phương tiện: Phát hiện xe tại Cam {channel:02d}"
+            description = f"Phát hiện phương tiện (Vehicle Trait) tại Cam {channel:02d}"
+        else:
+            description = f"Sự kiện {code} tại Cam {channel:02d}"
 
         event_id = database.save_event(
             event_code=code,
