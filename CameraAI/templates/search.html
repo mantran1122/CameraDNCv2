@@ -5822,20 +5822,17 @@ user=None`;
                 }
                 const wfStatus = document.getElementById('wf-status-indicator');
                 if (wfStatus) {
-                    wfStatus.innerText = `BƯỚC 2: SERVER 4x H200 PHÂN TÍCH 32 FRAMES... [${min}:${sec}s]`;
                     wfStatus.innerText = `BƯỚC 2: SERVER 4x H200 PHÂN TÍCH THỊ GIÁC & ÂM THANH... [${min}:${sec}s]`;
                 }
             }, 1000);
 
             // GIAI ĐOẠN 1 THỰC TẾ: VIOS trích xuất frame từ file video clip
-            syncWorkflowStage('vios', 'BƯỚC 1: VIOS CẮT 32 FRAMES TỪ VIDEO CLIP...');
-            syncWorkflowStage('vios', 'BƯỚC 1: VIOS CẮT 32 FRAMES & LỌC NHIỄU ÂM THANH...');
+            syncWorkflowStage('vios', 'BƯỚC 1: VIOS CẮT 8 FRAMES & LỌC NHIỄU ÂM THANH...');
 
             try {
-                // GIAI ĐOẠN 2 THỰC TẾ: Server 4x H200 (VLM Qwen 3.8-27B) đang phân tích thị giác 32 frames (Node VLM chớp nhịp theo thời gian thực)
+                // GIAI ĐOẠN 2 THỰC TẾ: Server 4x H200 (VLM Qwen 3.8-27B) đang phân tích thị giác & âm thanh đa phương thức
                 setTimeout(() => {
                     if (window.isChatActive) {
-                        syncWorkflowStage('vlm_dense_frames', 'BƯỚC 2: SERVER 4x H200 (QWEN 3.8-27B VLM) ĐANG PHÂN TÍCH 32 FRAMES...', true);
                         syncWorkflowStage('vlm_dense_frames', 'BƯỚC 2: SERVER 4x H200 (QWEN 3.8-27B) ĐANG PHÂN TÍCH ĐA PHƯƠNG THỨC...', true);
                     }
                 }, 400);
@@ -5848,7 +5845,7 @@ user=None`;
                         clip_filename: videoContext.clipFilename,
                         event_id: videoContext.eventId,
                         query: queryText,
-                        num_frames: 32
+                        num_frames: 8
                     })
                 });
 
@@ -5860,7 +5857,7 @@ user=None`;
                 const data = await res.json();
                 const replyText = data.reply || 'Đã phân tích xong video.';
                 const reasoningText = data.reasoning || '';
-                const frameCount = data.frame_count || 32;
+                const frameCount = data.frame_count || 8;
                 const serverTag = `${data.model || 'Qwen3.8-27B'} · Server 4x H200 (${frameCount} frames + Audio)`;
 
                 // GIAI ĐOẠN 3 THỰC TẾ: Hoàn tất phản hồi VLM xuất ra chat

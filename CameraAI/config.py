@@ -146,7 +146,8 @@ QWEN_USER_AGENT = os.getenv(
     "QWEN_USER_AGENT",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
-DENSE_FRAMES_COUNT = int(os.getenv("DENSE_FRAMES_COUNT", "32"))
+DENSE_FRAMES_COUNT = int(os.getenv("DENSE_FRAMES_COUNT", "8"))
+MAX_VLM_FRAMES = int(os.getenv("MAX_VLM_FRAMES", "8"))
 
 # Internal Audio AI Server (Speech-to-Text & Sound Anomaly Detection)
 INTERNAL_AUDIO_SERVER_URL = os.getenv("INTERNAL_AUDIO_SERVER_URL", "https://llm.ttpmsandbox.us.kg/v1/audio").rstrip("/")

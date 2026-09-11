@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def extract_dense_frames(
     clip_path: Path | str,
-    num_frames: int = 32,
+    num_frames: int = 8,
     max_dim: int = 768,
     jpeg_quality: int = 80,
 ) -> List[Tuple[float, str]]:
@@ -152,8 +152,16 @@ def call_qwen_chat(
             "usage": data.get("usage", {}),
         }
     except requests.RequestException as exc:
-        logger.error(f"[Qwen Server Error]: {exc}")
-        raise RuntimeError(f"Lỗi kết nối Server AI 4x H200 ({config.QWEN_SERVER_URL}): {exc}")
+        err_detail = ""
+        if getattr(exc, "response", None) is not None:
+            try:
+                err_json = exc.response.json()
+                msg = err_json.get("error", {}).get("message") or exc.response.text
+                err_detail = f" (Chi tiết máy chủ: {msg})"
+            except Exception:
+                err_detail = f" (Chi tiết máy chủ: {exc.response.text[:200]})"
+        logger.error(f"[Qwen Server Error]: {exc}{err_detail}")
+        raise RuntimeError(f"Lỗi kết nối Server AI 4x H200 ({config.QWEN_SERVER_URL}): {exc}{err_detail}")
 
 
 def analyze_video_dense(
@@ -164,32 +172,26 @@ def analyze_video_dense(
     audio_analysis: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Dense Video Multimodal Analysis:
-    1. Extracts 32 (or num_frames) dense frames from the video.
-    2. Builds an OpenAI multimodal payload with frame sequence and timestamps.
-    3. Calls Qwen3.8-27B on 4x H200 to generate detailed action analysis and reasoning.
     Dense Video Multimodal Analysis kết hợp âm thanh thực tế:
-    1. Trích xuất 32 (hoặc num_frames) dense frames từ video.
+    1. Trích xuất tối đa num_frames (giới hạn an toàn bởi config.MAX_VLM_FRAMES = 8) từ video.
     2. Đưa chuỗi frame và dữ liệu âm thanh thực tế (đã qua lọc DeepFilterNet) vào prompt.
-    3. Gọi Qwen3.8-27B trên Server 4x H200 để phân tích toàn diện đa phương thức.
+    3. Gọi Qwen3.8 trên Server 4x H200 để phân tích toàn diện đa phương thức.
     """
-    num_frames = num_frames or config.DENSE_FRAMES_COUNT
-    frames = extract_dense_frames(clip_path, num_frames=num_frames)
+    max_frames = getattr(config, "MAX_VLM_FRAMES", 8)
+    target_frames = num_frames or config.DENSE_FRAMES_COUNT
+    effective_frames = min(target_frames, max_frames)
+
+    frames = extract_dense_frames(clip_path, num_frames=effective_frames)
     if not frames:
         raise ValueError(f"Không trích xuất được frame nào từ video {clip_path}")
 
     system_prompt = (
-        "Bạn là 'Vision Agent' - trợ lý AI chuyên gia thị giác máy tính và phân tích an ninh giám sát video thông minh "
-        "thuộc hệ thống VSS Blueprint (chạy trên Server 4x NVIDIA H200 siêu tốc).\n\n"
-        "Bạn là 'Vision & Audio Agent' - trợ lý AI chuyên gia phân tích đa phương thức (Thị giác 32 frames + Âm thanh thực tế) "
+        "Bạn là 'Vision & Audio Agent' - trợ lý AI chuyên gia phân tích đa phương thức (Thị giác các frame video liên tiếp + Âm thanh thực tế) "
         "thuộc hệ thống VSS Blueprint (Server 4x NVIDIA H200 siêu tốc).\n\n"
         "NHIỆM VỤ:\n"
-        "1. Phân tích chuỗi các frame liên tiếp được trích xuất từ clip video camera giám sát theo trình tự thời gian.\n"
-        "1. Phân tích chuỗi 32 frame liên tiếp theo trình tự thời gian kết hợp ĐỐI CHIẾU CHÉO với âm thanh thực tế được cung cấp.\n"
+        "1. Phân tích chuỗi frame liên tiếp theo trình tự thời gian kết hợp ĐỐI CHIẾU CHÉO với âm thanh thực tế được cung cấp.\n"
         "2. Xác định chi tiết: Các đối tượng (người, phương tiện, vật thể), đặc điểm trang phục/bảo hộ, hành động cụ thể.\n"
         "3. Nêu rõ diễn biến theo từng mốc thời gian (giây) nếu có hành vi đáng chú ý.\n"
-        "4. Đánh giá mức độ an toàn/rủi ro: Bình thường, Nghi vấn, hay Nguy hiểm/Bất thường.\n"
-        "5. Đưa ra kết luận và khuyến nghị rõ ràng, trực diện bằng tiếng Việt chuyên nghiệp."
         "4. TỔNG HỢP CẢ HÌNH ẢNH VÀ ÂM THANH THỰC TẾ: Trình bày rõ ràng những gì quan sát được từ hình ảnh và những gì nghe thấy từ âm thanh (lời thoại, tiếng động).\n"
         "5. Đánh giá mức độ an toàn/rủi ro: Bình thường, Nghi vấn, hay Nguy hiểm/Bất thường.\n"
         "6. Đưa ra kết luận và khuyến nghị rõ ràng, trực diện bằng tiếng Việt chuyên nghiệp."
@@ -226,12 +228,6 @@ def analyze_video_dense(
     user_content: List[Dict[str, Any]] = [
         {
             "type": "text",
-            "text": (
-                f"Dưới đây là chuỗi {len(frames)} frame hình ảnh liên tiếp được cắt đều từ clip camera an ninh "
-                f"từ giây 0 đến kết thúc.\n\n"
-                f"YÊU CẦU CỦA NGƯỜI VẬN HÀNH:\n{prompt}\n\n"
-                "Hãy phân tích chi tiết diễn biến và trả lời đầy đủ yêu cầu trên."
-            ),
             "text": user_prompt_text,
         }
     ]
