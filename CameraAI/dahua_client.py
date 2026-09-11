@@ -25,28 +25,40 @@ class DahuaNVRListener(threading.Thread):
             return
 
         self.is_running = True
-        protocol = "https" if config.USE_HTTPS else "http"
-        url = (
-            f"{protocol}://{config.NVR_HOST}:{config.NVR_PORT}/cgi-bin/eventManager.cgi"
-            # Dahua firmwares differ in which individual event codes they
-            # accept.  Subscribe to All and classify/filter locally so one
-            # unsupported code cannot silently suppress the whole stream.
-            "?action=attach&codes=[All]"
-        )
-        print(f"[DahuaClient] Connecting to Dahua NVR event stream over Internet/WAN: {url}")
-        
-        auth = HTTPDigestAuth(config.NVR_USER, config.NVR_PASSWORD)
         
         while self.is_running:
+            # Auto-detect HTTPS: Port 4443, 443, 8443 or config.USE_HTTPS
+            use_https = bool(config.USE_HTTPS or config.NVR_PORT in (443, 4443, 8443))
+            protocol = "https" if use_https else "http"
+            url = (
+                f"{protocol}://{config.NVR_HOST}:{config.NVR_PORT}/cgi-bin/eventManager.cgi"
+                "?action=attach&codes=[All]"
+            )
+            print(f"[DahuaClient] Connecting to Dahua NVR event stream ({protocol.upper()}): {url}")
+            
+            auth = HTTPDigestAuth(config.NVR_USER, config.NVR_PASSWORD)
+            
             try:
                 response = requests.get(url, auth=auth, stream=True, timeout=60, verify=False)
                 if response.status_code == 200:
-                    print(f"[DahuaClient] Connected successfully to Dahua NVR ({config.NVR_HOST}).")
+                    print(f"[DahuaClient] Connected successfully to Dahua NVR ({config.NVR_HOST}:{config.NVR_PORT}).")
                     self.parse_multipart_stream(response)
                 else:
                     print(f"[DahuaClient] HTTP Error {response.status_code} from NVR ({config.NVR_HOST}). Retrying in 10s...")
                     time.sleep(10)
             except Exception as e:
+                # If HTTP failed, try HTTPS fallback automatically
+                if protocol == "http":
+                    try:
+                        fallback_url = f"https://{config.NVR_HOST}:{config.NVR_PORT}/cgi-bin/eventManager.cgi?action=attach&codes=[All]"
+                        print(f"[DahuaClient] Trying HTTPS fallback to {fallback_url}...")
+                        fb_resp = requests.get(fallback_url, auth=auth, stream=True, timeout=60, verify=False)
+                        if fb_resp.status_code == 200:
+                            print(f"[DahuaClient] Connected successfully via HTTPS fallback ({config.NVR_HOST}).")
+                            self.parse_multipart_stream(fb_resp)
+                            continue
+                    except Exception as fb_err:
+                        print(f"[DahuaClient] HTTPS fallback failed: {fb_err}")
                 print(f"[DahuaClient] Connection error to {config.NVR_HOST}: {e}. Retrying in 10s...")
                 time.sleep(10)
 
@@ -101,7 +113,10 @@ class DahuaNVRListener(threading.Thread):
         description = f"Phát hiện sự kiện {code} tại Camera Ch {channel:02d}"
         audio_db = None
         
-        is_selected_abnormal = code in config.ABNORMAL_EVENT_CODES
+        is_selected_abnormal = (
+            code in config.ABNORMAL_EVENT_CODES
+            or (code == "SmartMotionHuman" and "HumanTrait" in config.ABNORMAL_EVENT_CODES)
+        )
         if is_selected_abnormal and code in config.AUDIO_EVENT_CODES:
             event_type = "audio_anomaly"
             severity = "high"
@@ -109,7 +124,7 @@ class DahuaNVRListener(threading.Thread):
             description = f"Cảnh Báo Âm Thanh: {code} ({audio_db} dB) tại Cam {channel:02d}"
         elif is_selected_abnormal:
             event_type = "video_anomaly"
-            severity = "high"
+            severity = "medium" if code in ["HumanTrait", "SmartMotionHuman", "FaceDetection"] else "high"
             code_vn_map = {
                 "Intrusion": "Xâm nhập trái phép",
                 "CrossLine": "Vượt vạch cấm",
@@ -117,9 +132,13 @@ class DahuaNVRListener(threading.Thread):
                 "VideoMotion": "Chuyển động bất thường",
                 "SoundDetection": "Âm thanh bất thường",
                 "AudioAnomaly": "Âm thanh đột biến",
+                "HumanTrait": "Người di chuyển (Human Trait)",
+                "SmartMotionHuman": "Người di chuyển (Smart Motion)",
+                "FaceDetection": "Nhận diện khuôn mặt",
+                "VehicleTrait": "Phương tiện di chuyển",
             }
             vn_code = code_vn_map.get(code, code)
-            description = f"Cảnh Báo An Ninh ({vn_code}) tại Cam {channel:02d}"
+            description = f"Cảnh Báo ({vn_code}) tại Cam {channel:02d}"
         elif code in ["FaceDetection", "HumanTrait"]:
             description = f"Phát hiện người (Human Trait) tại Cam {channel:02d}"
         elif code in ["VehicleTrait"]:

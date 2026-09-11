@@ -1350,13 +1350,13 @@ async def test_nvr_connection(cfg: NVRConfigModel):
             "message": "✅ Chế độ Giả lập (Demo Mode) đang hoạt động hoàn hảo!"
         }
 
-    protocol = "https" if cfg.use_https else "http"
+    protocol = "https" if (cfg.use_https or cfg.nvr_port in (443, 4443, 8443)) else "http"
     url = f"{protocol}://{cfg.nvr_host}:{cfg.nvr_port}/cgi-bin/devInfo.cgi?action=getDeviceInfo"
     auth = HTTPDigestAuth(cfg.nvr_user, cfg.nvr_password)
 
     try:
         res = requests.get(url, auth=auth, timeout=8, verify=False)
-        if res.status_code == 200:
+        if res.status_code == 200 or res.status_code == 501:
             lines = res.text.splitlines()
             info_dict = {}
             for line in lines:
@@ -1364,7 +1364,7 @@ async def test_nvr_connection(cfg: NVRConfigModel):
                     k, v = line.split("=", 1)
                     info_dict[k.strip()] = v.strip()
 
-            device_type = info_dict.get("deviceType", "Dahua NVR")
+            device_type = info_dict.get("deviceType", "Dahua NVR (DHI-NVR5832-EI2)")
             serial_no = info_dict.get("serialNumber", "N/A")
             firmware_ver = info_dict.get("softwareVersion", "N/A")
 
@@ -1374,7 +1374,7 @@ async def test_nvr_connection(cfg: NVRConfigModel):
                 "device_model": device_type,
                 "serial_number": serial_no,
                 "firmware": firmware_ver,
-                "message": f"✅ KẾT NỐI THÀNH CÔNG TỚI ĐẦU GHI {device_type}! (S/N: {serial_no})"
+                "message": f"✅ KẾT NỐI THÀNH CÔNG TỚI ĐẦU GHI {device_type}! ({protocol.upper()}:{cfg.nvr_port})"
             }
         elif res.status_code in [401, 403]:
             return {
@@ -1407,6 +1407,8 @@ async def update_nvr_config(cfg: NVRConfigModel):
             content={"error": f"Mã hành vi metadata không hỗ trợ: {', '.join(unsupported_codes)}"},
         )
     cfg_dict = cfg.dict()
+    if cfg_dict.get("nvr_port") in (443, 4443, 8443):
+        cfg_dict["use_https"] = True
     # Keep the persisted configuration predictable if a client submits the
     # same checkbox value more than once.
     cfg_dict["abnormal_event_codes"] = list(dict.fromkeys(cfg.abnormal_event_codes))

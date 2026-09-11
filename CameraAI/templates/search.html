@@ -8275,7 +8275,22 @@ user=None`;
             if (rtspInput && NCC_NVR_CONFIG.rtsp_port) rtspInput.value = NCC_NVR_CONFIG.rtsp_port;
             if (userInput && NCC_NVR_CONFIG.nvr_user) userInput.value = NCC_NVR_CONFIG.nvr_user;
             if (passInput && NCC_NVR_CONFIG.nvr_password) passInput.value = NCC_NVR_CONFIG.nvr_password;
-            if (httpsInput && NCC_NVR_CONFIG.use_https !== undefined) httpsInput.checked = !!NCC_NVR_CONFIG.use_https;
+            if (httpsInput) {
+                if (NCC_NVR_CONFIG.use_https !== undefined && NCC_NVR_CONFIG.use_https !== null) {
+                    httpsInput.checked = !!NCC_NVR_CONFIG.use_https;
+                } else if (portInput && (portInput.value === '4443' || portInput.value === '443')) {
+                    httpsInput.checked = true;
+                }
+            }
+            if (portInput && !portInput.hasAttribute('data-bound-https')) {
+                portInput.setAttribute('data-bound-https', '1');
+                portInput.addEventListener('input', () => {
+                    const val = portInput.value.trim();
+                    if (val === '4443' || val === '443') {
+                        if (httpsInput) httpsInput.checked = true;
+                    }
+                });
+            }
 
             renderNccAbnormalBehaviors();
             renderNccConfigTableRows(camsList);
@@ -8424,13 +8439,16 @@ user=None`;
             const banner = document.getElementById('ncc-cfg-status-banner');
             if (btn) btn.innerHTML = '<span>⏳ Đang kiểm tra...</span>';
 
+            const testPort = parseInt(document.getElementById('cfg-nvr-port').value, 10) || 4443;
+            const testUseHttps = document.getElementById('cfg-use-https').checked || testPort === 4443 || testPort === 443;
+
             const payload = {
                 nvr_host: document.getElementById('cfg-nvr-host').value.trim(),
-                nvr_port: parseInt(document.getElementById('cfg-nvr-port').value, 10) || 4443,
+                nvr_port: testPort,
                 rtsp_port: parseInt(document.getElementById('cfg-rtsp-port').value, 10) || 33554,
                 nvr_user: document.getElementById('cfg-nvr-user').value.trim(),
                 nvr_password: document.getElementById('cfg-nvr-pass').value.trim(),
-                use_https: document.getElementById('cfg-use-https').checked,
+                use_https: testUseHttps,
                 active_channels: NCC_NVR_CONFIG.active_channels || [11, 18, 19, 20],
                 demo_mode: false,
                 abnormal_event_codes: NCC_NVR_CONFIG.abnormal_event_codes || []
@@ -8498,13 +8516,16 @@ user=None`;
                 abnormalCodes.push(cb.value);
             });
 
+            const nvrPort = parseInt(document.getElementById('cfg-nvr-port').value, 10) || 4443;
+            const useHttps = document.getElementById('cfg-use-https').checked || nvrPort === 4443 || nvrPort === 443;
+
             const payload = {
                 nvr_host: document.getElementById('cfg-nvr-host').value.trim(),
-                nvr_port: parseInt(document.getElementById('cfg-nvr-port').value, 10) || 4443,
+                nvr_port: nvrPort,
                 rtsp_port: parseInt(document.getElementById('cfg-rtsp-port').value, 10) || 33554,
                 nvr_user: document.getElementById('cfg-nvr-user').value.trim(),
                 nvr_password: document.getElementById('cfg-nvr-pass').value.trim(),
-                use_https: document.getElementById('cfg-use-https').checked,
+                use_https: useHttps,
                 active_channels: activeChannels,
                 camera_names: cameraNames,
                 demo_mode: false,
