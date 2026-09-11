@@ -34,3 +34,4 @@ python3 CameraAI/app_search_linux.py || {
         xdg-open "http://localhost:8000/search"
     fi
 }
+

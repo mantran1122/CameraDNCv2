@@ -8297,7 +8297,7 @@ user=None`;
             if (!grid) return;
 
             const activeCodes = new Set(NCC_NVR_CONFIG.abnormal_event_codes || [
-                "Intrusion", "CrossLine", "Fight", "VideoMotion", "AudioAnomaly", "SoundDetection"
+                "Intrusion", "CrossLine", "Fight", "VideoMotion", "AudioAnomaly", "SoundDetection", "HumanTrait", "FaceDetection", "VehicleTrait"
             ]);
 
             grid.innerHTML = NCC_ABNORMAL_DEFINITIONS.map(item => {

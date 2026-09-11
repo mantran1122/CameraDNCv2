@@ -18,23 +18,63 @@ CLIPS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Default NVR Configuration
 DEFAULT_CONFIG = {
-    "nvr_host": os.getenv("NVR_HOST", ""),
-    "use_https": False,
-    "nvr_port": 80,
-    "rtsp_port": 554,
-    "nvr_user": os.getenv("NVR_USER", ""),
-    "nvr_password": os.getenv("NVR_PASSWORD", ""),
-    "active_channels": list(range(1, 33)),  # 1 to 32
+    "nvr_host": os.getenv("NVR_HOST", "14.241.182.94"),
+    "use_https": os.getenv("USE_HTTPS", "true").lower() in ("true", "1", "yes"),
+    "nvr_port": int(os.getenv("NVR_PORT", "4443")),
+    "rtsp_port": int(os.getenv("RTSP_PORT", "33554")),
+    "nvr_user": os.getenv("NVR_USER", "user2"),
+    "nvr_password": os.getenv("NVR_PASSWORD", "User#$168"),
+    "active_channels": [3, 11, 18, 19, 20],
     "demo_mode": False,
     "pre_buffer_sec": 5,
     "post_buffer_sec": 5,
-    # Give the NVR index a moment to publish the final post-event recording
-    # segment before requesting playback.
     "clip_ready_delay_sec": 2,
     "metadata_retention_days": 3,
-    # Metadata codes selected here are treated as abnormal behaviour. A 10s
-    # replay clip is saved for each selected event.
-    "abnormal_event_codes": ["Intrusion", "CrossLine", "Fight", "AudioAnomaly", "SoundDetection"]
+    "abnormal_event_codes": [
+        "Intrusion",
+        "Fight",
+        "AudioAnomaly",
+        "CrossLine",
+        "SoundDetection",
+        "VideoMotion",
+        "HumanTrait",
+        "FaceDetection",
+        "VehicleTrait"
+    ],
+    "camera_names": {
+        "1": "1.T1. ĐÀO TẠO VÀ NCKH CAM1",
+        "2": "2.T1. ĐÀO TẠO VÀ NCKH CAM2",
+        "3": "3.T1. TTĐT CHUẨN ĐẦU RA CAM1",
+        "4": "4.T1. TTĐT CHUẨN ĐẦU RA CAM2",
+        "5": "5.T1. TVTS VÀ HƯỚNG NGHIỆP CAM1",
+        "6": "6.T1. TVTS VÀ HƯỚNG NGHIỆP CAM2",
+        "7": "7.T1. TÀI CHÍNH-KẾ HOẠCH CAM1",
+        "8": "8.T1. TÀI CHÍNH-KẾ HOẠCH CAM2",
+        "9": "9.T1. TỔ CHỨC - HÀNH CHÍNH CAM1",
+        "10": "10.T1. TỔ CHỨC - HÀNH CHÍNH CAM2",
+        "11": "11.T1. QUẢN LÝ HSSV",
+        "12": "12.T1. QTTB",
+        "13": "13.TH. KHOA KINH TẾ",
+        "14": "14.HAM. KHOA CƠ BẢN",
+        "15": "15.HAM. QTKQ",
+        "16": "16.T1. Y TẾ",
+        "17": "17.T1. PHÒNG HỌP",
+        "18": "18.T1. SẢNH CAM1",
+        "19": "19.T1. SẢNH CAM2",
+        "20": "20.T1. SẢNH CAM3",
+        "21": "21.T1. HÀNH LANG TCHC",
+        "22": "22.T1. HL ĐÀO TẠO",
+        "23": "23.T1. HÀNH LANG CHỦ TỊCH",
+        "24": "24.T1. HÀNH LANG HIỆU TRƯỞNG",
+        "25": "25",
+        "26": "26",
+        "27": "27",
+        "28": "28",
+        "29": "Channel29",
+        "30": "30",
+        "31": "31",
+        "32": "32"
+    }
 }
 
 def load_config():
@@ -44,9 +84,19 @@ def load_config():
                 data = json.load(f)
                 merged = DEFAULT_CONFIG.copy()
                 merged.update(data)
+                # Đảm bảo các sự kiện quan trọng như HumanTrait không bị thiếu do nvr_config cũ
+                if "abnormal_event_codes" in merged:
+                    curr_codes = set(merged["abnormal_event_codes"])
+                    if "HumanTrait" not in curr_codes:
+                        merged["abnormal_event_codes"].append("HumanTrait")
                 return merged
         except Exception as e:
             print(f"[Config] Error loading nvr_config.json: {e}")
+    else:
+        try:
+            save_config(DEFAULT_CONFIG.copy())
+        except Exception as e:
+            print(f"[Config] Error auto-saving initial nvr_config.json: {e}")
     return DEFAULT_CONFIG.copy()
 
 def save_config(cfg_dict: dict):
