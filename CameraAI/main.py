@@ -1,7 +1,10 @@
 import os
 import json
+import logging
 import asyncio
 import threading
+
+logger = logging.getLogger("CameraAI.main")
 import secrets
 import uuid
 import re
@@ -707,6 +710,7 @@ class AgentQueryModel(BaseModel):
     query: str
     channel: Optional[int] = None
     event_id: Optional[int] = None
+    top_k: Optional[int] = 10
 
 
 @app.post("/api/agent/query")
@@ -715,6 +719,10 @@ async def agent_query_api(req: AgentQueryModel):
     query_text = req.query.strip()
     lowered = query_text.lower()
     active_channels = [11, 18, 19, 20]
+    req_top_k = int(req.top_k or 10)
+    if req_top_k < 1:
+        req_top_k = 10
+    fetch_limit = max(150, req_top_k * 4)
 
     # 1. Parse Temporal, Camera Scope, Event ID, and Intent via AI Search Planner
     plan = plan_search_intent(query_text, selected_channel=req.channel)
@@ -766,7 +774,7 @@ async def agent_query_api(req: AgentQueryModel):
             only_anomalies=only_anomalies,
             event_codes=event_codes,
             has_clip=True,
-            limit=25
+            limit=fetch_limit
         )
         time_all = database.get_events(
             channel=ch,
@@ -775,7 +783,7 @@ async def agent_query_api(req: AgentQueryModel):
             keyword=search_kw,
             only_anomalies=only_anomalies,
             event_codes=event_codes,
-            limit=35
+            limit=fetch_limit
         )
         seen_ids = set()
         matched_events = []
@@ -801,14 +809,14 @@ async def agent_query_api(req: AgentQueryModel):
             date_str=target_date,
             event_codes=alarm_codes,
             has_clip=True,
-            limit=30
+            limit=fetch_limit
         )
         # 2. Retrieve other alarm events for context
         alarms_all = database.get_events(
             channel=ch,
             date_str=target_date,
             event_codes=alarm_codes,
-            limit=35
+            limit=fetch_limit
         )
         seen_ids = set()
         matched_events = []
@@ -823,13 +831,13 @@ async def agent_query_api(req: AgentQueryModel):
             keyword=search_kw,
             date_str=target_date,
             has_clip=True,
-            limit=20
+            limit=fetch_limit
         )
         kw_all = database.get_events(
             channel=ch,
             keyword=search_kw,
             date_str=target_date,
-            limit=30
+            limit=fetch_limit
         )
         seen_ids = set()
         matched_events = []
@@ -844,13 +852,13 @@ async def agent_query_api(req: AgentQueryModel):
             date_str=target_date,
             event_codes=event_codes,
             has_clip=True,
-            limit=20
+            limit=fetch_limit
         )
         ev_all = database.get_events(
             channel=ch,
             date_str=target_date,
             event_codes=event_codes,
-            limit=30
+            limit=fetch_limit
         )
         seen_ids = set()
         matched_events = []
@@ -864,8 +872,8 @@ async def agent_query_api(req: AgentQueryModel):
         matched_events = database.get_diverse_channel_events(
             channel=ch,
             date_str=target_date,
-            limit_per_code=3,
-            total_limit=20,
+            limit_per_code=max(5, req_top_k // 2),
+            total_limit=fetch_limit,
             has_clip=True
         )
 
@@ -885,7 +893,7 @@ async def agent_query_api(req: AgentQueryModel):
         matched_events = events_with_clips
     else:
         # If no clips found in specific search, fetch recent verified clips from database
-        recent_verified = database.get_diverse_channel_events(channel=ch, total_limit=15, has_clip=True)
+        recent_verified = database.get_diverse_channel_events(channel=ch, total_limit=fetch_limit, has_clip=True)
         matched_events = [e for e in recent_verified if _has_physical_clip(e)]
 
     daily_summary = summary_engine.generate_daily_summary()
@@ -940,7 +948,7 @@ async def agent_query_api(req: AgentQueryModel):
             "Giao diện sẽ gắn nút bấm phát video trực tiếp vào từng mã #ID. Tuyệt đối KHÔNG tự bịa hoặc nêu mã sự kiện không có trong danh sách trên vì sẽ không có video để phát."
         )
 
-    clip_event_ids = [ev["id"] for ev in matched_events]
+    clip_event_ids = [ev["id"] for ev in matched_events[:req_top_k]]
 
     try:
         def _call_qwen_text():
@@ -960,7 +968,7 @@ async def agent_query_api(req: AgentQueryModel):
             "matched_events": matched_events
         }
     except Exception as exc:
-        print(f"[Agent Query Qwen Server Error]: {exc}")
+        logger.warning("[Agent Query Qwen Server Error]: %s", str(exc).encode("ascii", "replace").decode("ascii"))
 
     # 5. Intelligent Fallback (if server unreachable)
     anomalies = [e for e in matched_events if e.get("event_type") in ("audio_anomaly", "video_anomaly") or e.get("severity") in ("high", "medium")]

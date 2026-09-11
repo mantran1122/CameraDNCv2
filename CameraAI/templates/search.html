@@ -578,6 +578,15 @@
             font-weight: 500;
             gap: 0.25rem;
             white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        .topk-pill:hover {
+            border-color: var(--nv-green);
+            background: rgba(118, 185, 0, 0.08);
+            color: #f4f4f5;
         }
 
         .topk-pill span.val {
@@ -4599,7 +4608,7 @@
                     </div>
 
                     <!-- Top K Result pill badge -->
-                    <div class="topk-pill" id="topk-tag">
+                    <div class="topk-pill" id="topk-tag" onclick="openTopKSelector()" title="Nhấp để thay đổi Top K (số lượng video kết quả)">
                         Top K: <span class="val" id="topk-tag-val">10</span>
                     </div>
                 </div>
@@ -6084,23 +6093,31 @@ user=None`;
             }
         }
 
-        // 1. Dành riêng cho TÌM KIẾM VIDEO (khi bấm Search ở thanh trên)
+        // 1. Dành riêng cho TÌM KIẾM VIDEO (khi bấm Search ở thanh trên hoặc Apply Filter)
         async function executeSearch() {
             const input = document.getElementById('search-input');
-            const queryText = (input?.value || '').trim();
-            if (!queryText) {
-                resetToEmptyState();
-                return;
+            let queryText = (input?.value || '').trim();
+            if (!queryText && currentSearchQuery) {
+                queryText = currentSearchQuery;
+                if (input) input.value = queryText;
             }
             currentSearchQuery = queryText;
 
             let ch = null;
-            const ch_m = queryText.match(/(?:cam|kênh|kenh|channel|ch)\s*0*(\d+)/i);
-            const isAll = /(?:tất cả|tat ca|toàn bộ|toan bo|mọi|moi|các|cac|all)/i.test(queryText);
-            if (ch_m) {
-                ch = parseInt(ch_m[1]);
-                window.currentActiveChannel = ch;
-            } else if (!isAll) {
+            if (queryText) {
+                const ch_m = queryText.match(/(?:cam|kênh|kenh|channel|ch)\s*0*(\d+)/i);
+                const isAll = /(?:tất cả|tat ca|toàn bộ|toan bo|mọi|moi|các|cac|all)/i.test(queryText);
+                if (ch_m) {
+                    ch = parseInt(ch_m[1]);
+                    window.currentActiveChannel = ch;
+                } else if (!isAll) {
+                    const videoSrc = document.getElementById('filter-video-sources')?.value || '';
+                    if (videoSrc) {
+                        const vm = videoSrc.match(/(\d+)/);
+                        if (vm) ch = parseInt(vm[1]);
+                    }
+                }
+            } else {
                 const videoSrc = document.getElementById('filter-video-sources')?.value || '';
                 if (videoSrc) {
                     const vm = videoSrc.match(/(\d+)/);
@@ -6110,7 +6127,7 @@ user=None`;
 
             // Đồng bộ bước 1: Tiếp nhận Query
             const chLabel = ch ? `CAM ${ch}` : 'TOÀN BỘ CAMERA';
-            syncWorkflowStage('query', `BƯỚC 1: TIẾP NHẬN TÌM KIẾM (${chLabel}): "${queryText.slice(0, 20) || 'Tất cả'}"`);
+            syncWorkflowStage('query', `BƯỚC 1: TIẾP NHẬN TÌM KIẾM (${chLabel}): "${queryText ? queryText.slice(0, 20) : 'Tất cả clips'}"`);
             setTimeout(() => {
                 syncWorkflowStage('agent_planning', 'BƯỚC 2: VIDEO AGENT LẬP KẾ HOẠCH TRUY XUẤT');
             }, 300);
@@ -6285,10 +6302,11 @@ user=None`;
                     }
                 }, 350);
 
+                const topKVal = parseInt(document.getElementById('filter-topk')?.value) || 10;
                 const res = await fetch('/api/agent/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: queryText, channel: ch })
+                    body: JSON.stringify({ query: queryText, channel: ch, top_k: topKVal })
                 });
 
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -6565,6 +6583,17 @@ user=None`;
         function toggleFilterPopover() { toggleToolbarMenu('filter'); }
         function closeFilterPopover() { closeAllToolbarMenus(); }
 
+        function openTopKSelector() {
+            toggleToolbarMenu('filter');
+            setTimeout(() => {
+                const el = document.getElementById('filter-topk');
+                if (el) {
+                    el.focus();
+                    el.select();
+                }
+            }, 60);
+        }
+
         function applyFilters() {
             const topk = document.getElementById('filter-topk')?.value || 10;
             const topkTag = document.getElementById('topk-tag-val');
@@ -6741,6 +6770,23 @@ user=None`;
                 setViewMode(saved);
             } catch(e) {}
             updateDetailsPaneDot();
+
+            // Real-time Top K sync and Enter key submit
+            const topkInput = document.getElementById('filter-topk');
+            if (topkInput) {
+                topkInput.addEventListener('input', (e) => {
+                    const val = e.target.value || '10';
+                    const tag = document.getElementById('topk-tag-val');
+                    if (tag) tag.innerText = val;
+                });
+                topkInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applyFilters();
+                    }
+                });
+            }
+
             // Khởi tạo trạng thái sạch (chờ người dùng gõ tìm kiếm hoặc hỏi Vision Agent)
             resetToEmptyState();
         }

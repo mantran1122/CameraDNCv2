@@ -40,6 +40,11 @@ def resolve_clip_path(reference: str) -> Path:
     path = (root / Path(*relative.parts)).resolve()
     if path != root and root not in path.parents:
         raise ValueError("Clip path is outside storage root")
+    if not path.is_file():
+        local_root = (Path(__file__).resolve().parent / "storage" / "clips").resolve()
+        local_path = (local_root / Path(*relative.parts)).resolve()
+        if local_path.is_file():
+            return local_path
     return path
 
 

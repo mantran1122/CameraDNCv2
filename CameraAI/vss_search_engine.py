@@ -309,7 +309,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
             sql += " AND channel = ?"
             params.append(ch)
         req_top_k = max(int(decomp.get("top_k") or 10), len(event_ids))
-        sql += f" ORDER BY id DESC LIMIT {max(50, req_top_k)}"
+        sql += f" ORDER BY id DESC LIMIT {max(200, req_top_k * 4)}"
         cursor.execute(sql, params)
         rows = [dict(r) for r in cursor.fetchall()]
     else:
@@ -335,7 +335,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
             params.extend(decomp["event_codes"])
 
         req_top_k = max(int(decomp.get("top_k") or 10), 10)
-        sql += f" ORDER BY id DESC LIMIT {max(50, req_top_k)}"
+        sql += f" ORDER BY id DESC LIMIT {max(200, req_top_k * 4)}"
         cursor.execute(sql, params)
         rows = [dict(r) for r in cursor.fetchall()]
 
@@ -351,6 +351,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
     )
 
     if not has_specific_filter and len(rows) < decomp["top_k"]:
+        fallback_limit = max(200, decomp["top_k"] * 4)
         fallback_sql = """
             SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec
             FROM events
@@ -361,14 +362,14 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
             fallback_sql += " AND channel = ?"
             fallback_params.append(ch)
             
-        fallback_sql += " ORDER BY id DESC LIMIT 50"
+        fallback_sql += f" ORDER BY id DESC LIMIT {fallback_limit}"
         cursor.execute(fallback_sql, fallback_params)
         fallback_rows = [dict(r) for r in cursor.fetchall()]
         existing_ids = {r["id"] for r in rows}
         for fr in fallback_rows:
             if fr["id"] not in existing_ids:
                 rows.append(fr)
-                if len(rows) >= 50:
+                if len(rows) >= fallback_limit:
                     break
 
     conn.close()
