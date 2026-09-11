@@ -16,6 +16,13 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+if not exist "CameraAI\.env" (
+    if exist "CameraAI\.env.example" (
+        echo [Khoi tao] Tao file CameraAI\.env tu file mau CameraAI\.env.example...
+        copy "CameraAI\.env.example" "CameraAI\.env" >nul
+    )
+)
+
 echo [1/3] Kiem tra va dung container cu (neu co)...
 docker compose down
 

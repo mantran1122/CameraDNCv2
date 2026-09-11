@@ -17,6 +17,11 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
+if [ ! -f "CameraAI/.env" ] && [ -f "CameraAI/.env.example" ]; then
+    echo "[Khoi tao] Tao file CameraAI/.env tu file mau CameraAI/.env.example..."
+    cp "CameraAI/.env.example" "CameraAI/.env"
+fi
+
 echo "[1/3] Kiem tra va dung container cu neu dang chay..."
 docker compose down || true
 

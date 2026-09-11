@@ -36,7 +36,8 @@ services:
       # (Tuy chon) Mount o dia NAS truc tiep de luu tru video khong ton dung luong may chu:
       # - /mnt/nas_camera_clips:/app/storage/clips
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=Asia/Ho_Chi_Minh
