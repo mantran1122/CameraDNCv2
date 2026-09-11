@@ -6,10 +6,20 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 STORAGE_DIR = BASE_DIR / "storage"
-# Keep database/config local; video evidence can be redirected to a mounted
-# NAS share without changing code.  The value must be writable by the account
-# that runs CameraAI (for example: \\nas01\\camera-ai\\clips).
-CLIPS_DIR = Path(os.getenv("CAMERAAI_CLIPS_DIR", str(STORAGE_DIR / "clips"))).expanduser()
+# Keep database/config local; video evidence is saved directly to NAS.
+def _detect_clips_dir() -> Path:
+    env_dir = os.getenv("CAMERAAI_CLIPS_DIR", "").strip()
+    if env_dir:
+        return Path(env_dir).expanduser()
+    for candidate in [Path("Z:/dataCameraAI"), Path(r"\\192.168.100.3\Common\dataCameraAI")]:
+        try:
+            if candidate.is_dir():
+                return candidate
+        except Exception:
+            pass
+    return (STORAGE_DIR / "clips").expanduser()
+
+CLIPS_DIR = _detect_clips_dir()
 CONFIG_FILE = STORAGE_DIR / "nvr_config.json"
 
 # Ensure directories exist
