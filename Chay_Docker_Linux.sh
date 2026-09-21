@@ -20,3 +20,4 @@ echo "  Truy cap he thong tai: http://localhost:8000/login"
 echo "  - Tai khoan can bo giam sat: user  /  Mat khau: 123"
 echo "  - Tai khoan quan tri vien:  admin  /  Mat khau: namcantho@168"
 echo "=============================================================================="
+

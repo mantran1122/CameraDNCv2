@@ -44,23 +44,25 @@ Khi đó toàn bộ clip 10s sẽ tự động ghi thẳng vào ổ cứng NAS!
 
 ### Trên máy Linux:
 ```bash
-chmod +x run_docker.sh
-./run_docker.sh
+chmod +x Chay_Docker_Linux.sh
+./Chay_Docker_Linux.sh
 ```
 *(Hoặc chạy trực tiếp: `docker compose up -d --build`)*
 
 ### Trên máy Windows (nếu có Docker Desktop):
 Nhấp đúp chuột vào file:
-* [`run_docker.bat`](file:///d:/CameraV2/run_docker.bat)
+* [`Chay_Docker_Windows.bat`](file:///d:/CameraV2/Chay_Docker_Windows.bat)
 
 ---
 
 ## 4. Truy cập giao diện & Sử dụng
 
+* **Trang Đăng nhập (Mặc định)**: 
+  `http://localhost:8000/login` hoặc `http://<IP_MAY_LINUX>:8000/login`
+  - Cán bộ / Giám sát: `user` / `123` (Ẩn Cấu hình NVR)
+  - Quản trị viên: `admin` / `namcantho@168` (Toàn quyền NVR & cấp tài khoản con)
 * **Giao diện Search & Dashboard**: 
   `http://localhost:8000/search` hoặc `http://<IP_MAY_LINUX>:8000/search`
-* **Desktop App trên Linux**:
-  `./run_desktop_linux.sh`
 * **Desktop App trên Windows**:
   Chạy `Chay_Search_Windows.bat`
 * **Kết nối PostgreSQL**:
