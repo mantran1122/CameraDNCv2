@@ -6292,6 +6292,10 @@ user=None`;
             if (!text) return '';
             let content = String(text);
 
+            // 0. Chống hiện tượng lặp từ thoái hóa (Repetition Degeneration) từ AI (ví dụ: 'tuy tuy tuy tuy...')
+            content = content.replace(/(\b\S+\b)(?:\s+\1){2,}/gi, '$1');
+            content = content.replace(/(\b\S+\s+\S+\b)(?:\s+\1){2,}/gi, '$1');
+
             // 1. Tạm thời trích xuất và bảo vệ các mã sự kiện dạng #14752 (bấm để xem clip)
             const eventChips = {};
             let chipIndex = 0;

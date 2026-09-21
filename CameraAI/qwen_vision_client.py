@@ -86,16 +86,36 @@ def extract_dense_frames(
     return extracted
 
 
+def clean_repetitive_text(text: str) -> str:
+    """
+    Loại bỏ hiện tượng thoái hóa lặp từ vô tận của LLM (token repetition degeneration).
+    Ví dụ: 'tuy tuy tuy tuy...', 'cụ thể cụ thể cụ thể...', hoặc lặp cụm từ liên tiếp.
+    """
+    if not text:
+        return text
+    # 1. Lặp 1 từ >= 3 lần liên tiếp: 'tuy tuy tuy...' -> 'tuy'
+    text = re.sub(r'(\b\S+\b)(?:\s+\1){2,}', r'\1', text, flags=re.IGNORECASE)
+    # 2. Lặp cụm 2 từ >= 3 lần liên tiếp
+    text = re.sub(r'(\b\S+\s+\S+\b)(?:\s+\1){2,}', r'\1', text, flags=re.IGNORECASE)
+    # 3. Lặp cụm 3 từ >= 3 lần liên tiếp
+    text = re.sub(r'(\b\S+\s+\S+\s+\S+\b)(?:\s+\1){2,}', r'\1', text, flags=re.IGNORECASE)
+    return text
+
+
 def call_qwen_chat(
     messages: List[Dict[str, Any]],
     model: Optional[str] = None,
     max_tokens: int = 4096,
-    temperature: float = 0.2,
+    temperature: float = 0.5,
+    frequency_penalty: float = 0.4,
+    presence_penalty: float = 0.2,
+    repetition_penalty: float = 1.15,
     timeout: int = 90,
 ) -> Dict[str, Any]:
     """
     Call the OpenAI-compatible SGLang endpoint on Server AI.
     Returns dict with 'content', 'reasoning', and 'model'.
+    Configured with frequency/presence/repetition penalties to prevent token degeneration loops.
     """
     url = f"{config.QWEN_SERVER_URL.rstrip('/')}/chat/completions"
     headers = {
@@ -108,6 +128,9 @@ def call_qwen_chat(
         "messages": messages,
         "max_tokens": max_tokens,
         "temperature": temperature,
+        "frequency_penalty": frequency_penalty,
+        "presence_penalty": presence_penalty,
+        "repetition_penalty": repetition_penalty,
     }
 
     try:
@@ -145,9 +168,12 @@ def call_qwen_chat(
             else:
                 content = reasoning.strip()
 
+        content = clean_repetitive_text(content.strip())
+        reasoning = clean_repetitive_text(reasoning.strip())
+
         return {
-            "content": content.strip(),
-            "reasoning": reasoning.strip(),
+            "content": content,
+            "reasoning": reasoning,
             "model": data.get("model", config.QWEN_MODEL_NAME),
             "usage": data.get("usage", {}),
         }
@@ -195,7 +221,8 @@ def analyze_video_dense(
         "4. TỔNG HỢP CẢ HÌNH ẢNH VÀ ÂM THANH THỰC TẾ: Trình bày rõ ràng những gì quan sát được từ hình ảnh và những gì nghe thấy từ âm thanh (lời thoại, tiếng động).\n"
         "5. Đánh giá mức độ an toàn/rủi ro: Bình thường, Nghi vấn, hay Nguy hiểm/Bất thường.\n"
         "6. Đưa ra kết luận và khuyến nghị rõ ràng, trực diện bằng tiếng Việt chuyên nghiệp.\n"
-        "7. QUY CÁCH TRÌNH BÀY: Trình bày văn bản tiếng Việt tự nhiên, sạch sẽ, súc tích. Tuyệt đối KHÔNG dùng ký tự markdown như dấu thăng (#, ##, ###) để làm tiêu đề, không dùng dấu sao kép (**in đậm**) hay dấu sao (*in nghiêng*). Trình bày từng ý bằng gạch đầu dòng ngắn gọn."
+        "7. QUY CÁCH TRÌNH BÀY: Trình bày văn bản tiếng Việt tự nhiên, sạch sẽ, súc tích. Tuyệt đối KHÔNG dùng ký tự markdown như dấu thăng (#, ##, ###) để làm tiêu đề, không dùng dấu sao kép (**in đậm**) hay dấu sao (*in nghiêng*). Trình bày từng ý bằng gạch đầu dòng ngắn gọn.\n"
+        "8. CHÍNH TẢ & CHỐNG LẶP TỪ: Luôn trả lời bằng TIẾNG VIỆT CHUẨN CÓ DẤU ĐẦY ĐỦ. Tuyệt đối không lặp lại một từ hoặc cụm từ nhiều lần."
     )
 
     # Build user content array containing text prompt and all extracted image frames
@@ -284,7 +311,8 @@ def query_vision_agent_text(
         "3. PHÂN ĐỊNH RÕ BẤT THƯỜNG: Phân biệt rõ giữa các cảnh báo an ninh thực sự (VideoMotion - chuyển động hình ảnh, AudioMutation - đột biến âm thanh/tiếng ồn, Intrusion, Fight) với các sự kiện nhận diện người/xe định kỳ (HumanTrait, VehicleTrait).\n"
         "4. DẪN CHỨNG SỰ KIỆN: Nêu rõ mã sự kiện dạng #ID (ví dụ #23916, #24231) kèm mốc thời gian và Kênh camera (nếu có) để người vận hành bấm xem trực tiếp video clip.\n"
         "5. TRÌNH BÀY: Súc tích, mạch lạc (3-5 ý chính), kèm nhận định an ninh và khuyến nghị hành động. Tuyệt đối không sinh bảng Markdown rườm rà dài dòng làm chậm tốc độ phản hồi.\n"
-        "6. ĐỊNH DẠNG VĂN BẢN: Trình bày văn bản tiếng Việt tự nhiên, sạch sẽ, súc tích. Tuyệt đối KHÔNG dùng các ký tự markdown thô như dấu thăng (#, ##, ###) làm tiêu đề, không dùng dấu sao kép (**in đậm**) hay dấu sao (*in nghiêng*). Giữ nguyên mã sự kiện camera dạng #ID (ví dụ #23916) để giao diện hiển thị nút xem clip."
+        "6. ĐỊNH DẠNG VĂN BẢN: Trình bày văn bản tiếng Việt tự nhiên, sạch sẽ, súc tích. Tuyệt đối KHÔNG dùng các ký tự markdown thô như dấu thăng (#, ##, ###) làm tiêu đề, không dùng dấu sao kép (**in đậm**) hay dấu sao (*in nghiêng*). Giữ nguyên mã sự kiện camera dạng #ID (ví dụ #23916) để giao diện hiển thị nút xem clip.\n"
+        "7. CHÍNH TẢ & CHỐNG LẶP TỪ: Luôn luôn trả lời bằng TIẾNG VIỆT CHUẨN CÓ DẤU ĐẦY ĐỦ ngay cả khi người dùng đặt câu hỏi không dấu. Tuyệt đối KHÔNG viết tiếng Việt không dấu. Tuyệt đối KHÔNG lặp lại một từ hoặc cụm từ nhiều lần. Nếu đã trình bày xong một ý thì chuyển sang ý tiếp theo hoặc kết thúc ngắn gọn."
     )
 
     cam_str = f"Kênh {channel:02d}" if channel is not None else "Đa kênh (Toàn bộ các Camera: Kênh 11, 18, 19, 20)"
