@@ -7,6 +7,7 @@ Provides dense frame extraction, multimodal vision reasoning, and agent conversa
 import base64
 import json
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
