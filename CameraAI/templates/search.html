@@ -1396,6 +1396,81 @@
             transform: scale(1.04);
         }
 
+        /* Formatted Assistant Reply Styles (Cleaned Markdown) */
+        .assistant-heading {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #a3e635;
+            margin: 8px 0 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .assistant-heading::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 12px;
+            background: var(--nv-green);
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .assistant-bullet {
+            margin: 2px 0 2px 6px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            line-height: 1.5;
+        }
+        .assistant-bullet-dot {
+            color: var(--nv-green);
+            font-size: 0.85rem;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .assistant-bullet-text {
+            flex: 1;
+        }
+        .assistant-line {
+            margin: 2px 0;
+            line-height: 1.55;
+        }
+        .assistant-spacer {
+            height: 6px;
+        }
+        .assistant-strong {
+            color: #ffffff;
+            font-weight: 600;
+        }
+        .assistant-em {
+            color: #e4e4e7;
+            font-style: italic;
+        }
+        .assistant-code {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: var(--nv-green);
+            font-size: 0.85em;
+        }
+        .assistant-code-block {
+            background: #121214;
+            border: 1px solid #27272a;
+            border-radius: 4px;
+            padding: 6px 10px;
+            margin: 6px 0;
+            font-family: monospace;
+            font-size: 0.82rem;
+            color: #a1a1aa;
+            overflow-x: auto;
+        }
+        .assistant-hr {
+            border: none;
+            border-top: 1px solid #27272a;
+            margin: 8px 0;
+        }
+
         
         /* ==========================================================================
            Left Demo Panel: Live Camera & VSS Workflow Architecture
@@ -6005,7 +6080,7 @@ user=None`;
                                     </div>
                                     <span style="color: #a1a1aa; font-family: monospace; font-size: 0.625rem;">${escapeHtml(videoContext.title)}</span>
                                 </div>
-                                <div style="font-size: 0.875rem; line-height: 1.6; color: #f4f4f5; white-space: pre-wrap;">${escapeHtml(replyText)}</div>
+                                <div style="font-size: 0.875rem; line-height: 1.6; color: #f4f4f5;">${formatAssistantReply(replyText)}</div>
                                 ${audioCardHtml}
                                 ${reasoningHtml}
                             </div>
@@ -6211,14 +6286,101 @@ user=None`;
             return /^(chao|xin chao|hello|hi|hey|ban la ai|ban ten gi|cam on|thanks|thank you|tam biet|bye|ban lam duoc gi|tro giup|help|gioi thieu|ban la con gi|co ai o day khong|who are you|how are you)[\s!.?]*$/i.test(clean);
         }
 
-        // Định dạng văn bản phản hồi của bot: biến các mã sự kiện #14752 thành nút bấm mở xem clip ngay
+        // Định dạng văn bản phản hồi của bot: loại bỏ ký tự markdown thô (#, **, *), chuyển đổi tiêu đề/danh sách đẹp mắt và bảo toàn chip sự kiện #14752
         function formatAssistantReply(text) {
             if (!text) return '';
-            let escaped = escapeHtml(text);
-            escaped = escaped.replace(/(?:#|#)(\d{4,6})/g, (match, id) => {
-                return `<span class="chat-event-chip" onclick="searchAndPlayEvent('${id}')" title="Bấm để tìm và mở clip #${id}">#${id} ▶</span>`;
+            let content = String(text);
+
+            // 1. Tạm thời trích xuất và bảo vệ các mã sự kiện dạng #14752 (bấm để xem clip)
+            const eventChips = {};
+            let chipIndex = 0;
+            content = content.replace(/#(\d{4,6})/g, (match, id) => {
+                const placeholder = `XEVENTCHIPX${chipIndex}XENDX`;
+                eventChips[placeholder] = `<span class="chat-event-chip" onclick="searchAndPlayEvent('${id}')" title="Bấm để tìm và mở clip #${id}">#${id} ▶</span>`;
+                chipIndex++;
+                return placeholder;
             });
-            return escaped;
+
+            // 2. Escape HTML an toàn trước khi render thẻ
+            content = escapeHtml(content);
+
+            // 3. Tạm thời trích xuất code block ``` ... ```
+            const codeBlocks = {};
+            let blockIndex = 0;
+            content = content.replace(/```(?:[a-zA-Z]*\n)?([\s\S]*?)```/g, (match, code) => {
+                const ph = `XCODEBLOCKX${blockIndex}XENDX`;
+                codeBlocks[ph] = `<div class="assistant-code-block">${code.trim()}</div>`;
+                blockIndex++;
+                return ph;
+            });
+
+            // 4. Xử lý inline code `...`
+            content = content.replace(/`([^`\n]+)`/g, '<code class="assistant-code">$1</code>');
+
+            // 5. Xử lý in đậm **text** hoặc __text__ -> đổi thành thẻ <strong class="assistant-strong">
+            content = content.replace(/\*\*([^*\n]+?)\*\*/g, '<strong class="assistant-strong">$1</strong>');
+            content = content.replace(/__([^_\n]+?)__/g, '<strong class="assistant-strong">$1</strong>');
+
+            // 6. Xử lý in nghiêng *text* hoặc _text_ -> đổi thành thẻ <em class="assistant-em">
+            content = content.replace(/(^|[^\*])\*([^*\n]+?)\*([^\*]|$)/g, '$1<em class="assistant-em">$2</em>$3');
+            content = content.replace(/(^|[^_])_([^_\n]+?)_([^_]|$)/g, '$1<em class="assistant-em">$2</em>$3');
+
+            // 7. Xử lý từng dòng: Headers (#, ##, ###), Bullets (*, -, +), Dividers (---)
+            const lines = content.split(/\r?\n/);
+            const formattedLines = [];
+
+            for (let line of lines) {
+                let trimmed = line.trim();
+                if (!trimmed) {
+                    formattedLines.push('<div class="assistant-spacer"></div>');
+                    continue;
+                }
+
+                // Đường phân cách ngang
+                if (/^(?:---|\*\*\*|___)$/.test(trimmed)) {
+                    formattedLines.push('<div class="assistant-hr"></div>');
+                    continue;
+                }
+
+                // Tiêu đề Markdown (#, ##, ###,...) -> loại bỏ sạch dấu # và áp dụng class assistant-heading
+                const headingMatch = trimmed.match(/^#{1,6}\s*(.+)$/);
+                if (headingMatch) {
+                    let headingText = headingMatch[1].replace(/#{1,}/g, '').trim();
+                    formattedLines.push(`<div class="assistant-heading">${headingText}</div>`);
+                    continue;
+                }
+
+                // Danh sách gạch đầu dòng (*, -, +) -> thay bằng bullet tròn gọn gàng
+                const bulletMatch = trimmed.match(/^[\*\-\+]\s*(.+)$/);
+                if (bulletMatch) {
+                    let itemText = bulletMatch[1].trim();
+                    formattedLines.push(`<div class="assistant-bullet"><span class="assistant-bullet-dot">•</span><span class="assistant-bullet-text">${itemText}</span></div>`);
+                    continue;
+                }
+
+                // Dòng nội dung bình thường
+                formattedLines.push(`<div class="assistant-line">${trimmed}</div>`);
+            }
+
+            content = formattedLines.join('');
+
+            // 8. DỌN SẠCH TRIỆT ĐỂ: Loại bỏ bất kỳ dấu #, **, *, `, __ còn sót lại độc lập
+            content = content.replace(/#{1,}/g, '');
+            content = content.replace(/\*{1,}/g, '');
+            content = content.replace(/_{2,}/g, '');
+            content = content.replace(/`{1,}/g, '');
+
+            // 9. Khôi phục Code blocks
+            for (const [ph, codeHtml] of Object.entries(codeBlocks)) {
+                content = content.replaceAll(ph, codeHtml);
+            }
+
+            // 10. Khôi phục Event Chips (#14752)
+            for (const [ph, chipHtml] of Object.entries(eventChips)) {
+                content = content.replaceAll(ph, chipHtml);
+            }
+
+            return content;
         }
 
         // Bấm vào chip sự kiện #14752 trong chat để tìm và phát clip trực tiếp
@@ -6407,7 +6569,7 @@ user=None`;
                                     <span style="width: 7px; height: 7px; border-radius: 50%; background-color: var(--nv-green); display: inline-block;"></span>
                                     ${escapeHtml(sourceTag)} (${channelDisplay})
                                 </div>
-                                <div style="font-size: 0.875rem; line-height: 1.6; color: #f4f4f5; white-space: pre-wrap;">${formattedReply}</div>
+                                <div style="font-size: 0.875rem; line-height: 1.6; color: #f4f4f5;">${formattedReply}</div>
                                 ${reasoningHtml}
                             </div>
                         </div>

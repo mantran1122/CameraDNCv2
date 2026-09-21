@@ -140,3 +140,4 @@ Nếu có thêm cán bộ hoặc nhân viên bảo vệ mới cần tài khoản
 | Chạy file `.bat` báo lỗi không tìm thấy Docker | Docker Desktop chưa được cài hoặc chưa mở | Mở phần mềm Docker Desktop trên máy tính, chờ biểu tượng chuyển sang màu xanh rồi chạy lại file `.bat`. |
 | Báo lỗi cổng 8000 đã bị chiếm dụng | Có ứng dụng khác đang dùng port 8000 | Tắt ứng dụng đang dùng port 8000 hoặc khởi động lại máy. |
 | Camera không lên hình hoặc báo Offline | Mạng Internet hoặc IP DDNS đầu ghi bị thay đổi | Đăng nhập bằng tài khoản `admin`, vào tab Cấu hình kiểm tra IP/Port NVR và bấm **"Kiểm tra kết nối"**. |
+

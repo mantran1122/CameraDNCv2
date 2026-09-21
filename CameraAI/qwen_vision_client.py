@@ -194,7 +194,8 @@ def analyze_video_dense(
         "3. Nêu rõ diễn biến theo từng mốc thời gian (giây) nếu có hành vi đáng chú ý.\n"
         "4. TỔNG HỢP CẢ HÌNH ẢNH VÀ ÂM THANH THỰC TẾ: Trình bày rõ ràng những gì quan sát được từ hình ảnh và những gì nghe thấy từ âm thanh (lời thoại, tiếng động).\n"
         "5. Đánh giá mức độ an toàn/rủi ro: Bình thường, Nghi vấn, hay Nguy hiểm/Bất thường.\n"
-        "6. Đưa ra kết luận và khuyến nghị rõ ràng, trực diện bằng tiếng Việt chuyên nghiệp."
+        "6. Đưa ra kết luận và khuyến nghị rõ ràng, trực diện bằng tiếng Việt chuyên nghiệp.\n"
+        "7. QUY CÁCH TRÌNH BÀY: Trình bày văn bản tiếng Việt tự nhiên, sạch sẽ, súc tích. Tuyệt đối KHÔNG dùng ký tự markdown như dấu thăng (#, ##, ###) để làm tiêu đề, không dùng dấu sao kép (**in đậm**) hay dấu sao (*in nghiêng*). Trình bày từng ý bằng gạch đầu dòng ngắn gọn."
     )
 
     # Build user content array containing text prompt and all extracted image frames
@@ -282,7 +283,8 @@ def query_vision_agent_text(
         "2. NGUỒN DỮ LIỆU: Phân tích dựa trên ĐÚNG các số liệu thực tế được trích xuất từ CSDL Camera bên dưới (bao gồm tổng số sự kiện, chi tiết từng loại và các bản ghi tiêu biểu). Tuyệt đối không giả định thông tin không có trong CSDL.\n"
         "3. PHÂN ĐỊNH RÕ BẤT THƯỜNG: Phân biệt rõ giữa các cảnh báo an ninh thực sự (VideoMotion - chuyển động hình ảnh, AudioMutation - đột biến âm thanh/tiếng ồn, Intrusion, Fight) với các sự kiện nhận diện người/xe định kỳ (HumanTrait, VehicleTrait).\n"
         "4. DẪN CHỨNG SỰ KIỆN: Nêu rõ mã sự kiện dạng #ID (ví dụ #23916, #24231) kèm mốc thời gian và Kênh camera (nếu có) để người vận hành bấm xem trực tiếp video clip.\n"
-        "5. TRÌNH BÀY: Súc tích, mạch lạc (3-5 ý chính), kèm nhận định an ninh và khuyến nghị hành động. Tuyệt đối không sinh bảng Markdown rườm rà dài dòng làm chậm tốc độ phản hồi."
+        "5. TRÌNH BÀY: Súc tích, mạch lạc (3-5 ý chính), kèm nhận định an ninh và khuyến nghị hành động. Tuyệt đối không sinh bảng Markdown rườm rà dài dòng làm chậm tốc độ phản hồi.\n"
+        "6. ĐỊNH DẠNG VĂN BẢN: Trình bày văn bản tiếng Việt tự nhiên, sạch sẽ, súc tích. Tuyệt đối KHÔNG dùng các ký tự markdown thô như dấu thăng (#, ##, ###) làm tiêu đề, không dùng dấu sao kép (**in đậm**) hay dấu sao (*in nghiêng*). Giữ nguyên mã sự kiện camera dạng #ID (ví dụ #23916) để giao diện hiển thị nút xem clip."
     )
 
     cam_str = f"Kênh {channel:02d}" if channel is not None else "Đa kênh (Toàn bộ các Camera: Kênh 11, 18, 19, 20)"
