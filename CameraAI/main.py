@@ -221,6 +221,7 @@ async def startup_event():
         print("[PostgreSQL Sync] Dual-write enabled; SQLite remains the read source.")
     restart_listener_service()
     print("[Server Startup] Dahua Internet Metadata & Anomaly Summarizer online.")
+    print(f"[Storage] Video Clips Directory: {config.CLIPS_DIR} (Trang thai: {'San sang' if config.CLIPS_DIR.exists() else 'Chua tim thay'})")
 
 @app.on_event("shutdown")
 async def shutdown_event():

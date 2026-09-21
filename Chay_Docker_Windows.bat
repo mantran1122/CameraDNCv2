@@ -19,9 +19,21 @@ if %errorlevel% neq 0 (
 
 :: [Tu dong kiem tra va ket noi o dia mang Common NAS Z:]
 if exist "Z:\" goto HAS_DRIVE_Z
+
 echo [*] Dang tu dong ket noi o dia mang Common NAS...
 net use Z: \\192.168.100.3\Common /persistent:yes >nul 2>&1
+if exist "Z:\" (
+    echo [OK] Da ket noi thanh cong o dia mang Z: - Common NAS!
+) else (
+    echo [!] Chua the ket noi o Z:. Neu xem clip bao thieu file, hay dam bao may dang cam mang LAN.
+)
+goto DRIVE_Z_DONE
+
 :HAS_DRIVE_Z
+echo [OK] O dia mang Z: - Common NAS da san sang.
+
+:DRIVE_Z_DONE
+echo.
 
 echo [1/3] Dang build va khoi dong cac container (PostgreSQL + CameraAI)...
 docker compose up -d --build
