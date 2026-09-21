@@ -36,16 +36,31 @@ def resolve_clip_path(reference: str) -> Path:
     relative = PurePosixPath(normalized)
     if relative.is_absolute() or ".." in relative.parts:
         raise ValueError("Invalid clip reference")
-    root = Path(config.CLIPS_DIR).resolve()
-    path = (root / Path(*relative.parts)).resolve()
-    if path != root and root not in path.parents:
-        raise ValueError("Clip path is outside storage root")
-    if not path.is_file():
-        local_root = (Path(__file__).resolve().parent / "storage" / "clips").resolve()
-        local_path = (local_root / Path(*relative.parts)).resolve()
-        if local_path.is_file():
-            return local_path
-    return path
+
+    # 1. Primary check: config.CLIPS_DIR
+    try:
+        root = Path(config.CLIPS_DIR).resolve()
+        path = (root / Path(*relative.parts)).resolve()
+        if path.is_file():
+            return path
+    except Exception:
+        path = None
+
+    # 2. Multi-root fallback: Check Z:\dataCameraAI, direct UNC path, and local storage
+    candidates = [
+        Path("Z:/dataCameraAI"),
+        Path(r"\\192.168.100.3\Common\dataCameraAI"),
+        (Path(__file__).resolve().parent / "storage" / "clips").resolve(),
+    ]
+    for cand in candidates:
+        try:
+            cand_path = (cand / Path(*relative.parts))
+            if cand_path.is_file():
+                return cand_path
+        except Exception:
+            pass
+
+    return path if path is not None else (Path(config.CLIPS_DIR) / Path(*relative.parts))
 
 
 def legacy_clip_details(filename: str):

@@ -10,8 +10,17 @@ STORAGE_DIR = BASE_DIR / "storage"
 def _detect_clips_dir() -> Path:
     env_dir = os.getenv("CAMERAAI_CLIPS_DIR", "").strip()
     if env_dir:
-        return Path(env_dir).expanduser()
-    for candidate in [Path("Z:/dataCameraAI"), Path(r"\\192.168.100.3\Common\dataCameraAI")]:
+        try:
+            p = Path(env_dir).expanduser()
+            if p.is_dir():
+                return p
+        except Exception:
+            pass
+    for candidate in [
+        Path("Z:/dataCameraAI"),
+        Path(r"\\192.168.100.3\Common\dataCameraAI"),
+        Path("//192.168.100.3/Common/dataCameraAI"),
+    ]:
         try:
             if candidate.is_dir():
                 return candidate
@@ -24,7 +33,10 @@ CONFIG_FILE = STORAGE_DIR / "nvr_config.json"
 
 # Ensure directories exist
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-CLIPS_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    CLIPS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
 # Default NVR Configuration
 DEFAULT_CONFIG = {

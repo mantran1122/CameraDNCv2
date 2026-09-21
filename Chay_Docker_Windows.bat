@@ -17,20 +17,34 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: [Tu dong kiem tra va ket noi o dia mang Common NAS Z:]
-if exist "Z:\" goto HAS_DRIVE_Z
+:: [Tu dong kiem tra va ket noi kho video Common NAS Z:]
+if exist "Z:\dataCameraAI" goto HAS_DRIVE_Z
 
-echo [*] Dang tu dong ket noi o dia mang Common NAS...
+echo [*] Dang kiem tra ket noi o dia mang Common NAS (\\192.168.100.3\Common)...
 net use Z: \\192.168.100.3\Common /persistent:yes >nul 2>&1
-if exist "Z:\" (
-    echo [OK] Da ket noi thanh cong o dia mang Z: - Common NAS!
-) else (
-    echo [!] Chua the ket noi o Z:. Neu xem clip bao thieu file, hay dam bao may dang cam mang LAN.
+
+if exist "Z:\dataCameraAI" (
+    echo [OK] Da ket noi thanh cong o dia mang Z:\dataCameraAI - Kho video Common NAS!
+    goto DRIVE_Z_DONE
 )
+
+if exist "\\192.168.100.3\Common\dataCameraAI" (
+    echo [OK] Da tim thay kho video qua dia chi mang \\192.168.100.3\Common\dataCameraAI!
+    goto DRIVE_Z_DONE
+)
+
+echo.
+echo [!] CHU Y KHO VIDEO NAS:
+echo   Chua the doc thu muc video 'dataCameraAI' tu \\192.168.100.3\Common.
+echo   - Neu ban dang dung may moi/may con: Hay mo File Explorer, go:
+echo     \\192.168.100.3\Common roi Enter de nhap User/Pass mang noi bo (neu duoc hoi).
+echo   - Luu y: Chay qua Docker can chia se thu muc mang voi Docker Desktop.
+echo     Neu muon xem video nhanh nhat, hay dung 'Chay_Search_Windows.bat'.
+echo.
 goto DRIVE_Z_DONE
 
 :HAS_DRIVE_Z
-echo [OK] O dia mang Z: - Common NAS da san sang.
+echo [OK] O dia mang Z:\dataCameraAI - Kho video Common NAS da san sang.
 
 :DRIVE_Z_DONE
 echo.
