@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import requests
+from dotenv import load_dotenv
 
 import config
 
@@ -117,9 +118,16 @@ def call_qwen_chat(
     Returns dict with 'content', 'reasoning', and 'model'.
     Configured with frequency/presence/repetition penalties to prevent token degeneration loops.
     """
-    url = f"{config.QWEN_SERVER_URL.rstrip('/')}/chat/completions"
+    try:
+        load_dotenv(config.BASE_DIR / ".env", override=True)
+    except Exception:
+        pass
+    active_key = os.getenv("QWEN_API_KEY", config.QWEN_API_KEY).strip()
+    active_server = (os.getenv("QWEN_SERVER_URL") or config.QWEN_SERVER_URL).rstrip("/")
+
+    url = f"{active_server}/chat/completions"
     headers = {
-        "Authorization": f"Bearer {config.QWEN_API_KEY}",
+        "Authorization": f"Bearer {active_key}",
         "User-Agent": config.QWEN_USER_AGENT,
         "Content-Type": "application/json",
     }
