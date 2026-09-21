@@ -138,7 +138,7 @@ COSMOS_AUDIO_MODEL = os.getenv("COSMOS_AUDIO_MODEL", "whisper-large-v3-turbo")
 COSMOS_VIDEO_URL = os.getenv("COSMOS_VIDEO_URL", "http://127.0.0.1:8765/analyze")
 COSMOS_PROMPT_PROFILE = _current_cfg.get("cosmos_prompt_profile", "comprehensive")
 
-# Internal AI Server (4x NVIDIA H200 - Qwen3.8-27B SGLang)
+# Internal AI Server (2x NVIDIA H200 - Qwen3.8-27B SGLang)
 QWEN_SERVER_URL = os.getenv("QWEN_SERVER_URL", "https://llm.ttpmsandbox.us.kg/v1")
 QWEN_API_KEY = os.getenv("QWEN_API_KEY", "")
 QWEN_MODEL_NAME = os.getenv("QWEN_MODEL_NAME", "Qwen3.8-27B")
@@ -152,7 +152,7 @@ MAX_VLM_FRAMES = int(os.getenv("MAX_VLM_FRAMES", "8"))
 # Internal Audio AI Server (Speech-to-Text & Sound Anomaly Detection)
 INTERNAL_AUDIO_SERVER_URL = os.getenv("INTERNAL_AUDIO_SERVER_URL", "https://llm.ttpmsandbox.us.kg/v1/audio").rstrip("/")
 INTERNAL_AUDIO_SERVER_API_KEY = os.getenv("INTERNAL_AUDIO_SERVER_API_KEY", QWEN_API_KEY).strip()
-INTERNAL_AUDIO_MODEL_NAME = os.getenv("INTERNAL_AUDIO_MODEL_NAME", "Internal Audio AI (Server H200)")
+INTERNAL_AUDIO_MODEL_NAME = os.getenv("INTERNAL_AUDIO_MODEL_NAME", "Internal Audio AI (Server AI)")
 
 
 # Video analysis is performed as ordered short sequences, rather than three

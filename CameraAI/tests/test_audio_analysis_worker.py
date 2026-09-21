@@ -156,7 +156,7 @@ class AudioAnalysisWorkerTest(unittest.TestCase):
             "detected_sounds": ["tiếng bước chân"],
             "risk_level": "medium",
             "summary": "Phát hiện giọng nói và bước chân.",
-            "audio_model": "Internal Audio AI (Server H200)",
+            "audio_model": "Internal Audio AI (Server AI)",
             "ignored_reason": None,
         }
         with patch("audio_analysis_worker.send_clean_audio_to_server", return_value=server_mock):
@@ -165,7 +165,7 @@ class AudioAnalysisWorkerTest(unittest.TestCase):
         analysis = database.get_audio_analysis(event_id)
         self.assertEqual(analysis["status"], "completed")
         self.assertEqual(analysis["transcript"], "Ai đang ở đó?")
-        self.assertEqual(analysis["audio_model"], "Internal Audio AI (Server H200)")
+        self.assertEqual(analysis["audio_model"], "Internal Audio AI (Server AI)")
         self.assertEqual(analysis["speech_detected"], 1)
         self.assertIsNotNone(analysis["suggestion"])
         self.assertEqual(analysis["suggestion"]["risk_level"], "medium")

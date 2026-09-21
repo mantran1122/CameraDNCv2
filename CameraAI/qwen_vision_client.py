@@ -1,5 +1,5 @@
 """
-Qwen Vision & LLM Client for Internal Server (4x NVIDIA H200)
+Qwen Vision & LLM Client for Internal Server (2x NVIDIA H200)
 Replaces both Cosmos local video model and Gemini 2.5 cloud model.
 Provides dense frame extraction, multimodal vision reasoning, and agent conversations.
 """
@@ -94,7 +94,7 @@ def call_qwen_chat(
     timeout: int = 90,
 ) -> Dict[str, Any]:
     """
-    Call the OpenAI-compatible SGLang endpoint on Server 4x H200.
+    Call the OpenAI-compatible SGLang endpoint on Server AI.
     Returns dict with 'content', 'reasoning', and 'model'.
     """
     url = f"{config.QWEN_SERVER_URL.rstrip('/')}/chat/completions"
@@ -161,7 +161,7 @@ def call_qwen_chat(
             except Exception:
                 err_detail = f" (Chi tiết máy chủ: {exc.response.text[:200]})"
         logger.error(f"[Qwen Server Error]: {exc}{err_detail}")
-        raise RuntimeError(f"Lỗi kết nối Server AI 4x H200 ({config.QWEN_SERVER_URL}): {exc}{err_detail}")
+        raise RuntimeError(f"Lỗi kết nối Server AI ({config.QWEN_SERVER_URL}): {exc}{err_detail}")
 
 
 def analyze_video_dense(
@@ -175,7 +175,7 @@ def analyze_video_dense(
     Dense Video Multimodal Analysis kết hợp âm thanh thực tế:
     1. Trích xuất tối đa num_frames (giới hạn an toàn bởi config.MAX_VLM_FRAMES = 8) từ video.
     2. Đưa chuỗi frame và dữ liệu âm thanh thực tế (đã qua lọc DeepFilterNet) vào prompt.
-    3. Gọi Qwen3.8 trên Server 4x H200 để phân tích toàn diện đa phương thức.
+    3. Gọi Qwen3.8 trên Server AI để phân tích toàn diện đa phương thức.
     """
     max_frames = getattr(config, "MAX_VLM_FRAMES", 8)
     target_frames = num_frames or config.DENSE_FRAMES_COUNT
@@ -187,7 +187,7 @@ def analyze_video_dense(
 
     system_prompt = (
         "Bạn là 'Vision & Audio Agent' - trợ lý AI chuyên gia phân tích đa phương thức (Thị giác các frame video liên tiếp + Âm thanh thực tế) "
-        "thuộc hệ thống VSS Blueprint (Server 4x NVIDIA H200 siêu tốc).\n\n"
+        "thuộc hệ thống VSS Blueprint (Server AI siêu tốc).\n\n"
         "NHIỆM VỤ:\n"
         "1. Phân tích chuỗi frame liên tiếp theo trình tự thời gian kết hợp ĐỐI CHIẾU CHÉO với âm thanh thực tế được cung cấp.\n"
         "2. Xác định chi tiết: Các đối tượng (người, phương tiện, vật thể), đặc điểm trang phục/bảo hộ, hành động cụ thể.\n"
@@ -262,7 +262,7 @@ def analyze_video_dense(
         "reasoning": res["reasoning"],
         "frame_count": len(frames),
         "model": res["model"],
-        "server": "4x NVIDIA H200 (SGLang)",
+        "server": "Server AI (SGLang)",
         "audio_analysis": audio_analysis,
     }
 
@@ -304,7 +304,7 @@ def query_vision_agent_text(
     return {
         "reply": res["content"],
         "reasoning": res["reasoning"],
-        "source": f"Vision Agent (Server H200: {res['model']})",
+        "source": f"Vision Agent (Server AI: {res['model']})",
         "channel": channel,
     }
 

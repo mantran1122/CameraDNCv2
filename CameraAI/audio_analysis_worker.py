@@ -181,7 +181,7 @@ class AudioAnalysisWorker:
     def _transcribe(self, event_id: int, event: dict, wav_path: str) -> None:
         self._set_status(event_id, "transcribing")
 
-        # 1. Primary Engine: Internal Audio AI Server (4x H200 infrastructure)
+        # 1. Primary Engine: Internal Audio AI Server (2x H200 infrastructure)
         # Máy trạm chỉ lọc nhiễu DeepFilterNet3, gửi clean WAV lên server phân tích
         server_analysis = None
         transcription = None
@@ -241,7 +241,7 @@ class AudioAnalysisWorker:
         """Create a strictly evidence-grounded suggestion after transcription.
 
         Prioritizes structured analysis from Internal Audio Server,
-        then Gemini if configured, then OpenAI-compatible endpoint / Qwen 4x H200.
+        then Gemini if configured, then OpenAI-compatible endpoint / Qwen Server AI.
         """
         # 1. If server_analysis already has structured summary & risk_level from internal server
         if server_analysis and server_analysis.get("summary"):
@@ -316,7 +316,7 @@ class AudioAnalysisWorker:
             except (requests.RequestException, ValueError, TypeError, KeyError, IndexError) as exc:
                 return None, f"Không thể tạo gợi ý LLM: {exc}"
 
-        # 4. Use Qwen3.8-27B on Server 4x H200
+        # 4. Use Qwen3.8-27B on Server AI
         if config.QWEN_SERVER_URL and config.QWEN_API_KEY:
             try:
                 evidence = {

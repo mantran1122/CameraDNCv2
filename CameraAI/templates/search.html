@@ -5410,7 +5410,7 @@
                             <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                         </svg>
                         <span class="attached-video-title" id="attached-video-title">video_name.mp4</span>
-                        <span class="attached-video-frames" id="attached-video-frames">32 frames (4x H200)</span>
+                        <span class="attached-video-frames" id="attached-video-frames">32 frames (Server AI)</span>
                     </div>
                     <button class="remove-attached-video-btn" onclick="clearAttachedVideo()" title="Bỏ đính kèm video clip">✕</button>
                 </div>
@@ -5728,8 +5728,8 @@
 
             if (bar) bar.style.display = 'flex';
             if (titleEl) titleEl.innerText = `${title} [${startTime} - ${endTime}]`;
-            if (framesEl) framesEl.innerText = `32 frames (4x H200)`;
-            if (framesEl) framesEl.innerText = `32 frames + Audio (4x H200)`;
+            if (framesEl) framesEl.innerText = `32 frames (Server AI)`;
+            if (framesEl) framesEl.innerText = `32 frames + Audio (Server AI)`;
 
             // Pre-fill smart prompt
             const input = document.getElementById('chat-query-input');
@@ -5927,15 +5927,15 @@ user=None`;
                             <div style="display: flex; align-items: center; gap: 0.65rem; color: #a1a1aa; font-size: 0.8125rem;">
                                 <div class="camera-spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>
                                 <span id="${timerId}" style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--nv-green); min-width: 58px;">[00:00s]</span>
-                                <span>Đang trích xuất 32 frames & gửi lên Server 4x H200 (Qwen3.8-27B)...</span>
+                                <span>Đang trích xuất 32 frames & gửi lên Server AI (Qwen3.8-27B)...</span>
                                 <span>Đang trích xuất 32 frames & phân tích âm thanh thực tế (DeepFilterNet)...</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.6875rem; color: #71717a; font-family: monospace; padding-left: 1.65rem;">
                                 <span style="color: #f97316;">[1. VIOS Cắt 32 Frames]</span>
                                 <span style="color: #f97316;">[1. Cắt 32 Frames & Lọc Âm Thanh]</span>
                                 <span>➔</span>
-                                <span style="color: #a3e635; font-weight: 600;">[2. Server 4x H200 VLM Phân tích]</span>
-                                <span style="color: #a3e635; font-weight: 600;">[2. Server 4x H200 Đa Phương Thức]</span>
+                                <span style="color: #a3e635; font-weight: 600;">[2. Server AI VLM Phân tích]</span>
+                                <span style="color: #a3e635; font-weight: 600;">[2. Server AI Đa Phương Thức]</span>
                                 <span>➔</span>
                                 <span>[3. Hoàn tất]</span>
                             </div>
@@ -5960,7 +5960,7 @@ user=None`;
                 }
                 const wfStatus = document.getElementById('wf-status-indicator');
                 if (wfStatus) {
-                    wfStatus.innerText = `BƯỚC 2: SERVER 4x H200 PHÂN TÍCH THỊ GIÁC & ÂM THANH... [${min}:${sec}s]`;
+                    wfStatus.innerText = `BƯỚC 2: SERVER AI PHÂN TÍCH THỊ GIÁC & ÂM THANH... [${min}:${sec}s]`;
                 }
             }, 1000);
 
@@ -5968,10 +5968,10 @@ user=None`;
             syncWorkflowStage('vios', 'BƯỚC 1: VIOS CẮT 8 FRAMES & LỌC NHIỄU ÂM THANH...');
 
             try {
-                // GIAI ĐOẠN 2 THỰC TẾ: Server 4x H200 (VLM Qwen 3.8-27B) đang phân tích thị giác & âm thanh đa phương thức
+                // GIAI ĐOẠN 2 THỰC TẾ: Server AI (VLM Qwen 3.8-27B) đang phân tích thị giác & âm thanh đa phương thức
                 setTimeout(() => {
                     if (window.isChatActive) {
-                        syncWorkflowStage('vlm_dense_frames', 'BƯỚC 2: SERVER 4x H200 (QWEN 3.8-27B) ĐANG PHÂN TÍCH ĐA PHƯƠNG THỨC...', true);
+                        syncWorkflowStage('vlm_dense_frames', 'BƯỚC 2: SERVER AI (QWEN 3.8-27B) ĐANG PHÂN TÍCH ĐA PHƯƠNG THỨC...', true);
                     }
                 }, 400);
 
@@ -5996,7 +5996,7 @@ user=None`;
                 const replyText = data.reply || 'Đã phân tích xong video.';
                 const reasoningText = data.reasoning || '';
                 const frameCount = data.frame_count || 8;
-                const serverTag = `${data.model || 'Qwen3.8-27B'} · Server 4x H200 (${frameCount} frames + Audio)`;
+                const serverTag = `${data.model || 'Qwen3.8-27B'} · Server AI (${frameCount} frames + Audio)`;
 
                 // GIAI ĐOẠN 3 THỰC TẾ: Hoàn tất phản hồi VLM xuất ra chat
                 syncWorkflowStage('output', `BƯỚC 3: HOÀN TẤT PHÂN TÍCH (${frameCount} FRAMES + AUDIO QWEN 3.8-27B)`);
@@ -6080,6 +6080,7 @@ user=None`;
                                     </div>
                                     <span style="color: #a1a1aa; font-family: monospace; font-size: 0.625rem;">${escapeHtml(videoContext.title)}</span>
                                 </div>
+                                <div style="font-size: 0.875rem; line-height: 1.6; color: #f4f4f5; white-space: pre-wrap;">${escapeHtml(replyText)}</div>
                                 <div style="font-size: 0.875rem; line-height: 1.6; color: #f4f4f5;">${formatAssistantReply(replyText)}</div>
                                 ${audioCardHtml}
                                 ${reasoningHtml}
@@ -6092,7 +6093,7 @@ user=None`;
                 if (thinkingEl) thinkingEl.outerHTML = assistantMsgHtml;
             } catch (err) {
                 console.error('[Video Chat Error]:', err);
-                syncWorkflowStage('error', 'LỖI PHÂN TÍCH VIDEO TỪ SERVER H200');
+                syncWorkflowStage('error', 'LỖI PHÂN TÍCH VIDEO TỪ SERVER AI');
                 const thinkingEl = document.getElementById(thinkingId);
                 if (thinkingEl) {
                     thinkingEl.outerHTML = `
@@ -6286,9 +6287,13 @@ user=None`;
             return /^(chao|xin chao|hello|hi|hey|ban la ai|ban ten gi|cam on|thanks|thank you|tam biet|bye|ban lam duoc gi|tro giup|help|gioi thieu|ban la con gi|co ai o day khong|who are you|how are you)[\s!.?]*$/i.test(clean);
         }
 
+        // Định dạng văn bản phản hồi của bot: biến các mã sự kiện #14752 thành nút bấm mở xem clip ngay
         // Định dạng văn bản phản hồi của bot: loại bỏ ký tự markdown thô (#, **, *), chuyển đổi tiêu đề/danh sách đẹp mắt và bảo toàn chip sự kiện #14752
         function formatAssistantReply(text) {
             if (!text) return '';
+            let escaped = escapeHtml(text);
+            escaped = escaped.replace(/(?:#|#)(\d{4,6})/g, (match, id) => {
+                return `<span class="chat-event-chip" onclick="searchAndPlayEvent('${id}')" title="Bấm để tìm và mở clip #${id}">#${id} ▶</span>`;
             let content = String(text);
 
             // 1. Tạm thời trích xuất và bảo vệ các mã sự kiện dạng #14752 (bấm để xem clip)
@@ -6300,6 +6305,7 @@ user=None`;
                 chipIndex++;
                 return placeholder;
             });
+            return escaped;
 
             // 2. Escape HTML an toàn trước khi render thẻ
             content = escapeHtml(content);
@@ -6439,12 +6445,12 @@ user=None`;
                             <div style="display: flex; align-items: center; gap: 0.65rem; color: #a1a1aa; font-size: 0.8125rem;">
                                 <div class="camera-spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>
                                 <span id="${timerId}" style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--nv-green); min-width: 58px;">[00:00s]</span>
-                                <span>Server 4x H200 (Qwen 3.8-27B) đang suy luận dữ liệu...</span>
+                                <span>Server AI (Qwen 3.8-27B) đang suy luận dữ liệu...</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.6875rem; color: #71717a; font-family: monospace; padding-left: 1.65rem;">
                                 <span style="color: #38bdf8;">[1. Tiếp nhận]</span>
                                 <span>➔</span>
-                                <span style="color: #a3e635; font-weight: 600;">[2. Video Agent & Qwen H200]</span>
+                                <span style="color: #a3e635; font-weight: 600;">[2. Video Agent & Qwen AI]</span>
                                 <span>➔</span>
                                 <span>[3. Xuất Video & Trả lời]</span>
                             </div>
@@ -6469,7 +6475,7 @@ user=None`;
                 }
                 const wfStatus = document.getElementById('wf-status-indicator');
                 if (wfStatus && window.isChatActive) {
-                    wfStatus.innerText = `BƯỚC 3: SERVER 4x H200 ĐANG SUY LUẬN... [${min}:${sec}s]`;
+                    wfStatus.innerText = `BƯỚC 3: SERVER AI ĐANG SUY LUẬN... [${min}:${sec}s]`;
                 }
             }, 1000);
 
@@ -6505,7 +6511,7 @@ user=None`;
                     empty.innerHTML = `
                         <div class="camera-spinner" style="margin-bottom: 0.75rem;"></div>
                         <p class="empty-state-text" style="color: var(--nv-green); font-weight: 500;">
-                            Vision Agent đang suy luận & phân tích CSDL (Server 4x H200)...
+                            Vision Agent đang suy luận & phân tích CSDL (Server AI)...
                         </p>
                         <p style="font-size: 0.75rem; color: #71717a; margin-top: 0.35rem;">
                             Danh sách video sẽ hiển thị ngay sau khi AI hoàn tất phân tích
@@ -6516,11 +6522,11 @@ user=None`;
             }
 
             try {
-                // BƯỚC 2: Video Agent điều phối -> BƯỚC 3: Server 4x H200 (Qwen 3.8-27B) suy luận
+                // BƯỚC 2: Video Agent điều phối -> BƯỚC 3: Server AI (Qwen 3.8-27B) suy luận
                 syncWorkflowStage('agent_planning', `BƯỚC 2: VIDEO AGENT ĐIỀU PHỐI SUY LUẬN (${initialChLabel})`);
                 setTimeout(() => {
                     if (window.isChatActive) {
-                        syncWorkflowStage('llm_reasoning', `BƯỚC 3: SERVER 4x H200 (QWEN 3.8-27B) SUY LUẬN (${initialChLabel})...`, true);
+                        syncWorkflowStage('llm_reasoning', `BƯỚC 3: SERVER AI (QWEN 3.8-27B) SUY LUẬN (${initialChLabel})...`, true);
                     }
                 }, 350);
 
@@ -6535,7 +6541,7 @@ user=None`;
                 const data = await res.json();
                 const replyText = data.reply || 'Vision Agent đã nhận được thông tin.';
                 const reasoningText = data.reasoning || '';
-                const sourceTag = data.source || 'Vision Agent (Server 4x H200)';
+                const sourceTag = data.source || 'Vision Agent (Server AI)';
                 const targetChannel = (data.channel !== undefined && data.channel !== null) ? data.channel : null;
                 const channelDisplay = targetChannel !== null ? `Kênh ${String(targetChannel).padStart(2, '0')}` : `Toàn bộ Camera`;
                 const matchedEventIds = data.event_ids || [];
@@ -6595,7 +6601,7 @@ user=None`;
                 }
             } catch (err) {
                 console.error('[Chat Error]:', err);
-                syncWorkflowStage('error', 'LỖI KẾT NỐI SERVER AI 4x H200');
+                syncWorkflowStage('error', 'LỖI KẾT NỐI SERVER AI');
                 const thinkingEl = document.getElementById(thinkingId);
                 if (thinkingEl) {
                     thinkingEl.outerHTML = `
@@ -6715,7 +6721,7 @@ user=None`;
                         <div class="card-info-pane">
                             <div class="card-header-bar">
                                 <span class="card-title" title="${escapeHtml(cardTitle)}">${escapeHtml(cardTitle)}</span>
-                                <button class="card-chat-btn" onclick="event.stopPropagation(); attachVideoByIndex(${idx})" title="Phân tích chi tiết video này với Server 4x H200">+ Chat</button>
+                                <button class="card-chat-btn" onclick="event.stopPropagation(); attachVideoByIndex(${idx})" title="Phân tích chi tiết video này với Server AI">+ Chat</button>
                             </div>
                             <div class="card-footer-bar">
                                 <div class="similarity-row">

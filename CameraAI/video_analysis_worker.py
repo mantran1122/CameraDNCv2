@@ -116,13 +116,13 @@ class VideoAnalysisWorker:
                 risk_level=risk_level,
                 events=[{"event": event.get("event_code"), "detail": reply_text[:120]}],
                 frames=[],
-                video_model=f"Qwen3.8-27B (4x NVIDIA H200 SGLang)",
+                video_model=f"Qwen3.8-27B (Server AI)",
                 analyzed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
             )
             return
         except Exception as exc:
             print(f"[VIDEO AI] Qwen dense analysis failed for event #{event_id}: {exc}")
-            self._set_status(event_id, "failed", error_message=f"Lỗi phân tích AI Server H200: {exc}")
+            self._set_status(event_id, "failed", error_message=f"Lỗi phân tích Server AI: {exc}")
             return
         # Keep the report in the existing suggestion field so both the main
         # event modal and /test-ai display the same Gemini conclusion.

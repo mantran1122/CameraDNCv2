@@ -967,7 +967,7 @@ async def agent_query_api(req: AgentQueryModel):
         return {
             "reply": qwen_res["reply"],
             "reasoning": qwen_res.get("reasoning", ""),
-            "source": qwen_res.get("source", f"Vision Agent (Server H200: {config.QWEN_MODEL_NAME})"),
+            "source": qwen_res.get("source", f"Vision Agent (Server AI: {config.QWEN_MODEL_NAME})"),
             "channel": ch,
             "event_ids": clip_event_ids,
             "matched_events": matched_events
@@ -999,7 +999,7 @@ async def agent_query_api(req: AgentQueryModel):
         else:
             reply = f"Không ghi nhận sự kiện xô xát hoặc đánh nhau nào trên {ch_label}. Khu vực an toàn."
     elif any(k in lowered for k in ["chào", "hello", "hi", "bạn là ai"]):
-        reply = f"Xin chào! Tôi là Vision Agent trong hệ thống VSS Blueprint (vận hành trên Server AI 4x NVIDIA H200). Tôi đang giám sát {ch_label}. Tôi có thể hỗ trợ truy vấn CSDL, kiểm tra đối tượng/hành vi và chạy phân tích video chuyên sâu."
+        reply = f"Xin chào! Tôi là Vision Agent trong hệ thống VSS Blueprint (vận hành trên Server AI). Tôi đang giám sát {ch_label}. Tôi có thể hỗ trợ truy vấn CSDL, kiểm tra đối tượng/hành vi và chạy phân tích video chuyên sâu."
     else:
         latest = matched_events[0] if matched_events else None
         latest_info = f"Sự kiện liên quan gần nhất [#{latest.get('id')} - Kênh {latest.get('channel')}] lúc {latest.get('timestamp')}: '{latest.get('description')}'." if latest else "Chưa có sự kiện mới."
@@ -1027,7 +1027,7 @@ class VSSChatVideoRequest(BaseModel):
 async def vss_chat_video_api(req: VSSChatVideoRequest):
     """
     Direct Multimodal Video Chat:
-    Cắt dense frames từ clip video và gửi kèm câu hỏi của người dùng lên Server 4x H200 (Qwen3.8-27B).
+    Cắt dense frames từ clip video và gửi kèm câu hỏi của người dùng lên Server AI (Qwen3.8-27B).
     """
     clip_path = None
     event_id = req.event_id
@@ -1084,7 +1084,7 @@ async def vss_chat_video_api(req: VSSChatVideoRequest):
             "reasoning": res.get("reasoning", ""),
             "frame_count": res.get("frame_count", num_frames),
             "model": res.get("model", config.QWEN_MODEL_NAME),
-            "server": res.get("server", "4x NVIDIA H200 (SGLang)"),
+            "server": res.get("server", "Server AI (SGLang)"),
             "video_name": clip_path.name,
             "clip_url": req.video_url,
             "event_id": event_id,
@@ -1092,7 +1092,7 @@ async def vss_chat_video_api(req: VSSChatVideoRequest):
         }
     except Exception as exc:
         print(f"[Chat Video Error]: {exc}")
-        raise HTTPException(status_code=500, detail=f"Lỗi phân tích video trên Server H200: {exc}")
+        raise HTTPException(status_code=500, detail=f"Lỗi phân tích video trên Server AI: {exc}")
 
 
 class VSSSearchRequest(BaseModel):

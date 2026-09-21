@@ -6,8 +6,8 @@
  * 
  * Optimized for REAL-TIME SYNCHRONIZED EXECUTION:
  * - Accurately tracks actual backend pipeline stages (no premature timeouts).
- * - Nodes pulse and stay active during real Server 4x H200 inference and video processing.
- * - Displays exact model specs (Qwen 3.8-27B 4x H200, 32 Dense Frames).
+ * - Nodes pulse and stay active during real Server AI inference and video processing.
+ * - Displays exact model specs (Qwen 3.8-27B, 32 Dense Frames).
  */
 
 class WorkflowDiagram {
@@ -175,7 +175,7 @@ class WorkflowDiagram {
                         <rect width="120" height="66" rx="8" fill="#131926" stroke="#26334a" stroke-width="1.5" />
                         <text x="60" y="24" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="'Inter', sans-serif">LLM</text>
                         <text x="60" y="40" text-anchor="middle" fill="#94a3b8" font-size="9.5" font-family="'Inter', sans-serif">Qwen 3.8-27B</text>
-                        <text x="60" y="54" text-anchor="middle" fill="#84cc16" font-size="9" font-weight="600" font-family="'Inter', sans-serif">Server 4x H200</text>
+                        <text x="60" y="54" text-anchor="middle" fill="#84cc16" font-size="9" font-weight="600" font-family="'Inter', sans-serif">Server AI</text>
                     </g>
 
                     <!-- 4. Attributes -->
@@ -202,12 +202,12 @@ class WorkflowDiagram {
                         <text x="55" y="54" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="'Inter', sans-serif">Clip Retrieval</text>
                     </g>
 
-                    <!-- 7. VLM (Qwen 3.8-27B 4x H200 Vision Critic) -->
+                    <!-- 7. VLM (Qwen 3.8-27B Vision Critic) -->
                     <g class="wf-node" id="node-vlm" transform="translate(645, 277)" filter="url(#wf-node-shadow)">
                         <rect width="110" height="66" rx="8" fill="#131926" stroke="#26334a" stroke-width="1.5" />
                         <text x="55" y="24" text-anchor="middle" fill="#f1f5f9" font-size="12.5" font-weight="700" font-family="'Inter', sans-serif">VLM</text>
                         <text x="55" y="40" text-anchor="middle" fill="#94a3b8" font-size="9.5" font-family="'Inter', sans-serif">Qwen 3.8-27B</text>
-                        <text x="55" y="54" text-anchor="middle" fill="#f43f5e" font-size="9" font-weight="600" font-family="'Inter', sans-serif">Server 4x H200</text>
+                        <text x="55" y="54" text-anchor="middle" fill="#f43f5e" font-size="9" font-weight="600" font-family="'Inter', sans-serif">Server AI</text>
                     </g>
 
                     <!-- 8. Elasticsearch / DB -->
@@ -299,9 +299,9 @@ class WorkflowDiagram {
                 break;
 
             case 'llm_reasoning':
-                // LLM active on Server 4x H200 (pulsing while request is in-flight)
+                // LLM active on Server AI (pulsing while request is in-flight)
                 this.highlightStage(['node-video-agent', 'node-llm'], ['conn-query-agent', 'conn-agent-llm'], isPulsing, 'node-llm');
-                this.updateStatusText(customStatus || 'BƯỚC 3: SERVER 4x H200 (QWEN 3.8-27B) ĐANG SUY LUẬN...');
+                this.updateStatusText(customStatus || 'BƯỚC 3: SERVER AI (QWEN 3.8-27B) ĐANG SUY LUẬN...');
                 break;
 
             case 'search_retrieval':
@@ -331,9 +331,9 @@ class WorkflowDiagram {
                 break;
 
             case 'vlm_dense_frames':
-                // Multimodal dense frame analysis on Server 4x H200
+                // Multimodal dense frame analysis on Server AI
                 this.highlightStage(['node-video-agent', 'node-vios', 'node-vlm'], ['conn-agent-vios', 'conn-vios-vlm'], isPulsing, 'node-vlm');
-                this.updateStatusText(customStatus || 'BƯỚC 2: SERVER 4x H200 PHÂN TÍCH 32 FRAMES THỊ GIÁC...');
+                this.updateStatusText(customStatus || 'BƯỚC 2: SERVER AI PHÂN TÍCH 32 FRAMES THỊ GIÁC...');
                 break;
 
             case 'output':

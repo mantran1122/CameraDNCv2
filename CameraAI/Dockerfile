@@ -14,7 +14,7 @@ ENV PYTHONUNBUFFERED=1 \
     MAX_VLM_FRAMES=8 \
     INTERNAL_AUDIO_SERVER_URL=https://llm.ttpmsandbox.us.kg/v1/audio \
     INTERNAL_AUDIO_SERVER_API_KEY="" \
-    INTERNAL_AUDIO_MODEL_NAME="Internal Audio AI (Server H200)" \
+    INTERNAL_AUDIO_MODEL_NAME="Internal Audio AI (Server AI)" \
     USE_DEEPFILTER=true
 
 # Install system dependencies:

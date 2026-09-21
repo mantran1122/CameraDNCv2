@@ -1,7 +1,7 @@
 """Internal Audio AI Client for CameraAI V2.
 
 Sends clean, edge-denoised WAV audio (16 kHz Mono PCM from DeepFilterNet3)
-to the Internal AI Server (NVIDIA H200 infrastructure) for Vietnamese speech-to-text
+to the Internal AI Server (2x NVIDIA H200 infrastructure) for Vietnamese speech-to-text
 and acoustic anomaly detection.
 """
 

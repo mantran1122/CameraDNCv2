@@ -34,7 +34,7 @@ class InternalAudioClientTest(unittest.TestCase):
             "detected_sounds": ["tiếng bước chân", "tiếng gọi"],
             "risk_level": "medium",
             "summary": "Phát hiện người gọi ngoài cổng.",
-            "audio_model": "Internal Audio AI (Server H200)",
+            "audio_model": "Internal Audio AI (Server AI)",
         }
 
         with patch("internal_audio_client.requests.post", return_value=mock_resp) as mock_post:
@@ -45,7 +45,7 @@ class InternalAudioClientTest(unittest.TestCase):
         self.assertEqual(result["speech_detected"], 1)
         self.assertEqual(result["risk_level"], "medium")
         self.assertIn("tiếng bước chân", result["detected_sounds"])
-        self.assertEqual(result["audio_model"], "Internal Audio AI (Server H200)")
+        self.assertEqual(result["audio_model"], "Internal Audio AI (Server AI)")
         self.assertTrue(mock_post.called)
 
     def test_normalize_audio_response_defaults(self):
