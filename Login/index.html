@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Đăng nhập - SSO | Đại học Nam Cần Thơ</title>
+    <link rel="icon" type="image/png" href="logo_truong_only.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            color-scheme: light;
+            --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            --md-primary: #4f6f9f;
+            --md-on-primary: #ffffff;
+            --md-primary-container: #e3edf9;
+            --md-on-primary-container: #263c5b;
+            --md-secondary-container: #e9eff7;
+            --md-on-secondary-container: #344355;
+            --md-surface: #f8faff;
+            --md-surface-container: #f0f4fa;
+            --md-surface-container-high: #e8edf5;
+            --md-on-surface: #26313f;
+            --md-on-surface-variant: #5f6b7a;
+            --md-outline: #8c99aa;
+            --md-outline-variant: #e2e8f0;
+            --md-error-container: #fbe4e1;
+            --md-on-error-container: #68201d;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            min-width: 320px;
+            background: var(--md-surface);
+            font-family: var(--font-family);
+            font-synthesis: none;
+        }
+
+        body,
+        button,
+        input,
+        select,
+        textarea {
+            font-family: var(--font-family);
+        }
+
+        body {
+            min-height: 100vh;
+            min-height: 100dvh;
+            margin: 0;
+            padding: 32px 20px;
+            overflow-x: hidden;
+            display: grid;
+            place-items: center;
+            position: relative;
+            font-family: inherit;
+            font-size: 15px;
+            line-height: 1.5;
+            color: var(--md-on-surface);
+            background:
+                radial-gradient(circle, rgba(79, 111, 159, .14) 1px, transparent 1.2px) 0 0 / 24px 24px,
+                radial-gradient(circle at 12% 16%, rgba(211, 228, 248, .58) 0 7%, transparent 7.2%),
+                radial-gradient(circle at 88% 84%, rgba(226, 236, 248, .72) 0 10%, transparent 10.2%),
+                linear-gradient(145deg, #f8faff 0%, #fff 48%, #f2f6fb 100%);
+        }
+
+        .background-shape {
+            position: fixed;
+            z-index: 0;
+            pointer-events: none;
+            filter: blur(.2px);
+            opacity: .58;
+        }
+
+        .background-shape--one {
+            width: 280px;
+            height: 190px;
+            top: -70px;
+            right: -85px;
+            border-radius: 42% 58% 62% 38% / 48% 36% 64% 52%;
+            background: var(--md-primary-container);
+            transform: rotate(12deg);
+        }
+
+        .background-shape--two {
+            width: 230px;
+            height: 230px;
+            bottom: -115px;
+            left: -70px;
+            border-radius: 63% 37% 43% 57% / 42% 61% 39% 58%;
+            background: var(--md-secondary-container);
+            transform: rotate(-18deg);
+        }
+
+        .container {
+            width: min(100%, 500px);
+            position: relative;
+            z-index: 1;
+            padding: 38px 36px 28px;
+            border: 0;
+            border-radius: 36px;
+            background: #fff;
+            box-shadow: 0 1px 2px rgba(38, 60, 91, .025), 0 12px 36px rgba(38, 60, 91, .055);
+            backdrop-filter: blur(18px);
+        }
+
+        .brand-mark {
+            width: 92px;
+            height: 92px;
+            display: grid;
+            place-items: center;
+            margin: 0 auto 20px;
+            border-radius: 30px 30px 30px 12px;
+            background: #F8FAFC;
+            transform: rotate(-2deg);
+        }
+
+        .logo {
+            display: block;
+            width: auto;
+            height: 68px;
+            transform: rotate(2deg);
+            object-fit: contain;
+        }
+
+        .eyebrow {
+            margin: 0 0 8px;
+            color: #b3261e;
+            font-size: 12px;
+            line-height: 1.3;
+            font-weight: 600;
+            letter-spacing: .1em;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .page-title {
+            display: block;
+            width: 100% !important;
+            max-width: none;
+            margin: 15px 0 15px;
+            color: var(--md-on-surface);
+            font-size: clamp(22px, 5vw, 25px);
+            line-height: 1.18;
+            font-weight: 500;
+            letter-spacing: -.025em;
+            text-align: center !important;
+        }
+
+        .subtitle {
+            max-width: 360px;
+            margin: 0 auto 30px;
+            color: var(--md-on-surface-variant);
+            font-size: 15px;
+            line-height: 1.55;
+            text-align: center;
+        }
+
+        .account-list {
+            max-height: 340px;
+            margin: 0 -4px 24px;
+            padding: 4px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .account-card {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            border: 1px solid transparent;
+            border-radius: 22px;
+            background: rgb(246 246 255 / 94%);
+            transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+        }
+
+        .account-card:hover {
+            border-color: var(--md-outline-variant);
+            box-shadow: 0 3px 10px rgba(38, 60, 91, .045);
+            transform: translateY(-1px);
+        }
+
+        .account-info {
+            flex: 1;
+            min-width: 0;
+            font-size: 14px;
+            color: var(--md-on-surface-variant);
+        }
+
+        .account-info span {
+            display: block;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .account-info strong {
+            color: var(--md-on-surface);
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .account-provider {
+            margin-top: 3px;
+            color: var(--md-outline);
+            font-size: 12px;
+        }
+
+        .account-actions {
+            display: flex;
+            flex-shrink: 0;
+            gap: 8px;
+        }
+
+        form {
+            display: block;
+            max-width: 100%;
+        }
+
+        button {
+            min-height: 42px;
+            padding: 9px 16px;
+            border: 0;
+            border-radius: 999px;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color .2s ease, box-shadow .2s ease, transform .15s ease;
+        }
+
+        button:active,
+        .social-button:active {
+            transform: scale(.98);
+        }
+
+        .btn-primary {
+            color: var(--md-on-primary);
+            background: var(--md-primary);
+            box-shadow: 0 2px 5px rgba(79, 111, 159, .14);
+        }
+
+        .btn-primary:hover {
+            background: #42618f;
+            box-shadow: 0 3px 8px rgba(79, 111, 159, .16);
+        }
+
+        .btn-secondary {
+            color: var(--md-on-secondary-container);
+            background: var(--md-secondary-container);
+        }
+
+        .btn-secondary:hover {
+            background: #dfe7f1;
+        }
+
+        .link {
+            width: fit-content;
+            display: block;
+            margin: 8px auto 0;
+            padding: 10px 18px;
+            border-radius: 999px;
+            color: var(--md-primary);
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background-color .2s ease;
+        }
+
+        .link:hover {
+            background: var(--md-primary-container);
+        }
+
+        .social-login {
+            margin-top: 24px;
+        }
+
+        .social-buttons {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .social-button {
+            min-height: 58px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 14px 54px;
+            border: 1px solid transparent;
+            border-radius: 19px;
+            background: rgb(246 246 255 / 94%);
+            color: var(--md-on-surface);
+            font-size: 15px;
+            font-weight: 500;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background-color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .15s ease;
+        }
+
+        .social-button:hover {
+            border-color: var(--md-outline-variant);
+            background: var(--md-surface-container);
+            box-shadow: 0 2px 7px rgba(38, 60, 91, .04);
+        }
+
+        .social-button > .social-icon,
+        .social-button > img {
+            width: 22px;
+            height: 22px;
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            object-fit: contain;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 26px 0 20px;
+            color: var(--md-outline);
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--md-outline-variant);
+        }
+
+        .divider::before { margin-right: 14px; }
+        .divider::after { margin-left: 14px; }
+
+        .error,
+        .message {
+            margin-bottom: 22px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .error {
+            border: 0;
+            background: var(--md-error-container);
+            color: var(--md-on-error-container);
+        }
+
+        .message {
+            border: 0;
+            background: #f0f2fa;
+            color: #424a67;
+        }
+
+        .security-note {
+            margin: 26px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            color: var(--md-outline);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .security-note svg {
+            width: 17px;
+            height: 17px;
+            flex: 0 0 auto;
+        }
+
+        :focus-visible {
+            outline: 3px solid rgba(79, 111, 159, .22);
+            outline-offset: 3px;
+        }
+
+        /* Responsive Mobile */
+        @media (max-width: 560px) {
+            body {
+                padding: 16px 12px;
+                align-items: start;
+            }
+
+            .container {
+                margin: auto 0;
+                padding: 30px 20px 24px;
+                border-radius: 30px;
+            }
+
+            .brand-mark {
+                width: 82px;
+                height: 82px;
+                border-radius: 26px 26px 26px 10px;
+            }
+
+            .logo { height: 60px; }
+
+            .account-card {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .account-actions,
+            .account-actions form {
+                width: 100%;
+            }
+
+            .account-actions button {
+                width: 100%;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+            }
+        }
+
+        /* Thanh điều khiển preview nhỏ ở góc trên để chuyển qua lại các chế độ */
+        .preview-controls {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            z-index: 99;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: 12px;
+            padding: 8px 12px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(8px);
+        }
+        .preview-controls select {
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 12px;
+            color: #334155;
+            outline: none;
+            background: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background-shape background-shape--one" aria-hidden="true"></div>
+    <div class="background-shape background-shape--two" aria-hidden="true"></div>
+
+    <main class="container">
+        <!-- Brand Mark & Logo -->
+        <div class="brand-mark">
+            <img class="logo" src="logo_truong_only.png" alt="ĐNC — Đại học Nam Cần Thơ">
+        </div>
+
+        <!-- Tiêu đề trang -->
+        <h3 class="page-title" id="pageTitle">Đăng nhập vào SSO</h3>
+        <p class="subtitle" id="pageSubtitle">Kết nối an toàn với tài khoản của bạn</p>
+
+        <!-- Thông báo (Message & Error) -->
+        <div class="message" id="alertMessage"></div>
+        <div class="error" id="alertError"></div>
+
+        <!-- VIEW 1: CHẾ ĐỘ CHỌN TÀI KHOẢN ĐÃ LƯU -->
+        <section id="accountSelectionView" style="display: none;">
+            <div class="account-list" id="accountListContainer">
+                <div class="account-card">
+                    <div class="account-info">
+                        <span><strong>Trần Hoàng Mẫn</strong></span>
+                        <span class="truncate">mantran@nctu.edu.vn</span>
+                        <span class="account-provider">Đã đăng nhập bằng Google</span>
+                    </div>
+                    <div class="account-actions">
+                        <button type="button" class="btn-primary" onclick="selectAccount('mantran@nctu.edu.vn')">Sử dụng</button>
+                        <button type="button" class="btn-secondary" onclick="removeAccount(this)">Xoá</button>
+                    </div>
+                </div>
+                <div class="account-card">
+                    <div class="account-info">
+                        <span><strong>Quản Trị Viên DNC</strong></span>
+                        <span class="truncate">admin.camera@nctu.edu.vn</span>
+                        <span class="account-provider">Đã đăng nhập bằng SSO nội bộ</span>
+                    </div>
+                    <div class="account-actions">
+                        <button type="button" class="btn-primary" onclick="selectAccount('admin.camera@nctu.edu.vn')">Sử dụng</button>
+                        <button type="button" class="btn-secondary" onclick="removeAccount(this)">Xoá</button>
+                    </div>
+                </div>
+            </div>
+
+            <a class="link" id="linkUseAnotherAccount" onclick="showSocialLoginMode(true)">Sử dụng tài khoản khác</a>
+
+            <div class="divider">Hoặc tiếp tục với</div>
+        </section>
+
+        <!-- VIEW 2: CHẾ ĐỘ ĐĂNG NHẬP SSO / SOCIAL BUTTONS (Chuẩn theo ảnh chụp gốc) -->
+        <section id="socialLoginView">
+            <div id="switchBackToAccountsContainer" style="display: none; margin-bottom: 16px;">
+                <a class="link" onclick="showAccountSelectionMode()">Chọn từ tài khoản đã lưu</a>
+            </div>
+
+            <div class="social-login" style="margin-top: 0;">
+                <div class="social-buttons" id="socialButtonsContainer">
+                    <!-- Google -->
+                    <a class="social-button" href="javascript:void(0)" onclick="handleSocialLogin('Google')">
+                        <svg class="social-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                        </svg>
+                        <div>Đăng nhập với Google</div>
+                    </a>
+
+                    <!-- Facebook -->
+                    <a class="social-button" href="javascript:void(0)" onclick="handleSocialLogin('Facebook')">
+                        <svg class="social-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" fill="#1877F2" />
+                        </svg>
+                        <div>Đăng nhập với Facebook</div>
+                    </a>
+
+                    <!-- GitHub (Có thể bật qua preview control) -->
+                    <a class="social-button extra-provider" href="javascript:void(0)" style="display: none;" onclick="handleSocialLogin('GitHub')">
+                        <svg class="social-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" fill="#181717" />
+                        </svg>
+                        <div>Đăng nhập với GitHub</div>
+                    </a>
+
+                    <!-- Apple (Có thể bật qua preview control) -->
+                    <a class="social-button extra-provider" href="javascript:void(0)" style="display: none;" onclick="handleSocialLogin('Apple')">
+                        <svg class="social-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" fill="#000000" />
+                        </svg>
+                        <div>Đăng nhập với Apple</div>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Security Note Footer -->
+        <p class="security-note">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 3 5 6v5c0 4.6 3 8.6 7 10 4-1.4 7-5.4 7-10V6l-7-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <path d="m9.2 12 1.8 1.8 3.8-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Phiên đăng nhập được bảo vệ bởi SSO
+        </p>
+    </main>
+
+    <!-- Preview Switcher Control (Chỉ dùng để kiểm thử các chế độ trực tiếp) -->
+    <aside class="preview-controls">
+        <label for="modeSwitcher" style="color: #64748b; font-weight: 500;">Chế độ mẫu:</label>
+        <select id="modeSwitcher" onchange="switchDemoMode(this.value)">
+            <option value="sso_screenshot" selected>1. Giao diện SSO (Chuẩn theo ảnh chụp)</option>
+            <option value="account_list">2. Chọn tài khoản đã lưu</option>
+            <option value="all_providers">3. Đầy đủ các cổng (Google, FB, GitHub, Apple)</option>
+        </select>
+    </aside>
+
+    <script>
+        function showMessage(msg, isError = false) {
+            const el = document.getElementById(isError ? 'alertError' : 'alertMessage');
+            const otherEl = document.getElementById(isError ? 'alertMessage' : 'alertError');
+            otherEl.style.display = 'none';
+            el.textContent = msg;
+            el.style.display = 'block';
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 3500);
+        }
+
+        function handleSocialLogin(provider) {
+            showMessage('Đang kết nối xác thực SSO với ' + provider + '...', false);
+        }
+
+        function selectAccount(email) {
+            showMessage('Đang tiếp tục phiên đăng nhập với: ' + email, false);
+        }
+
+        function removeAccount(btn) {
+            const card = btn.closest('.account-card');
+            if (card) {
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    card.remove();
+                    showMessage('Đã xoá tài khoản khỏi danh sách lưu.', false);
+                }, 200);
+            }
+        }
+
+        function showSocialLoginMode(hasSavedAccounts = false) {
+            document.getElementById('pageTitle').textContent = 'Đăng nhập vào SSO';
+            document.getElementById('pageSubtitle').textContent = 'Kết nối an toàn với tài khoản của bạn';
+            document.getElementById('accountSelectionView').style.display = 'none';
+            document.getElementById('socialLoginView').style.display = 'block';
+            document.getElementById('switchBackToAccountsContainer').style.display = hasSavedAccounts ? 'block' : 'none';
+        }
+
+        function showAccountSelectionMode() {
+            document.getElementById('pageTitle').textContent = 'Chọn tài khoản';
+            document.getElementById('pageSubtitle').textContent = 'Chọn tài khoản đã lưu để tiếp tục';
+            document.getElementById('accountSelectionView').style.display = 'block';
+            document.getElementById('socialLoginView').style.display = 'block';
+            document.getElementById('switchBackToAccountsContainer').style.display = 'none';
+        }
+
+        function switchDemoMode(mode) {
+            const extras = document.querySelectorAll('.extra-provider');
+            if (mode === 'sso_screenshot') {
+                extras.forEach(el => el.style.display = 'none');
+                showSocialLoginMode(false);
+            } else if (mode === 'account_list') {
+                extras.forEach(el => el.style.display = 'none');
+                showAccountSelectionMode();
+            } else if (mode === 'all_providers') {
+                extras.forEach(el => el.style.display = 'flex');
+                showSocialLoginMode(false);
+            }
+        }
+    </script>
+</body>
+
+</html>
+

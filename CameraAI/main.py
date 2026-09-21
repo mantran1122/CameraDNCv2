@@ -283,7 +283,12 @@ def postgres_sync_loop() -> None:
 
 @app.get("/")
 async def read_index():
-    return RedirectResponse(url="/search", status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse(request=request, name="login.html")
 
 
 @app.get("/dashboard", response_class=HTMLResponse)

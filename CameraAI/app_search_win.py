@@ -16,7 +16,7 @@ def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
         s.settimeout(0.5)
         return s.connect_ex((host, port)) == 0
 
-def is_server_ready(url: str = "http://127.0.0.1:8000/search", timeout: float = 1.0) -> bool:
+def is_server_ready(url: str = "http://127.0.0.1:8000/login", timeout: float = 1.0) -> bool:
     """Check if the backend server is actually responding with valid HTTP status."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "CameraAI-Desktop/1.0"})
@@ -25,7 +25,7 @@ def is_server_ready(url: str = "http://127.0.0.1:8000/search", timeout: float = 
     except Exception:
         return False
 
-def wait_for_server(url: str = "http://127.0.0.1:8000/search", max_wait: float = 20.0) -> bool:
+def wait_for_server(url: str = "http://127.0.0.1:8000/login", max_wait: float = 20.0) -> bool:
     """Poll until server responds, printing progress."""
     start_time = time.time()
     print(f"[Windows App] Waiting for server at {url} to become ready...")
@@ -45,7 +45,7 @@ def main():
     print("    AI CAMERA VSS - VIDEO SEARCH AND SUMMARIZATION (WINDOWS APP DEMO)     ")
     print("==========================================================================")
 
-    target_url = "http://127.0.0.1:8000/search"
+    target_url = "http://127.0.0.1:8000/login"
 
     if is_server_ready(target_url):
         print("[Windows App] Detected existing server on port 8000. Connecting directly...")

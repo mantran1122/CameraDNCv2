@@ -9000,6 +9000,21 @@ user=None`;
             if (isNccConfigAuthorized()) {
                 const cfgBtn = document.getElementById('ncc-btn-config');
                 if (cfgBtn) cfgBtn.style.display = 'inline-flex';
+                const lockBtn = document.getElementById('ncc-btn-lock-config');
+                if (lockBtn) lockBtn.style.display = 'inline-flex';
+                if (sessionStorage.getItem('ncc_auto_open_config') === 'true') {
+                    sessionStorage.removeItem('ncc_auto_open_config');
+                    setTimeout(() => {
+                        switchSidebarTab('videomanager');
+                        switchNccView('config');
+                    }, 350);
+                }
+            }
+            if (sessionStorage.getItem('dnc_shortcut_dashboard') === 'true') {
+                sessionStorage.removeItem('dnc_shortcut_dashboard');
+                setTimeout(() => {
+                    toggleDashboardVisibility();
+                }, 350);
             }
         });
     </script>

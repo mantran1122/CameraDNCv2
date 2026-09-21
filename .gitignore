@@ -44,6 +44,10 @@ id_rsa*
 *.jpg
 *.jpeg
 *.png
+!CameraAI/static/*.png
+!Login/*.png
+!Login/*.jpg
+
 
 # Build output and vendor runtime binaries (obtain separately under their licenses)
 **/build/
