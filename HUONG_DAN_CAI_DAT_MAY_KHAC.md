@@ -140,4 +140,29 @@ Nếu có thêm cán bộ hoặc nhân viên bảo vệ mới cần tài khoản
 | Chạy file `.bat` báo lỗi không tìm thấy Docker | Docker Desktop chưa được cài hoặc chưa mở | Mở phần mềm Docker Desktop trên máy tính, chờ biểu tượng chuyển sang màu xanh rồi chạy lại file `.bat`. |
 | Báo lỗi cổng 8000 đã bị chiếm dụng | Có ứng dụng khác đang dùng port 8000 | Tắt ứng dụng đang dùng port 8000 hoặc khởi động lại máy. |
 | Camera không lên hình hoặc báo Offline | Mạng Internet hoặc IP DDNS đầu ghi bị thay đổi | Đăng nhập bằng tài khoản `admin`, vào tab Cấu hình kiểm tra IP/Port NVR và bấm **"Kiểm tra kết nối"**. |
+| Xem lại clip báo không tìm thấy file video | Máy mới chưa kết nối tới ổ chia sẻ Common NAS | Đảm bảo máy cắm cùng mạng LAN/Wi-Fi nội bộ, xem hướng dẫn kết nối ổ Common ở Mục VIII bên dưới. |
+
+---
+
+## VIII. KẾT NỐI Ổ ĐĨA MẠNG CHIA SẺ VIDEO (COMMON NAS Ổ Z:)
+
+Để máy tính mới xem được toàn bộ video clip lưu trữ tập trung từ ổ chia sẻ của hệ thống:
+
+### 1. Cơ chế tự động kết nối của hệ thống:
+* Trong file **`Chay_Search_Windows.bat`**, hệ thống đã được tích hợp lệnh **tự động kiểm tra và kết nối** tới `\\192.168.100.3\Common` thành ổ đĩa **`Z:`** mỗi khi khởi động ứng dụng.
+* Backend Python (`config.py`) có cơ chế tự động dò tìm thông minh theo thứ tự:
+  1. Ổ đĩa mạng đã kết nối: `Z:\dataCameraAI`
+  2. Đường dẫn mạng LAN trực tiếp: `\\192.168.100.3\Common\dataCameraAI`
+  3. Thư mục cục bộ: `CameraAI\storage\clips`
+
+### 2. Yêu cầu & Kết nối thủ công (nếu cần):
+* **Điều kiện bắt buộc:** Máy tính mới phải cắm cùng **dây mạng LAN** hoặc bắt cùng **sóng Wi-Fi nội bộ** của cơ quan để nhìn thấy máy chủ `192.168.100.3`.
+* **Kết nối 1 lần duy nhất trên máy mới:**
+  * **Cách nhanh nhất:** Mở **Command Prompt (CMD)** hoặc **PowerShell** trên máy mới và dán lệnh sau:
+    ```cmd
+    net use Z: \\192.168.100.3\Common /persistent:yes
+    ```
+  * *(Nếu máy chủ yêu cầu tài khoản/mật khẩu, Windows sẽ hiện popup hỏi: Nhập tài khoản/mật khẩu truy cập ổ Common và tích chọn **"Remember my credentials"** là xong vĩnh viễn).*
+  * **Cách qua File Explorer:** Nhấn tổ hợp phím <kbd>Win</kbd> + <kbd>R</kbd>, gõ `\\192.168.100.3\Common` rồi Enter để truy cập vào thư mục chia sẻ.
+
 
