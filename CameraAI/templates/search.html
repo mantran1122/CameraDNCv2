@@ -4858,6 +4858,69 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- Card 3: User Management & Sub-accounts (RBAC) -->
+                    <div class="ncc-cfg-card" id="ncc-card-user-management" style="margin-top: 14px;">
+                        <div class="ncc-cfg-header">
+                            <div class="ncc-cfg-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#76b900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                                <span>Quản lý Tài khoản &amp; Cấp quyền Tài khoản con (RBAC)</span>
+                            </div>
+                            <span style="font-size: 0.75rem; color: #a1a1aa;">Chỉ Quản trị viên cấp cao có quyền phân cấp</span>
+                        </div>
+
+                        <!-- Form thêm tài khoản con -->
+                        <div style="display: grid; grid-template-columns: 1.2fr 1.2fr 1.5fr 1.2fr auto; gap: 10px; align-items: end; margin-bottom: 14px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid #272832;">
+                            <div>
+                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Tên đăng nhập (Username)</label>
+                                <input type="text" class="ncc-cfg-input" id="new-user-name" placeholder="vd: baove_khuA">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Mật khẩu</label>
+                                <input type="password" class="ncc-cfg-input" id="new-user-pass" placeholder="Nhập mật khẩu...">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Họ tên / Đơn vị phụ trách</label>
+                                <input type="text" class="ncc-cfg-input" id="new-user-fullname" placeholder="vd: Tổ Trực Bảo Vệ Khu A">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Vai trò phân quyền</label>
+                                <select class="ncc-cfg-input" id="new-user-role" style="height: 34px;">
+                                    <option value="viewer">Người xem (Viewer - Chỉ xem, ẩn cấu hình)</option>
+                                    <option value="operator">Điều hành viên (Operator - Tra cứu AI)</option>
+                                    <option value="admin">Quản trị viên (Admin - Toàn quyền)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <button class="ncc-cfg-btn" onclick="addNewSubAccount()" style="height: 34px; padding: 0 14px;">
+                                    <span>+ Cấp tài khoản</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Bảng danh sách tài khoản -->
+                        <div style="border: 1px solid #272832; border-radius: 6px; overflow: hidden;">
+                            <table class="ncc-table" style="margin: 0;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 150px;">Tài khoản</th>
+                                        <th>Họ tên / Đơn vị</th>
+                                        <th style="width: 180px; text-align: center;">Vai trò</th>
+                                        <th style="width: 180px; text-align: center;">Quyền Cấu hình NVR</th>
+                                        <th style="width: 100px; text-align: center;">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ncc-users-table-body">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 3. Right Floating Widget: Hidden in Video Manager -->
@@ -7754,6 +7817,7 @@ user=None`;
                 renderNccTable();
             } else if (mode === 'config') {
                 renderNccConfigTable();
+                fetchAndRenderSystemUsers();
             }
         }
 
@@ -8461,6 +8525,94 @@ user=None`;
                     </td>
                 </tr>
             `).join('');
+        }
+
+        async function fetchAndRenderSystemUsers() {
+            const tbody = document.getElementById('ncc-users-table-body');
+            if (!tbody) return;
+            try {
+                const resp = await fetch('/api/admin/users');
+                if (!resp.ok) return;
+                const users = await resp.json();
+                tbody.innerHTML = users.map(u => {
+                    const isAdmin = u.role === 'admin';
+                    const badgeColor = isAdmin ? '#a855f7' : (u.role === 'operator' ? '#3b82f6' : '#71717a');
+                    const roleName = isAdmin ? 'Quản trị viên (Admin)' : (u.role === 'operator' ? 'Điều hành viên (Operator)' : 'Người xem (Viewer)');
+                    return `
+                        <tr>
+                            <td><strong style="color: #f4f4f5;">${escapeHtml(u.username)}</strong></td>
+                            <td>${escapeHtml(u.full_name || '—')}</td>
+                            <td style="text-align: center;">
+                                <span style="background: ${badgeColor}22; color: ${badgeColor}; border: 1px solid ${badgeColor}55; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">
+                                    ${roleName}
+                                </span>
+                            </td>
+                            <td style="text-align: center;">
+                                ${u.can_config_nvr ? '<span style="color: #4ade80; font-size: 0.78rem;">✔ Toàn quyền cấu hình</span>' : '<span style="color: #94a3b8; font-size: 0.78rem;">✖ Bị ẩn &amp; chặn cấu hình</span>'}
+                            </td>
+                            <td style="text-align: center;">
+                                ${isAdmin ? '<span style="color: #64748b; font-size: 0.72rem;">Gốc</span>' : `
+                                    <button onclick="deleteSubAccount('${escapeHtml(u.username)}')" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 0.72rem;">
+                                        Xóa
+                                    </button>
+                                `}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error('Error fetching users:', err);
+            }
+        }
+
+        async function addNewSubAccount() {
+            const username = (document.getElementById('new-user-name')?.value || '').trim();
+            const password = (document.getElementById('new-user-pass')?.value || '').trim();
+            const full_name = (document.getElementById('new-user-fullname')?.value || '').trim();
+            const role = document.getElementById('new-user-role')?.value || 'viewer';
+
+            if (!username || !password) {
+                alert('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu cho tài khoản con.');
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/admin/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, full_name, role })
+                });
+                const res = await resp.json();
+                if (resp.ok) {
+                    alert(res.message || 'Cấp tài khoản con thành công!');
+                    document.getElementById('new-user-name').value = '';
+                    document.getElementById('new-user-pass').value = '';
+                    document.getElementById('new-user-fullname').value = '';
+                    fetchAndRenderSystemUsers();
+                } else {
+                    alert(res.detail || 'Không thể tạo tài khoản.');
+                }
+            } catch (err) {
+                alert('Lỗi kết nối máy chủ: ' + err.message);
+            }
+        }
+
+        async function deleteSubAccount(username) {
+            if (!confirm(`Bạn có chắc chắn muốn xóa tài khoản '${username}' không?`)) return;
+            try {
+                const resp = await fetch(`/api/admin/users/${encodeURIComponent(username)}`, {
+                    method: 'DELETE'
+                });
+                const res = await resp.json();
+                if (resp.ok) {
+                    alert(res.message || 'Đã xóa tài khoản.');
+                    fetchAndRenderSystemUsers();
+                } else {
+                    alert(res.detail || 'Không thể xóa tài khoản.');
+                }
+            } catch (err) {
+                alert('Lỗi kết nối: ' + err.message);
+            }
         }
 
         function toggleSelectAllCameras(selectAll) {

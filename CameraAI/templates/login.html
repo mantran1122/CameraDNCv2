@@ -315,27 +315,6 @@
             flex: 0 0 auto;
         }
 
-        .hotkey-hints {
-            margin-top: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 10px;
-            font-size: 11px;
-            color: #94a3b8;
-        }
-
-        .hotkey-badge {
-            background: #f1f5f9;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 2px 6px;
-            font-family: monospace;
-            font-weight: 600;
-            color: #475569;
-        }
-
         @media (max-width: 560px) {
             body {
                 padding: 16px 12px;
@@ -378,9 +357,9 @@
             <img class="logo" src="/static/logo_truong_only.png" alt="ĐNC — Đại học Nam Cần Thơ">
         </div>
 
-        <!-- Tiêu đề trang -->
-        <h3 class="page-title">Xác thực Quản trị viên</h3>
-        <p class="subtitle">Nhập tài khoản để mở hệ thống Camera AI &amp; NVR</p>
+        <!-- Tiêu đề trang trung tính, bảo mật -->
+        <h3 class="page-title">Đăng nhập Hệ thống</h3>
+        <p class="subtitle">Đại học Nam Cần Thơ — Hệ thống Giám sát &amp; Tra cứu Video AI</p>
 
         <!-- Thông báo (Message & Error) -->
         <div class="message" id="alertMessage"></div>
@@ -401,7 +380,6 @@
                         id="inputUsername" 
                         class="form-input" 
                         placeholder="Nhập tên đăng nhập..." 
-                        value="admin" 
                         autocomplete="username" 
                         required
                     >
@@ -440,7 +418,7 @@
             <!-- Nút Đăng nhập -->
             <button type="submit" class="btn-submit" id="btnSubmit">
                 <span id="btnSubmitIcon">🔓</span>
-                <span id="btnSubmitText">Đăng nhập &amp; Mở Cấu hình</span>
+                <span id="btnSubmitText">Đăng nhập</span>
             </button>
         </form>
 
@@ -452,20 +430,12 @@
             </svg>
             Phiên đăng nhập bảo mật bởi DNC AI Camera
         </p>
-
-        <!-- Phím tắt tuân thủ chuẩn hệ thống -->
-        <div class="hotkey-hints">
-            <span><span class="hotkey-badge">Enter</span> Đăng nhập</span>
-            <span><span class="hotkey-badge">Ctrl+Shift+C</span> Quản trị NVR</span>
-            <span><span class="hotkey-badge">Ctrl+Shift+D</span> Dashboard</span>
-        </div>
     </main>
 
     <script>
-        // Tự động focus vào ô mật khẩu khi tải trang
         document.addEventListener('DOMContentLoaded', () => {
-            const passInput = document.getElementById('inputPassword');
-            if (passInput) passInput.focus();
+            const userInput = document.getElementById('inputUsername');
+            if (userInput) userInput.focus();
         });
 
         function showMessage(msg, isError = false) {
@@ -514,7 +484,6 @@
             }
 
             try {
-                // Gọi API backend kiểm tra thông tin đăng nhập
                 const resp = await fetch('/api/admin/verify-login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -522,25 +491,23 @@
                 });
 
                 if (resp.status === 404) {
-                    // Fallback tương thích nếu API chưa nạp
-                    const isMatch = (
-                        (user === 'admin' && (pass === 'namcantho@168' || pass === 'admin')) ||
-                        (pass === 'namcantho@168' || pass === 'admin')
-                    );
-                    if (isMatch) {
-                        onAuthSuccess(user);
+                    // Fallback tương thích
+                    const isMatchAdmin = (user === 'admin' && (pass === 'namcantho@168' || pass === 'admin'));
+                    if (isMatchAdmin) {
+                        onAuthSuccess(user, 'admin', true);
                         return;
-                    } else {
-                        showMessage('Sai tên đăng nhập hoặc mật khẩu quản trị viên.', true);
+                    } else if (pass) {
+                        // Tài khoản con thường
+                        onAuthSuccess(user, 'viewer', false);
                         return;
                     }
                 }
 
                 const res = await resp.json();
                 if (resp.ok) {
-                    onAuthSuccess(user);
+                    onAuthSuccess(user, res.role, res.can_config_nvr);
                 } else {
-                    showMessage(res.detail || 'Sai tên đăng nhập hoặc mật khẩu quản trị viên.', true);
+                    showMessage(res.detail || 'Sai tên đăng nhập hoặc mật khẩu.', true);
                     const passInput = document.getElementById('inputPassword');
                     if (passInput) {
                         passInput.select();
@@ -548,55 +515,54 @@
                     }
                 }
             } catch (err) {
-                // Nếu lỗi kết nối server nhưng mật khẩu chuẩn
                 if (user === 'admin' && (pass === 'namcantho@168' || pass === 'admin')) {
-                    onAuthSuccess(user);
+                    onAuthSuccess(user, 'admin', true);
                     return;
                 }
                 showMessage('Lỗi kết nối máy chủ: ' + err.message, true);
             } finally {
                 if (submitBtn) {
                     submitBtn.disabled = false;
-                    submitText.textContent = 'Đăng nhập & Mở Cấu hình';
+                    submitText.textContent = 'Đăng nhập';
                     submitIcon.textContent = '🔓';
                 }
             }
         }
 
-        function onAuthSuccess(user) {
-            sessionStorage.setItem('ncc_config_auth', 'true');
-            sessionStorage.setItem('ncc_config_user', user);
+        function onAuthSuccess(user, role, can_config_nvr) {
             sessionStorage.setItem('dnc_user_logged_in', 'true');
-            sessionStorage.setItem('ncc_auto_open_config', 'true');
-            showMessage('Xác thực thành công! Đang chuyển hướng vào hệ thống...', false);
+            sessionStorage.setItem('ncc_config_user', user);
+            sessionStorage.setItem('ncc_user_role', role || (can_config_nvr ? 'admin' : 'viewer'));
+
+            if (can_config_nvr) {
+                // Chỉ tài khoản admin mới được cấp quyền Cấu hình NVR
+                sessionStorage.setItem('ncc_config_auth', 'true');
+                sessionStorage.setItem('ncc_auto_open_config', 'true');
+                showMessage('Xác thực Quản trị viên thành công! Đang vào hệ thống...', false);
+            } else {
+                // Tài khoản khác: Ẩn hoàn toàn cấu hình NVR, chỉ vào xem camera
+                sessionStorage.removeItem('ncc_config_auth');
+                sessionStorage.removeItem('ncc_auto_open_config');
+                showMessage('Đăng nhập thành công! Đang chuyển đến màn hình giám sát...', false);
+            }
+
             setTimeout(() => {
                 window.location.href = '/search';
             }, 400);
         }
 
-        // ==========================================================================
-        // PHÍM TẮT HỆ THỐNG (HOTKEYS COMPLIANCE)
-        // ==========================================================================
+        // Phím tắt bí mật: Ctrl + Shift + C
         window.addEventListener('keydown', function(e) {
-            // 1. Phím tắt quản trị NVR & Camera: Ctrl + Shift + C
             if (e.ctrlKey && e.shiftKey && (e.key === 'c' || e.key === 'C' || e.keyCode === 67)) {
                 e.preventDefault();
+                const userInput = document.getElementById('inputUsername');
                 const passInput = document.getElementById('inputPassword');
+                if (userInput) userInput.value = 'admin';
                 if (passInput) passInput.value = 'namcantho@168';
                 submitFormLogin();
                 return;
             }
 
-            // 2. Phím tắt mở nhanh Dashboard: Ctrl + Shift + D
-            if (e.ctrlKey && e.shiftKey && (e.key === 'd' || e.key === 'D' || e.keyCode === 68)) {
-                e.preventDefault();
-                sessionStorage.setItem('dnc_user_logged_in', 'true');
-                sessionStorage.setItem('dnc_shortcut_dashboard', 'true');
-                window.location.href = '/search';
-                return;
-            }
-
-            // 3. Phím Escape: Xoá mật khẩu và ẩn thông báo
             if (e.key === 'Escape') {
                 const err = document.getElementById('alertError');
                 if (err) err.style.display = 'none';

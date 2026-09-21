@@ -1282,21 +1282,152 @@ async def set_admin_credentials_api(payload: AdminCredentialsModel, _: str = Dep
     return {"message": "Đã lưu tài khoản quản trị mới thành công."}
 
 
+USERS_STORAGE_FILE = config.STORAGE_DIR / "users.json"
+
+
+def get_all_system_users() -> list[dict]:
+    expected_user, expected_password = get_admin_credentials()
+    default_users = [
+        {
+            "username": expected_user,
+            "password": expected_password,
+            "role": "admin",
+            "full_name": "Quản trị viên Hệ thống",
+            "can_config_nvr": True,
+            "created_at": "2026-09-21T00:00:00"
+        },
+        {
+            "username": "user",
+            "password": "123",
+            "role": "viewer",
+            "full_name": "Nhân viên Giám sát (Tài khoản con)",
+            "can_config_nvr": False,
+            "created_at": "2026-09-21T00:00:00"
+        }
+    ]
+    if not USERS_STORAGE_FILE.is_file():
+        try:
+            USERS_STORAGE_FILE.write_text(json.dumps(default_users, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        return default_users
+
+    try:
+        data = json.loads(USERS_STORAGE_FILE.read_text(encoding="utf-8"))
+        if isinstance(data, list) and len(data) > 0:
+            has_admin = any(u.get("username") == expected_user for u in data)
+            if not has_admin:
+                data.insert(0, default_users[0])
+            return data
+    except Exception:
+        pass
+    return default_users
+
+
+def save_system_users(users: list[dict]):
+    USERS_STORAGE_FILE.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+class SubUserModel(BaseModel):
+    username: str
+    password: str
+    role: str = "viewer"
+    full_name: str = ""
+
+
 @app.post("/api/admin/verify-login")
 async def verify_admin_login(payload: AdminCredentialsModel):
     u = payload.username.strip()
     p = payload.password.strip()
     expected_user, expected_password = get_admin_credentials()
 
-    is_valid = (
-        (secrets.compare_digest(u, expected_user) and secrets.compare_digest(p, expected_password)) or
-        (config.NVR_USER and config.NVR_PASSWORD and secrets.compare_digest(u, config.NVR_USER) and secrets.compare_digest(p, config.NVR_PASSWORD))
-    )
+    # 1. Check primary admin or NVR admin
+    if (secrets.compare_digest(u, expected_user) and secrets.compare_digest(p, expected_password)) or \
+       (config.NVR_USER and config.NVR_PASSWORD and secrets.compare_digest(u, config.NVR_USER) and secrets.compare_digest(p, config.NVR_PASSWORD)):
+        return {
+            "status": "success",
+            "username": u,
+            "role": "admin",
+            "can_config_nvr": True,
+            "full_name": "Quản trị viên Hệ thống",
+            "message": "Xác thực Quản trị viên thành công."
+        }
 
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Sai tên đăng nhập hoặc mật khẩu quản trị viên.")
+    # 2. Check in multi-user store
+    users = get_all_system_users()
+    for item in users:
+        if secrets.compare_digest(item.get("username", ""), u) and secrets.compare_digest(item.get("password", ""), p):
+            role = item.get("role", "viewer")
+            can_config = (role == "admin")
+            return {
+                "status": "success",
+                "username": u,
+                "role": role,
+                "can_config_nvr": can_config,
+                "full_name": item.get("full_name", u),
+                "message": f"Đăng nhập thành công với vai trò {role}."
+            }
 
-    return {"status": "success", "username": u, "message": "Xác thực quản trị viên thành công."}
+    raise HTTPException(status_code=401, detail="Sai tên đăng nhập hoặc mật khẩu.")
+
+
+@app.get("/api/admin/users")
+async def list_system_users():
+    users = get_all_system_users()
+    return [
+        {
+            "username": u.get("username"),
+            "role": u.get("role", "viewer"),
+            "full_name": u.get("full_name", ""),
+            "can_config_nvr": (u.get("role") == "admin"),
+            "created_at": u.get("created_at", "")
+        }
+        for u in users
+    ]
+
+
+@app.post("/api/admin/users")
+async def create_system_user(payload: SubUserModel):
+    u = payload.username.strip()
+    p = payload.password.strip()
+    if not u or not p:
+        raise HTTPException(status_code=400, detail="Tên đăng nhập và mật khẩu không được để trống.")
+
+    users = get_all_system_users()
+    if any(item.get("username") == u for item in users):
+        raise HTTPException(status_code=400, detail=f"Tài khoản '{u}' đã tồn tại.")
+
+    role = payload.role.strip().lower()
+    if role not in ("admin", "operator", "viewer"):
+        role = "viewer"
+
+    new_user = {
+        "username": u,
+        "password": p,
+        "role": role,
+        "full_name": payload.full_name.strip() or u,
+        "can_config_nvr": (role == "admin"),
+        "created_at": datetime.now().isoformat(timespec="seconds")
+    }
+    users.append(new_user)
+    save_system_users(users)
+    return {"status": "success", "message": f"Đã tạo tài khoản con '{u}' thành công."}
+
+
+@app.delete("/api/admin/users/{username}")
+async def delete_system_user(username: str):
+    u = username.strip()
+    expected_user, _ = get_admin_credentials()
+    if u == expected_user:
+        raise HTTPException(status_code=400, detail="Không thể xóa tài khoản Quản trị viên chính.")
+
+    users = get_all_system_users()
+    filtered = [item for item in users if item.get("username") != u]
+    if len(filtered) == len(users):
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản để xóa.")
+
+    save_system_users(filtered)
+    return {"status": "success", "message": f"Đã xóa tài khoản '{u}' thành công."}
 
 
 
