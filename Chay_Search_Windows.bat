@@ -41,6 +41,17 @@ echo [OK] O dia mang Z:\dataCameraAI - Kho video Common NAS da san sang.
 :DRIVE_Z_DONE
 echo.
 
+:: [Tu dong dong bo CSDL su kien tu Common NAS neu may con chua co]
+if exist "Z:\dataCameraAI\camera_metadata.db" (
+    if not exist "storage\camera_metadata.db" (
+        echo [*] Phat hien may con chua co CSDL su kien. Dang dong bo tu Common NAS...
+        if not exist "storage" mkdir "storage"
+        copy /y "Z:\dataCameraAI\camera_metadata.db" "storage\camera_metadata.db" >nul
+        echo [OK] Da dong bo thanh cong toan bo CSDL su kien tu may chu!
+        echo.
+    )
+)
+
 echo [1/2] Kiem tra va khoi dong FastAPI Backend Server (Port 8000)...
 echo [2/2] Dang mo Cua so Desktop Search Studio (pywebview)...
 echo.
