@@ -449,10 +449,13 @@ def delete_expired_events(retention_days: int) -> List[str]:
     event_ids = [row["id"] for row in expired]
     filenames = [row["clip_filename"] for row in expired if row["clip_filename"]]
     if event_ids:
-        placeholders = ",".join("?" for _ in event_ids)
-        cursor.execute(f"DELETE FROM audio_analyses WHERE event_id IN ({placeholders})", event_ids)
-        cursor.execute(f"DELETE FROM video_analyses WHERE event_id IN ({placeholders})", event_ids)
-        cursor.execute(f"DELETE FROM events WHERE id IN ({placeholders})", event_ids)
+        chunk_size = 500
+        for i in range(0, len(event_ids), chunk_size):
+            chunk = event_ids[i:i + chunk_size]
+            placeholders = ",".join("?" for _ in chunk)
+            cursor.execute(f"DELETE FROM audio_analyses WHERE event_id IN ({placeholders})", chunk)
+            cursor.execute(f"DELETE FROM video_analyses WHERE event_id IN ({placeholders})", chunk)
+            cursor.execute(f"DELETE FROM events WHERE id IN ({placeholders})", chunk)
     conn.commit()
     conn.close()
     for event_id in event_ids:

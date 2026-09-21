@@ -9,17 +9,21 @@ echo ===========================================================================
 echo.
 
 :: [Tu dong kiem tra va ket noi o dia mang Common NAS Z:]
-if not exist "Z:\" (
-    echo [*] Dang tu dong ket noi o dia mang Common (\\192.168.100.3\Common sang o Z:)...
-    net use Z: \\192.168.100.3\Common /persistent:yes >nul 2>&1
-    if exist "Z:\" (
-        echo [OK] Da ket noi thanh cong o dia mang Z: (Common NAS)!
-    ) else (
-        echo [!] Chua the ket noi o Z:. Neu xem clip bao thieu file, hay dam bao may dang cam mang LAN noi bo.
-    )
+if exist "Z:\" goto HAS_DRIVE_Z
+
+echo [*] Dang tu dong ket noi o dia mang Common NAS...
+net use Z: \\192.168.100.3\Common /persistent:yes >nul 2>&1
+if exist "Z:\" (
+    echo [OK] Da ket noi thanh cong o dia mang Z: - Common NAS!
 ) else (
-    echo [OK] O dia mang Z: (Common NAS) da san sang.
+    echo [!] Chua the ket noi o Z:. Neu xem clip bao thieu file, hay dam bao may dang cam mang LAN.
 )
+goto DRIVE_Z_DONE
+
+:HAS_DRIVE_Z
+echo [OK] O dia mang Z: - Common NAS da san sang.
+
+:DRIVE_Z_DONE
 echo.
 
 echo [1/2] Kiem tra va khoi dong FastAPI Backend Server (Port 8000)...
@@ -28,5 +32,9 @@ echo.
 
 python app_search_win.py
 
-pause
-
+if %errorlevel% neq 0 (
+    echo.
+    echo [LOI] Co loi khi chay ung dung.
+    echo.
+    pause
+)

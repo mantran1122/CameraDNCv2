@@ -17,6 +17,12 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+:: [Tu dong kiem tra va ket noi o dia mang Common NAS Z:]
+if exist "Z:\" goto HAS_DRIVE_Z
+echo [*] Dang tu dong ket noi o dia mang Common NAS...
+net use Z: \\192.168.100.3\Common /persistent:yes >nul 2>&1
+:HAS_DRIVE_Z
+
 echo [1/3] Dang build va khoi dong cac container (PostgreSQL + CameraAI)...
 docker compose up -d --build
 
