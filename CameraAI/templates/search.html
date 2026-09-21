@@ -6287,13 +6287,9 @@ user=None`;
             return /^(chao|xin chao|hello|hi|hey|ban la ai|ban ten gi|cam on|thanks|thank you|tam biet|bye|ban lam duoc gi|tro giup|help|gioi thieu|ban la con gi|co ai o day khong|who are you|how are you)[\s!.?]*$/i.test(clean);
         }
 
-        // Định dạng văn bản phản hồi của bot: biến các mã sự kiện #14752 thành nút bấm mở xem clip ngay
         // Định dạng văn bản phản hồi của bot: loại bỏ ký tự markdown thô (#, **, *), chuyển đổi tiêu đề/danh sách đẹp mắt và bảo toàn chip sự kiện #14752
         function formatAssistantReply(text) {
             if (!text) return '';
-            let escaped = escapeHtml(text);
-            escaped = escaped.replace(/(?:#|#)(\d{4,6})/g, (match, id) => {
-                return `<span class="chat-event-chip" onclick="searchAndPlayEvent('${id}')" title="Bấm để tìm và mở clip #${id}">#${id} ▶</span>`;
             let content = String(text);
 
             // 1. Tạm thời trích xuất và bảo vệ các mã sự kiện dạng #14752 (bấm để xem clip)
@@ -6305,7 +6301,6 @@ user=None`;
                 chipIndex++;
                 return placeholder;
             });
-            return escaped;
 
             // 2. Escape HTML an toàn trước khi render thẻ
             content = escapeHtml(content);
