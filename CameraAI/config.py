@@ -106,11 +106,6 @@ def load_config():
                 data = json.load(f)
                 merged = DEFAULT_CONFIG.copy()
                 merged.update(data)
-                # Đảm bảo các sự kiện quan trọng như HumanTrait không bị thiếu do nvr_config cũ
-                if "abnormal_event_codes" in merged:
-                    curr_codes = set(merged["abnormal_event_codes"])
-                    if "HumanTrait" not in curr_codes:
-                        merged["abnormal_event_codes"].append("HumanTrait")
                 return merged
         except Exception as e:
             print(f"[Config] Error loading nvr_config.json: {e}")
