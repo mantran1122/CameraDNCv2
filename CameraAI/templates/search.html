@@ -6296,6 +6296,29 @@ user=None`;
             content = content.replace(/(\b\S+\b)(?:\s+\1){2,}/gi, '$1');
             content = content.replace(/(\b\S+\s+\S+\b)(?:\s+\1){2,}/gi, '$1');
 
+            // 0.1 Tự động chuyển các cụm tiếng Anh CCTV của model Vision sang tiếng Việt chuẩn
+            content = content.replace(/\bin in a work\s*place\b/gi, 'trong môi trường làm việc');
+            content = content.replace(/\bin a work\s*place\b/gi, 'trong môi trường làm việc');
+            content = content.replace(/\bwith one person sitting quietly doing (?:his|her|their) job\b/gi, 'với một người đang ngồi làm việc bình thường');
+            content = content.replace(/\bno suspicious behavior or unusual activity detected\b/gi, 'không phát hiện hành vi khả nghi hay hoạt động bất thường nào');
+            content = content.replace(/\bneither from visual nor audio channel\b/gi, 'cả về mặt hình ảnh lẫn âm thanh');
+            content = content.replace(/\bsingle person scene without interaction noise disturbance or anomaly event\b/gi, 'khung cảnh một người, không có tiếng ồn gây rối hay sự kiện bất thường');
+            content = content.replace(/\bboth vision and audio channels confirm consistent benign status\b/gi, 'cả kênh hình ảnh và âm thanh đều xác nhận trạng thái an toàn');
+            content = content.replace(/\bso no immediate action required beyond routine monitoring log record for audit purpose only\b/gi, 'do đó không cần can thiệp, tiếp tục theo dõi định kỳ');
+            content = content.replace(/\bno suspicious behavior\b/gi, 'không có hành vi đáng ngờ');
+            content = content.replace(/\bunusual activity\b/gi, 'hoạt động bất thường');
+            content = content.replace(/\bvisual nor audio channel\b/gi, 'kênh hình ảnh lẫn âm thanh');
+            content = content.replace(/\bmú do\b/gi, 'mức độ');
+            content = content.replace(/\bbooi canh giac\b/gi, 'bối cảnh');
+            content = content.replace(/\bbooi canh\b/gi, 'bối cảnh');
+            content = content.replace(/\ban nine\b/gi, 'an ninh');
+            content = content.replace(/Kết luôn va khuyến ngh/gi, 'Kết luận và khuyến nghị');
+            content = content.replace(/\bvia âm thanh\b/gi, 'và âm thanh');
+            content = content.replace(/\band am thanh\b/gi, 'và âm thanh');
+            content = content.replace(/\bchimb xếp tài computer li computer\b/gi, 'bàn làm việc và các thiết bị máy tính');
+            content = content.replace(/\bchimb xếp tài computer\b/gi, 'bàn làm việc và máy tính');
+            content = content.replace(/\btài computer\b/gi, 'bàn máy tính');
+
             // 1. Tạm thời trích xuất và bảo vệ các mã sự kiện dạng #14752 (bấm để xem clip)
             const eventChips = {};
             let chipIndex = 0;

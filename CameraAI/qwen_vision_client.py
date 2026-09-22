@@ -101,6 +101,43 @@ def clean_repetitive_text(text: str) -> str:
     text = re.sub(r'(\b\S+\s+\S+\b)(?:\s+\1){2,}', r'\1', text, flags=re.IGNORECASE)
     # 3. Lặp cụm 3 từ >= 3 lần liên tiếp
     text = re.sub(r'(\b\S+\s+\S+\s+\S+\b)(?:\s+\1){2,}', r'\1', text, flags=re.IGNORECASE)
+def sanitize_cctv_english(text: str) -> str:
+    """
+    Tự động dịch/thay thế các cụm từ tiếng Anh rập khuôn thường gặp của mô hình Qwen Vision
+    và sửa các từ bị méo chính tả sang tiếng Việt chuẩn.
+    """
+    if not text:
+        return text
+    replacements = [
+        (r'\bin in a work\s*place\b', 'trong môi trường làm việc'),
+        (r'\bin a work\s*place\b', 'trong môi trường làm việc'),
+        (r'\bwith one person sitting quietly doing (?:his|her|their) job', 'với một người đang ngồi làm việc bình thường'),
+        (r'\bno suspicious behavior or unusual activity detected\b', 'không phát hiện hành vi khả nghi hay hoạt động bất thường nào'),
+        (r'\bneither from visual nor audio channel\b', 'cả về mặt hình ảnh lẫn âm thanh'),
+        (r'\bsingle person scene without interaction noise disturbance or anomaly event\b', 'khung cảnh một người, không có tiếng ồn gây rối hay sự kiện bất thường'),
+        (r'\bboth vision and audio channels confirm consistent benign status\b', 'cả kênh hình ảnh và âm thanh đều xác nhận trạng thái an toàn'),
+        (r'\bso no immediate action required beyond routine monitoring log record for audit purpose only\b', 'do đó không cần can thiệp, tiếp tục theo dõi định kỳ'),
+        (r'\bno suspicious behavior\b', 'không có hành vi đáng ngờ'),
+        (r'\bunusual activity\b', 'hoạt động bất thường'),
+        (r'\bvisual nor audio channel\b', 'kênh hình ảnh lẫn âm thanh'),
+        (r'\broutine monitoring\b', 'giám sát định kỳ'),
+        (r'\bmú do\b', 'mức độ'),
+        (r'\bbooi canh giac\b', 'bối cảnh'),
+        (r'\bbooi canh\b', 'bối cảnh'),
+        (r'\ban nine\b', 'an ninh'),
+        (r'\bchimb xếp tài computer li computer\b', 'bàn làm việc và các thiết bị máy tính'),
+        (r'\bchimb xếp tài computer\b', 'bàn làm việc và máy tính'),
+        (r'\btài computer\b', 'bàn máy tính'),
+        (r'Kết luôn va khuyến ngh', 'Kết luận và khuyến nghị'),
+        (r'\bvia âm thanh\b', 'và âm thanh'),
+        (r'\band am thanh\b', 'và âm thanh'),
+        (r'\bđồng thụj\b', 'đồng thời'),
+        (r'\bngưong\b', 'ngưỡng'),
+        (r'\bcử động\b', 'cử động'),
+        (r'\btổng hợp\b', 'Tổng hợp'),
+    ]
+    for pattern, repl in replacements:
+        text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
     return text
 
 
@@ -108,10 +145,10 @@ def call_qwen_chat(
     messages: List[Dict[str, Any]],
     model: Optional[str] = None,
     max_tokens: int = 4096,
-    temperature: float = 0.5,
-    frequency_penalty: float = 0.4,
-    presence_penalty: float = 0.2,
-    repetition_penalty: float = 1.15,
+    temperature: float = 0.35,
+    frequency_penalty: float = 0.25,
+    presence_penalty: float = 0.05,
+    repetition_penalty: float = 1.08,
     timeout: int = 90,
 ) -> Dict[str, Any]:
     """
@@ -178,6 +215,7 @@ def call_qwen_chat(
                 content = reasoning.strip()
 
         content = clean_repetitive_text(content.strip())
+        content = sanitize_cctv_english(content)
         reasoning = clean_repetitive_text(reasoning.strip())
 
         return {
@@ -191,7 +229,7 @@ def call_qwen_chat(
         if getattr(exc, "response", None) is not None:
             try:
                 err_json = exc.response.json()
-                msg = err_json.get("error", {}).get("message") or exc.response.text
+                msg = err_json.get("error", {}).get("message") or err_json.get("message") or str(err_json)
                 err_detail = f" (Chi tiết máy chủ: {msg})"
             except Exception:
                 err_detail = f" (Chi tiết máy chủ: {exc.response.text[:200]})"
@@ -221,17 +259,16 @@ def analyze_video_dense(
         raise ValueError(f"Không trích xuất được frame nào từ video {clip_path}")
 
     system_prompt = (
-        "Bạn là 'Vision & Audio Agent' - trợ lý AI chuyên gia phân tích đa phương thức (Thị giác các frame video liên tiếp + Âm thanh thực tế) "
-        "thuộc hệ thống VSS Blueprint (Server AI siêu tốc).\n\n"
-        "NHIỆM VỤ:\n"
-        "1. Phân tích chuỗi frame liên tiếp theo trình tự thời gian kết hợp ĐỐI CHIẾU CHÉO với âm thanh thực tế được cung cấp.\n"
-        "2. Xác định chi tiết: Các đối tượng (người, phương tiện, vật thể), đặc điểm trang phục/bảo hộ, hành động cụ thể.\n"
-        "3. Nêu rõ diễn biến theo từng mốc thời gian (giây) nếu có hành vi đáng chú ý.\n"
-        "4. TỔNG HỢP CẢ HÌNH ẢNH VÀ ÂM THANH THỰC TẾ: Trình bày rõ ràng những gì quan sát được từ hình ảnh và những gì nghe thấy từ âm thanh (lời thoại, tiếng động).\n"
-        "5. Đánh giá mức độ an toàn/rủi ro: Bình thường, Nghi vấn, hay Nguy hiểm/Bất thường.\n"
-        "6. Đưa ra kết luận và khuyến nghị rõ ràng, trực diện bằng tiếng Việt chuyên nghiệp.\n"
-        "7. QUY CÁCH TRÌNH BÀY: Trình bày văn bản tiếng Việt tự nhiên, sạch sẽ, súc tích. Tuyệt đối KHÔNG dùng ký tự markdown như dấu thăng (#, ##, ###) để làm tiêu đề, không dùng dấu sao kép (**in đậm**) hay dấu sao (*in nghiêng*). Trình bày từng ý bằng gạch đầu dòng ngắn gọn.\n"
-        "8. CHÍNH TẢ & CHỐNG LẶP TỪ: Luôn trả lời bằng TIẾNG VIỆT CHUẨN CÓ DẤU ĐẦY ĐỦ. Tuyệt đối không lặp lại một từ hoặc cụm từ nhiều lần."
+        "Bạn là 'Vision & Audio Agent' - trợ lý AI chuyên gia phân tích an ninh giám sát đa phương thức (Thị giác video + Âm thanh thực tế) "
+        "thuộc hệ thống VSS Blueprint.\n\n"
+        "QUY TẮC BẮT BUỘC:\n"
+        "1. 100% TIẾNG VIỆT THUẦN TÚY: Bắt buộc trả lời hoàn toàn bằng TIẾNG VIỆT chuẩn mực, tự nhiên, có dấu đầy đủ. TUYỆT ĐỐI KHÔNG CHÈN TIẾNG ANH (không dùng các câu tiếng Anh như 'in a workplace', 'single person scene', 'no suspicious behavior...', 'visual nor audio channel'). Dịch toàn bộ thuật ngữ sang tiếng Việt chuẩn.\n"
+        "2. CHÍNH TẢ CHUẨN XÁC: Viết đúng chính tả tiếng Việt ('Mức độ an toàn', 'Bối cảnh', 'An ninh', 'Bình thường', 'Khuyến nghị'). Tuyệt đối không viết sai dấu hay từ ngữ biến dạng.\n"
+        "3. PHÂN TÍCH DIỄN BIẾN THEO MỐC GIÂY: Trình bày chi tiết những gì nhìn thấy theo từng mốc thời gian (người, trang phục, vị trí, hành động).\n"
+        "4. TỔNG HỢP HÌNH ẢNH VÀ ÂM THANH: Kết hợp đối chiếu hình ảnh với dữ liệu âm thanh thực tế (mức dBFS, lời thoại nếu có).\n"
+        "5. ĐÁNH GIÁ MỨC ĐỘ RỦI RO: Phân định rõ: Bình thường, Nghi vấn, hay Nguy hiểm/Bất thường.\n"
+        "6. KẾT LUẬN & KHUYẾN NGHỊ: Đưa ra nhận định súc tích (3-4 dòng) bằng tiếng Việt chuyên nghiệp.\n"
+        "7. ĐỊNH DẠNG: Tuyệt đối KHÔNG dùng ký tự markdown như dấu thăng (#, ##) làm tiêu đề, không dùng dấu sao (**in đậm**). Trình bày từng ý bằng gạch đầu dòng ngắn gọn."
     )
 
     # Build user content array containing text prompt and all extracted image frames
