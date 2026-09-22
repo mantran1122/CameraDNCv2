@@ -91,16 +91,38 @@ def extract_dense_frames(
 def clean_repetitive_text(text: str) -> str:
     """
     Loại bỏ hiện tượng thoái hóa lặp từ vô tận của LLM (token repetition degeneration).
-    Ví dụ: 'tuy tuy tuy tuy...', 'cụ thể cụ thể cụ thể...', hoặc lặp cụm từ liên tiếp.
+    Ví dụ: 'tuy tuy tuy tuy...', 'cụ thể cụ thể cụ thể...', hoặc lặp cụm từ/âm tiết liên tiếp.
     """
     if not text:
         return text
-    # 1. Lặp 1 từ >= 3 lần liên tiếp: 'tuy tuy tuy...' -> 'tuy'
+
+    # 1. Lặp âm tiết dính liền nhau trong từ: 'chuchuchu' -> 'chu', 'aaaaa' -> 'a'
+    text = re.sub(r'([a-zA-Z\u00C0-\u1EF9]{2,6})\1{2,}', r'\1', text, flags=re.IGNORECASE)
+    text = re.sub(r'([a-zA-Z\u00C0-\u1EF9])\1{3,}', r'\1', text, flags=re.IGNORECASE)
+
+    # 2. Lặp 1 từ >= 2 lần liên tiếp: 'chu chu chu...' -> 'chu'
     text = re.sub(r'(\b\S+\b)(?:\s+\1){2,}', r'\1', text, flags=re.IGNORECASE)
-    # 2. Lặp cụm 2 từ >= 3 lần liên tiếp
+
+    # 3. Lặp cụm 2 từ >= 2 lần liên tiếp
     text = re.sub(r'(\b\S+\s+\S+\b)(?:\s+\1){2,}', r'\1', text, flags=re.IGNORECASE)
-    # 3. Lặp cụm 3 từ >= 3 lần liên tiếp
+
+    # 4. Lặp cụm 3 từ >= 2 lần liên tiếp
     text = re.sub(r'(\b\S+\s+\S+\s+\S+\b)(?:\s+\1){2,}', r'\1', text, flags=re.IGNORECASE)
+
+    # 5. Dọn dẹp các cụm từ lặp lại ở cuối dòng / cuối đoạn (ví dụ: 'khuyen nghj khuyến nghj khuyen', 'chu chu...')
+    text = re.sub(r'(\b[a-zA-Z\u00C0-\u1EF9]{2,}\b)(?:\s+\1){1,}', r'\1', text, flags=re.IGNORECASE)
+
+    # 6. Loại bỏ phần đuôi thoái hóa vô nghĩa (ví dụ: 'chu Chú Cúc Cuc uc u', 'aa aa A', lặp từ lẻ)
+    lines = []
+    for line in text.splitlines():
+        # Nếu dòng kết thúc bằng chuỗi 2+ từ ngắn lặp hoặc đuôi vô nghĩa
+        line = re.sub(r'(?:\s+[a-zA-Z\u00C0-\u1EF9]{1,4}){3,}\s*$', '.', line)
+        lines.append(line)
+    text = "\n".join(lines)
+
+    return text.strip()
+
+
 def sanitize_cctv_english(text: str) -> str:
     """
     Tự động dịch/thay thế các cụm từ tiếng Anh rập khuôn thường gặp của mô hình Qwen Vision
@@ -122,6 +144,7 @@ def sanitize_cctv_english(text: str) -> str:
         (r'\bvisual nor audio channel\b', 'kênh hình ảnh lẫn âm thanh'),
         (r'\broutine monitoring\b', 'giám sát định kỳ'),
         (r'\bmú do\b', 'mức độ'),
+        (r'\bmúc độ\b', 'mức độ'),
         (r'\bbooi canh giac\b', 'bối cảnh'),
         (r'\bbooi canh\b', 'bối cảnh'),
         (r'\ban nine\b', 'an ninh'),
@@ -135,6 +158,18 @@ def sanitize_cctv_english(text: str) -> str:
         (r'\bngưong\b', 'ngưỡng'),
         (r'\bcử động\b', 'cử động'),
         (r'\btổng hợp\b', 'Tổng hợp'),
+        (r'\bpha bên phải\b', 'phía bên phải'),
+        (r'\bpha trái\b', 'phía trái'),
+        (r'\bliên computer\b', 'liên tục'),
+        (r'\bkhuy[eê]n ngh[ij]\b', 'khuyến nghị'),
+        (r'\bgió\b', 'giờ'),
+        (r'\bá\s+o\b', 'áo'),
+        (r'\btiếp tuç\b', 'tiếp tục'),
+        (r'\bro re\b', 'rõ ràng'),
+        (r'\bmúc rủi ro\b', 'mức độ rủi ro'),
+        (r'\btrang tr\b', 'trang trí'),
+        (r'\bkhông biểu hung hang.*$', 'không có biểu hiện hung hãn hay hành vi bất thường.'),
+        (r'\bhung hang\b', 'hung hãn'),
     ]
     for pattern, repl in replacements:
         text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
@@ -145,10 +180,10 @@ def call_qwen_chat(
     messages: List[Dict[str, Any]],
     model: Optional[str] = None,
     max_tokens: int = 4096,
-    temperature: float = 0.35,
-    frequency_penalty: float = 0.25,
-    presence_penalty: float = 0.05,
-    repetition_penalty: float = 1.08,
+    temperature: float = 0.6,
+    frequency_penalty: float = 0.15,
+    presence_penalty: float = 0.1,
+    repetition_penalty: float = 1.1,
     timeout: int = 90,
 ) -> Dict[str, Any]:
     """
@@ -267,7 +302,7 @@ def analyze_video_dense(
         "3. PHÂN TÍCH DIỄN BIẾN THEO MỐC GIÂY: Trình bày chi tiết những gì nhìn thấy theo từng mốc thời gian (người, trang phục, vị trí, hành động).\n"
         "4. TỔNG HỢP HÌNH ẢNH VÀ ÂM THANH: Kết hợp đối chiếu hình ảnh với dữ liệu âm thanh thực tế (mức dBFS, lời thoại nếu có).\n"
         "5. ĐÁNH GIÁ MỨC ĐỘ RỦI RO: Phân định rõ: Bình thường, Nghi vấn, hay Nguy hiểm/Bất thường.\n"
-        "6. KẾT LUẬN & KHUYẾN NGHỊ: Đưa ra nhận định súc tích (3-4 dòng) bằng tiếng Việt chuyên nghiệp.\n"
+        "6. KẾT LUẬN: Đưa ra nhận định súc tích (1-2 câu ngắn gọn) xác nhận tình trạng an ninh và kết thúc phản hồi.\n"
         "7. ĐỊNH DẠNG: Tuyệt đối KHÔNG dùng ký tự markdown như dấu thăng (#, ##) làm tiêu đề, không dùng dấu sao (**in đậm**). Trình bày từng ý bằng gạch đầu dòng ngắn gọn."
     )
 
@@ -293,10 +328,11 @@ def analyze_video_dense(
 
     # Build user content array containing text prompt, audio context and all extracted image frames
     user_prompt_text = (
+        f"[YÊU CẦU BẮT BUỘC: TRẢ LỜI HOÀN TOÀN BẰNG TIẾNG VIỆT CHUẨN MỰC, KHÔNG DÙNG TIẾNG ANH]\n\n"
         f"Dưới đây là chuỗi {len(frames)} frame hình ảnh liên tiếp được cắt đều từ clip camera an ninh từ giây 0 đến kết thúc."
         f"{audio_context_text}\n"
         f"YÊU CẦU CỦA NGƯỜI VẬN HÀNH:\n{prompt}\n\n"
-        "Hãy phân tích chi tiết diễn biến, kết hợp đầy đủ cả hình ảnh lẫn âm thanh thực tế và trả lời yêu cầu trên."
+        "Hãy phân tích chi tiết diễn biến, kết hợp đầy đủ cả hình ảnh lẫn âm thanh thực tế và trả lời yêu cầu trên hoàn toàn bằng tiếng Việt."
     )
 
     user_content: List[Dict[str, Any]] = [
