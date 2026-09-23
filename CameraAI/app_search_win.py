@@ -37,8 +37,8 @@ def wait_for_server(url: str = "http://127.0.0.1:8000/login", max_wait: float = 
     return False
 
 def start_fastapi_server():
-    """Starts FastAPI background server on localhost:8000"""
-    uvicorn.run(fastapi_app, host="127.0.0.1", port=8000, log_level="warning")
+    """Start FastAPI on all interfaces for authenticated LAN/VPN clients."""
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=8000, log_level="warning")
 
 def main():
     print("==========================================================================")

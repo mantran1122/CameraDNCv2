@@ -28,8 +28,8 @@ def build_clip_reference(channel: int, event_time: datetime, event_id: int) -> s
     ).as_posix()
 
 
-def resolve_clip_path(reference: str) -> Path:
-    """Resolve a database reference without allowing traversal outside clip root."""
+def resolve_clip_path(reference: str, fetch_remote: bool = True) -> Path:
+    """Resolve a safe clip path, downloading it from remote storage on demand."""
     if not reference:
         raise ValueError("Clip reference is empty")
     normalized = reference.replace("\\", "/")
@@ -60,7 +60,30 @@ def resolve_clip_path(reference: str) -> Path:
         except Exception:
             pass
 
-    return path if path is not None else (Path(config.CLIPS_DIR) / Path(*relative.parts))
+    local_path = path if path is not None else (Path(config.CLIPS_DIR) / Path(*relative.parts))
+    if fetch_remote:
+        try:
+            from synology_storage import download_clip, enabled
+            if enabled() and download_clip(relative.as_posix(), local_path):
+                return local_path
+        except Exception as exc:
+            # Keep local capture and offline playback usable while the NAS is
+            # temporarily unavailable. Callers will handle a missing file.
+            print(f"[Synology Storage] Download skipped for {relative.as_posix()}: {exc}")
+    return local_path
+
+
+def mirror_clip(reference: str) -> bool:
+    """Upload an existing local clip to the configured remote backend."""
+    local_path = resolve_clip_path(reference, fetch_remote=False)
+    if not local_path.is_file():
+        return False
+    try:
+        from synology_storage import enabled, upload_clip
+        return upload_clip(reference, local_path) if enabled() else False
+    except Exception as exc:
+        print(f"[Synology Storage] Upload failed for {reference}: {exc}")
+        return False
 
 
 def legacy_clip_details(filename: str):

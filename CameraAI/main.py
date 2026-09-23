@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from starlette.middleware.sessions import SessionMiddleware
 
 import config
 import database
@@ -30,7 +31,7 @@ import video_clipper
 import data_health
 from temporal_parser import parse_query_temporal
 from ai_search_planner import plan_search_intent
-from clip_storage import resolve_clip_path
+from clip_storage import mirror_clip, resolve_clip_path
 from audio_analysis_worker import AudioAnalysisWorker
 from video_analysis_worker import VideoAnalysisWorker
 from qwen_vision_client import (
@@ -59,17 +60,55 @@ app = FastAPI(
     version="2.0.0"
 )
 
+
+@app.middleware("http")
+async def require_login_session(request: Request, call_next):
+    """Require a verified session outside public login assets."""
+    path = request.url.path
+    public = (
+        path in {"/", "/login", "/api/admin/verify-login", "/favicon.ico"}
+        or path.startswith("/static/")
+    )
+    if not public and not request.session.get("username"):
+        if path.startswith("/api/") or path.startswith("/clips/"):
+            return JSONResponse(status_code=401, content={"detail": "Authentication required"})
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    return await call_next(request)
+
+
+# This is registered after the authorization middleware so the signed session
+# cookie is decoded before require_login_session reads request.session.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=config.SESSION_SECRET,
+    session_cookie="cameraai_session",
+    max_age=config.SESSION_MAX_AGE_SECONDS,
+    same_site="lax",
+    https_only=config.SESSION_COOKIE_SECURE,
+)
+
 static_dir = config.BASE_DIR / "static"
 templates_dir = config.BASE_DIR / "templates"
 static_dir.mkdir(exist_ok=True)
 templates_dir.mkdir(exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-app.mount("/clips", StaticFiles(directory=str(config.CLIPS_DIR)), name="clips")
 
 templates = Jinja2Templates(directory=str(templates_dir))
 admin_security = HTTPBasic(auto_error=False)
 _gemini_quota_exceeded_until: float = 0.0
+
+
+@app.get("/clips/{clip_reference:path}")
+async def serve_clip(clip_reference: str):
+    """Serve a cached clip, fetching it from Synology when necessary."""
+    try:
+        clip_path = await asyncio.to_thread(resolve_clip_path, clip_reference)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid clip reference")
+    if not clip_path.is_file():
+        raise HTTPException(status_code=404, detail="Clip not found")
+    return FileResponse(clip_path, media_type="video/mp4")
 
 
 def get_admin_credentials() -> tuple[str, str]:
@@ -123,6 +162,12 @@ def require_database_admin(credentials: Optional[HTTPBasicCredentials] = Depends
             headers={"WWW-Authenticate": 'Basic realm="Database Administration"'},
         )
     return credentials.username
+
+
+def require_session_admin(request: Request) -> str:
+    if request.session.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Administrator permission required")
+    return str(request.session.get("username", ""))
 
 
 class ConnectionManager:
@@ -258,13 +303,19 @@ def purge_expired_metadata() -> None:
     filenames = database.delete_expired_events(config.METADATA_RETENTION_DAYS)
     removed_clips = 0
     for filename in filenames:
-        clip_path = resolve_clip_path(filename)
+        clip_path = resolve_clip_path(filename, fetch_remote=False)
         try:
             if clip_path.is_file():
                 clip_path.unlink()
                 removed_clips += 1
         except OSError as exc:
             print(f"[Cleanup] Could not remove expired clip {clip_path.name}: {exc}")
+        try:
+            from synology_storage import delete_clip, enabled as synology_enabled
+            if synology_enabled():
+                delete_clip(filename)
+        except Exception as exc:
+            print(f"[Cleanup] Could not remove remote clip {filename}: {exc}")
     if filenames:
         print(f"[Cleanup] Removed {len(filenames)} expired events and {removed_clips} clips (retention={config.METADATA_RETENTION_DAYS} days).")
 
@@ -361,7 +412,8 @@ async def upload_test_video(video: UploadFile = File(...), _: str = Depends(requ
         metadata_dict={"source": "manual_upload", "original_filename": os.path.basename(original_name), "size_bytes": written},
         clip_filename=reference,
     )
-    return {"event": database.get_event_by_id(event_id)}
+    remote_mirrored = await asyncio.to_thread(mirror_clip, reference)
+    return {"event": database.get_event_by_id(event_id), "remote_mirrored": remote_mirrored}
 
 @app.get("/api/events")
 async def get_events_api(
@@ -1076,6 +1128,7 @@ async def vss_chat_video_api(req: VSSChatVideoRequest):
                 history=req.history,
                 num_frames=num_frames,
                 audio_analysis=audio_data,
+                event=ev,
             )
             return res, audio_data
 
@@ -1296,14 +1349,6 @@ def get_all_system_users() -> list[dict]:
             "full_name": "Quản trị viên Hệ thống",
             "can_config_nvr": True,
             "created_at": "2026-09-21T00:00:00"
-        },
-        {
-            "username": "user",
-            "password": "123",
-            "role": "viewer",
-            "full_name": "Nhân viên Giám sát (Tài khoản con)",
-            "can_config_nvr": False,
-            "created_at": "2026-09-21T00:00:00"
         }
     ]
     if not USERS_STORAGE_FILE.is_file():
@@ -1316,9 +1361,28 @@ def get_all_system_users() -> list[dict]:
     try:
         data = json.loads(USERS_STORAGE_FILE.read_text(encoding="utf-8"))
         if isinstance(data, list) and len(data) > 0:
+            # Remove credentials that shipped as development/demo defaults before
+            # the service was made reachable from other computers.
+            cleaned_data = []
+            for item in data:
+                username = str(item.get("username", ""))
+                password = str(item.get("password", ""))
+                is_legacy_viewer = username == "user" and password == "123"
+                is_legacy_admin = (
+                    expected_user != "admin"
+                    and username == "admin"
+                    and password in {"admin", "namcantho@168"}
+                )
+                if not is_legacy_viewer and not is_legacy_admin:
+                    cleaned_data.append(item)
+            data = cleaned_data
             has_admin = any(u.get("username") == expected_user for u in data)
             if not has_admin:
                 data.insert(0, default_users[0])
+            try:
+                save_system_users(data)
+            except Exception:
+                pass
             return data
     except Exception:
         pass
@@ -1337,7 +1401,7 @@ class SubUserModel(BaseModel):
 
 
 @app.post("/api/admin/verify-login")
-async def verify_admin_login(payload: AdminCredentialsModel):
+async def verify_admin_login(payload: AdminCredentialsModel, request: Request):
     u = payload.username.strip()
     p = payload.password.strip()
     expected_user, expected_password = get_admin_credentials()
@@ -1345,6 +1409,8 @@ async def verify_admin_login(payload: AdminCredentialsModel):
     # 1. Check primary admin or NVR admin
     if (secrets.compare_digest(u, expected_user) and secrets.compare_digest(p, expected_password)) or \
        (config.NVR_USER and config.NVR_PASSWORD and secrets.compare_digest(u, config.NVR_USER) and secrets.compare_digest(p, config.NVR_PASSWORD)):
+        request.session.clear()
+        request.session.update({"username": u, "role": "admin", "can_config_nvr": True})
         return {
             "status": "success",
             "username": u,
@@ -1360,6 +1426,8 @@ async def verify_admin_login(payload: AdminCredentialsModel):
         if secrets.compare_digest(item.get("username", ""), u) and secrets.compare_digest(item.get("password", ""), p):
             role = item.get("role", "viewer")
             can_config = (role == "admin")
+            request.session.clear()
+            request.session.update({"username": u, "role": role, "can_config_nvr": can_config})
             return {
                 "status": "success",
                 "username": u,
@@ -1372,8 +1440,14 @@ async def verify_admin_login(payload: AdminCredentialsModel):
     raise HTTPException(status_code=401, detail="Sai tên đăng nhập hoặc mật khẩu.")
 
 
+@app.post("/api/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return {"status": "success"}
+
+
 @app.get("/api/admin/users")
-async def list_system_users():
+async def list_system_users(_: str = Depends(require_session_admin)):
     users = get_all_system_users()
     return [
         {
@@ -1388,7 +1462,7 @@ async def list_system_users():
 
 
 @app.post("/api/admin/users")
-async def create_system_user(payload: SubUserModel):
+async def create_system_user(payload: SubUserModel, _: str = Depends(require_session_admin)):
     u = payload.username.strip()
     p = payload.password.strip()
     if not u or not p:
@@ -1416,7 +1490,7 @@ async def create_system_user(payload: SubUserModel):
 
 
 @app.delete("/api/admin/users/{username}")
-async def delete_system_user(username: str):
+async def delete_system_user(username: str, _: str = Depends(require_session_admin)):
     u = username.strip()
     expected_user, _ = get_admin_credentials()
     if u == expected_user:

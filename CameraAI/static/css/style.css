@@ -1843,3 +1843,99 @@ body {
     }
 }
 
+/* Desktop viewport tuning: common laptop, Full HD and QHD/2K screens. */
+@media (min-width: 1200px) and (max-width: 1599px) {
+    .container {
+        width: 100%;
+        max-width: none;
+        margin: 1.25rem auto;
+        padding-inline: 1.25rem;
+    }
+
+    .navbar {
+        padding-inline: 1.25rem;
+    }
+
+    .grid-top {
+        gap: 1rem;
+    }
+
+    .main-grid {
+        grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+        gap: 1rem;
+    }
+
+    .vss-sidebar-controls {
+        width: 220px;
+        min-width: 220px;
+        max-width: 220px;
+    }
+
+    .vss-chat-sidebar {
+        width: 320px;
+        min-width: 320px;
+        max-width: 320px;
+    }
+}
+
+@media (min-width: 1200px) and (max-height: 900px) {
+    body {
+        padding-bottom: 24px;
+    }
+
+    .navbar {
+        padding-block: 0.65rem;
+    }
+
+    .brand-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .container {
+        margin-block: 1rem;
+    }
+
+    .grid-top {
+        margin-bottom: 1rem;
+    }
+
+    .metric-card {
+        padding: 1rem;
+    }
+
+    .summary-box {
+        padding: 1.2rem 1.35rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .summary-title {
+        margin-bottom: 0.65rem;
+    }
+
+    .card {
+        padding: 1.1rem;
+    }
+
+    .chart-container,
+    .timeline-workspace .chart-container {
+        height: 250px;
+    }
+
+    .vss-blueprint-root {
+        height: calc(100dvh - 150px);
+        min-height: 560px;
+        max-height: 750px;
+    }
+}
+
+@media (min-width: 1920px) {
+    .container {
+        max-width: 1800px;
+    }
+
+    .vss-blueprint-root {
+        max-height: 1080px;
+    }
+}
+

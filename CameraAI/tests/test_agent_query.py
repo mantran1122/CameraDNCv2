@@ -5,11 +5,17 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from main import app
+from main import app, get_admin_credentials
 
 class AgentQueryTest(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        username, password = get_admin_credentials()
+        response = self.client.post(
+            '/api/admin/verify-login',
+            json={'username': username, 'password': password},
+        )
+        self.assertEqual(response.status_code, 200)
 
     def test_agent_query_empty_text_returns_greeting(self):
         response = self.client.post('/api/agent/query', json={'query': '', 'channel': 2})

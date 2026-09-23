@@ -11,9 +11,9 @@ def _detect_clips_dir() -> Path:
     env_dir = os.getenv("CAMERAAI_CLIPS_DIR", "").strip()
     if env_dir:
         try:
-            p = Path(env_dir).expanduser()
-            if p.is_dir():
-                return p
+            # An explicit cache path may not exist on the first startup yet.
+            path = Path(env_dir).expanduser()
+            return path if path.is_absolute() else BASE_DIR / path
         except Exception:
             pass
     for candidate in [
@@ -31,12 +31,51 @@ def _detect_clips_dir() -> Path:
 CLIPS_DIR = _detect_clips_dir()
 CONFIG_FILE = STORAGE_DIR / "nvr_config.json"
 
+# Remote evidence storage. The Synology password must only be supplied through
+# the process environment or the git-ignored CameraAI/.env file.
+STORAGE_BACKEND = os.getenv("CAMERAAI_STORAGE_BACKEND", "local").strip().lower()
+SYNOLOGY_URL = os.getenv("CAMERAAI_SYNOLOGY_URL", "").strip().rstrip("/")
+SYNOLOGY_USERNAME = os.getenv("CAMERAAI_SYNOLOGY_USERNAME", "").strip()
+SYNOLOGY_PASSWORD = os.getenv("CAMERAAI_SYNOLOGY_PASSWORD", "")
+SYNOLOGY_SHARE = "/" + os.getenv("CAMERAAI_SYNOLOGY_SHARE", "Ai-Camera").strip().strip("/")
+SYNOLOGY_ROOT = os.getenv("CAMERAAI_SYNOLOGY_ROOT", "CameraAI/clips").strip().strip("/")
+SYNOLOGY_VERIFY_TLS = os.getenv("CAMERAAI_SYNOLOGY_VERIFY_TLS", "true").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+SYNOLOGY_TIMEOUT_SECONDS = max(5, int(os.getenv("CAMERAAI_SYNOLOGY_TIMEOUT_SECONDS", "60")))
+
 # Ensure directories exist
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 try:
     CLIPS_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:
     pass
+
+
+def _load_session_secret() -> str:
+    configured = os.getenv("CAMERAAI_SESSION_SECRET", "").strip()
+    if configured:
+        return configured
+    secret_file = STORAGE_DIR / "session_secret.key"
+    try:
+        if secret_file.is_file():
+            value = secret_file.read_text(encoding="utf-8").strip()
+            if value:
+                return value
+        import secrets
+        value = secrets.token_urlsafe(48)
+        secret_file.write_text(value, encoding="utf-8")
+        return value
+    except Exception:
+        import secrets
+        return secrets.token_urlsafe(48)
+
+
+SESSION_SECRET = _load_session_secret()
+SESSION_MAX_AGE_SECONDS = max(300, int(os.getenv("CAMERAAI_SESSION_MAX_AGE_SECONDS", "28800")))
+SESSION_COOKIE_SECURE = os.getenv("CAMERAAI_SESSION_COOKIE_SECURE", "false").strip().lower() in {
+    "1", "true", "yes", "on"
+}
 
 # Default NVR Configuration
 DEFAULT_CONFIG = {

@@ -41,8 +41,6 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=Asia/Ho_Chi_Minh
-      - ADMIN_DATABASE_USERNAME=admin
-      - ADMIN_DATABASE_PASSWORD=namcantho@168
       - USE_DEEPFILTER=true
       # Tu dong dong bo thoi gian thuc tu SQLite sang PostgreSQL
       - CAMERAAI_POSTGRES_DUAL_WRITE=true

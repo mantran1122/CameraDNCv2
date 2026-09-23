@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 def extract_dense_frames(
     clip_path: Path | str,
-    num_frames: int = 8,
-    max_dim: int = 768,
-    jpeg_quality: int = 80,
+    num_frames: int = 4,
+    max_dim: int = 400,
+    jpeg_quality: int = 40,
 ) -> List[Tuple[float, str]]:
     """
     Extract evenly distributed dense frames across a video clip.
@@ -179,12 +179,12 @@ def sanitize_cctv_english(text: str) -> str:
 def call_qwen_chat(
     messages: List[Dict[str, Any]],
     model: Optional[str] = None,
-    max_tokens: int = 4096,
+    max_tokens: int = 2048,
     temperature: float = 0.6,
     frequency_penalty: float = 0.15,
     presence_penalty: float = 0.1,
     repetition_penalty: float = 1.1,
-    timeout: int = 90,
+    timeout: int = 150,
 ) -> Dict[str, Any]:
     """
     Call the OpenAI-compatible SGLang endpoint on Server AI.
@@ -212,12 +212,22 @@ def call_qwen_chat(
         "frequency_penalty": frequency_penalty,
         "presence_penalty": presence_penalty,
         "repetition_penalty": repetition_penalty,
+        "chat_template_kwargs": {"enable_thinking": False},
     }
 
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
         resp.raise_for_status()
-        data = resp.json()
+        resp.encoding = "utf-8"
+        try:
+            data = resp.json()
+        except Exception:
+            raw_text = resp.content.decode("utf-8", errors="replace").strip()
+            if "data: [DONE]" in raw_text:
+                raw_text = raw_text.split("data: [DONE]")[0].strip()
+            if raw_text.startswith("data:"):
+                raw_text = raw_text[len("data:"):].strip()
+            data = json.loads(raw_text)
         choice = data["choices"][0]
         message = choice.get("message", {})
 
@@ -278,12 +288,13 @@ def analyze_video_dense(
     history: Optional[List[Dict[str, str]]] = None,
     num_frames: Optional[int] = None,
     audio_analysis: Optional[Dict[str, Any]] = None,
+    event: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Dense Video Multimodal Analysis kết hợp âm thanh thực tế:
-    1. Trích xuất tối đa num_frames (giới hạn an toàn bởi config.MAX_VLM_FRAMES = 8) từ video.
-    2. Đưa chuỗi frame và dữ liệu âm thanh thực tế (đã qua lọc DeepFilterNet) vào prompt.
-    3. Gọi Qwen3.8 trên Server AI để phân tích toàn diện đa phương thức.
+    1. Trích xuất tối đa num_frames từ video.
+    2. Đưa chuỗi frame, bối cảnh sự kiện và âm thanh thực tế vào prompt.
+    3. Gọi Server AI để phân tích toàn diện.
     """
     max_frames = getattr(config, "MAX_VLM_FRAMES", 8)
     target_frames = num_frames or config.DENSE_FRAMES_COUNT
@@ -297,16 +308,31 @@ def analyze_video_dense(
         "Bạn là 'Vision & Audio Agent' - trợ lý AI chuyên gia phân tích an ninh giám sát đa phương thức (Thị giác video + Âm thanh thực tế) "
         "thuộc hệ thống VSS Blueprint.\n\n"
         "QUY TẮC BẮT BUỘC:\n"
-        "1. 100% TIẾNG VIỆT THUẦN TÚY: Bắt buộc trả lời hoàn toàn bằng TIẾNG VIỆT chuẩn mực, tự nhiên, có dấu đầy đủ. TUYỆT ĐỐI KHÔNG CHÈN TIẾNG ANH (không dùng các câu tiếng Anh như 'in a workplace', 'single person scene', 'no suspicious behavior...', 'visual nor audio channel'). Dịch toàn bộ thuật ngữ sang tiếng Việt chuẩn.\n"
+        "1. 100% TIẾNG VIỆT THUẦN TÚY: Bắt buộc trả lời hoàn toàn bằng TIẾNG VIỆT chuẩn mực, tự nhiên, có dấu đầy đủ. TUYỆT ĐỐI KHÔNG CHÈN TIẾNG ANH. Dịch toàn bộ thuật ngữ sang tiếng Việt chuẩn.\n"
         "2. CHÍNH TẢ CHUẨN XÁC: Viết đúng chính tả tiếng Việt ('Mức độ an toàn', 'Bối cảnh', 'An ninh', 'Bình thường', 'Khuyến nghị'). Tuyệt đối không viết sai dấu hay từ ngữ biến dạng.\n"
-        "3. PHÂN TÍCH DIỄN BIẾN THEO MỐC GIÂY: Trình bày chi tiết những gì nhìn thấy theo từng mốc thời gian (người, trang phục, vị trí, hành động).\n"
+        "3. PHÂN TÍCH DIỄN BIẾN THEO MỐC GIÂY: Trình bày chi tiết những gì diễn ra theo từng mốc thời gian (người, chuyển động, vị trí, hành động).\n"
         "4. TỔNG HỢP HÌNH ẢNH VÀ ÂM THANH: Kết hợp đối chiếu hình ảnh với dữ liệu âm thanh thực tế (mức dBFS, lời thoại nếu có).\n"
         "5. ĐÁNH GIÁ MỨC ĐỘ RỦI RO: Phân định rõ: Bình thường, Nghi vấn, hay Nguy hiểm/Bất thường.\n"
         "6. KẾT LUẬN: Đưa ra nhận định súc tích (1-2 câu ngắn gọn) xác nhận tình trạng an ninh và kết thúc phản hồi.\n"
         "7. ĐỊNH DẠNG: Tuyệt đối KHÔNG dùng ký tự markdown như dấu thăng (#, ##) làm tiêu đề, không dùng dấu sao (**in đậm**). Trình bày từng ý bằng gạch đầu dòng ngắn gọn."
     )
 
-    # Build user content array containing text prompt and all extracted image frames
+    # Build event context
+    event_context_text = ""
+    if event:
+        ch = event.get("channel")
+        cam_name = config.CAMERA_NAMES.get(str(ch)) or f"Kênh {ch}"
+        code = event.get("event_code", "Giám sát")
+        desc = event.get("description", "")
+        ts = event.get("timestamp", "")
+        event_context_text = (
+            f"\n--- THÔNG TIN SỰ KIỆN CAMERA AN NINH ---\n"
+            f"- Camera: {cam_name} (Kênh {ch})\n"
+            f"- Cảnh báo kích hoạt: {code} ({desc})\n"
+            f"- Thời điểm ghi nhận: {ts}\n"
+            f"-----------------------------------------\n"
+        )
+
     # Ghép thông tin âm thanh thực tế nếu có
     audio_context_text = ""
     if audio_analysis and audio_analysis.get("has_audio"):
@@ -326,13 +352,14 @@ def analyze_video_dense(
             f"------------------------------------------------------------------------------------\n"
         )
 
-    # Build user content array containing text prompt, audio context and all extracted image frames
+    timestamps_str = ", ".join([f"{ts}s" for ts, _ in frames])
     user_prompt_text = (
         f"[YÊU CẦU BẮT BUỘC: TRẢ LỜI HOÀN TOÀN BẰNG TIẾNG VIỆT CHUẨN MỰC, KHÔNG DÙNG TIẾNG ANH]\n\n"
-        f"Dưới đây là chuỗi {len(frames)} frame hình ảnh liên tiếp được cắt đều từ clip camera an ninh từ giây 0 đến kết thúc."
+        f"Clip camera an ninh có thời lượng thực tế với các mốc khung hình chính tại: {timestamps_str}."
+        f"{event_context_text}"
         f"{audio_context_text}\n"
         f"YÊU CẦU CỦA NGƯỜI VẬN HÀNH:\n{prompt}\n\n"
-        "Hãy phân tích chi tiết diễn biến, kết hợp đầy đủ cả hình ảnh lẫn âm thanh thực tế và trả lời yêu cầu trên hoàn toàn bằng tiếng Việt."
+        "Hãy phân tích chi tiết diễn biến, kết hợp đầy đủ bối cảnh camera, diễn biến sự kiện và âm thanh thực tế để trả lời yêu cầu trên hoàn toàn bằng tiếng Việt."
     )
 
     user_content: List[Dict[str, Any]] = [
@@ -342,13 +369,17 @@ def analyze_video_dense(
         }
     ]
 
-    for ts_sec, data_url in frames:
-        user_content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": data_url
-            }
-        })
+    # Only attach raw image_url if model is not GLM text model (which rejects base64 image_url)
+    model_name = (config.QWEN_MODEL_NAME or "").lower()
+    is_glm_text = "glm" in model_name
+    if not is_glm_text:
+        for ts_sec, data_url in frames:
+            user_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": data_url
+                }
+            })
 
     messages: List[Dict[str, Any]] = [
         {"role": "system", "content": system_prompt}
@@ -364,7 +395,7 @@ def analyze_video_dense(
 
     messages.append({"role": "user", "content": user_content})
 
-    res = call_qwen_chat(messages, timeout=90)
+    res = call_qwen_chat(messages, timeout=150)
 
     return {
         "reply": res["content"],

@@ -30,7 +30,7 @@ def _sqlite_counts() -> dict[str, Any]:
     missing = 0
     for reference in references:
         try:
-            if not resolve_clip_path(reference).is_file(): missing += 1
+            if not resolve_clip_path(reference, fetch_remote=False).is_file(): missing += 1
         except ValueError:
             missing += 1
     values["missing_clip_references"] = missing
@@ -80,6 +80,11 @@ def get_data_health(force: bool = False) -> dict[str, Any]:
             return _cache["value"]
         sqlite = _sqlite_counts()
         postgres = _postgres_counts()
-        value = {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "sqlite": sqlite, "postgres": postgres, "nas": _nas_counts(), "comparison": _comparison(sqlite, postgres)}
+        try:
+            from synology_storage import health as synology_health
+            remote_storage = synology_health()
+        except Exception as exc:
+            remote_storage = {"state": "error", "error": str(exc)[:500]}
+        value = {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "sqlite": sqlite, "postgres": postgres, "nas": _nas_counts(), "remote_storage": remote_storage, "comparison": _comparison(sqlite, postgres)}
         _cache.update({"at": time.monotonic(), "value": value})
         return value

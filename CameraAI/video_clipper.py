@@ -163,7 +163,9 @@ def clip_event_video(
     """
     Extracts a 10-second MP4 video clip from Dahua NVR RTSP playback stream over WAN/Internet.
     """
-    full_output_path = str(resolve_clip_path(output_filename))
+    # Capture into the local cache first; remote mirroring happens only after
+    # FFmpeg has produced and validated a complete file.
+    full_output_path = str(resolve_clip_path(output_filename, fetch_remote=False))
     os.makedirs(os.path.dirname(full_output_path), exist_ok=True)
     
     start_time = event_timestamp - timedelta(seconds=config.PRE_BUFFER_SEC)

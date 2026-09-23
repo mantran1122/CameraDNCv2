@@ -10,7 +10,7 @@ from typing import Callable, Optional
 import config
 import database
 import video_clipper
-from clip_storage import build_clip_reference, resolve_clip_path
+from clip_storage import build_clip_reference, mirror_clip, resolve_clip_path
 
 
 class ClipCaptureWorker:
@@ -72,6 +72,9 @@ class ClipCaptureWorker:
                 time.sleep(5)
         if filename:
             database.update_event_clip(event_id, filename)
+            mirrored = mirror_clip(filename)
+            if config.STORAGE_BACKEND == "synology":
+                print(f"[CLIP] alert={event_id} synology_mirrored={mirrored}")
             print(f"[CLIP] alert={event_id} evidence={filename}")
         else:
             print(f"[CLIP] alert={event_id} evidence capture failed")
