@@ -170,9 +170,6 @@
                         <button class="vss-nav-btn" onclick="openConfigModal()" title="Cấu hình Kết nối NVR">
                             🌐 NVR Config
                         </button>
-                        <button class="vss-nav-btn" onclick="handleLogout()" title="Đăng xuất khỏi hệ thống" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);">
-                            🚪 Đăng xuất
-                        </button>
                     </div>
                 </header>
 
@@ -554,14 +551,6 @@
         </div>
     </div>
 
-    <script>
-        async function handleLogout() {
-            if (!confirm('Bạn có chắc chắn muốn đăng xuất khỏi hệ thống không?')) return;
-            try { await fetch('/api/logout', { method: 'POST' }); } catch (e) {}
-            try { sessionStorage.clear(); localStorage.removeItem('cameraai_session'); } catch (e) {}
-            window.location.href = '/login';
-        }
-    </script>
     <script src="/static/js/app.js?v=2.2"></script>
 </body>
 </html>

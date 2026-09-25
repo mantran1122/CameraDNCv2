@@ -318,52 +318,43 @@
         }
 
         .sidebar-user-section {
-            padding: 0.5rem;
+            padding: 0.625rem 0.75rem;
             border-top: 1px solid var(--border-main);
             margin-top: auto;
             flex-shrink: 0;
             display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
+            align-items: center;
+            justify-content: center;
         }
 
         .sidebar-logout-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
             color: #ef4444 !important;
-            transition: all 0.15s ease-in-out;
+            background-color: rgba(239, 68, 68, 0.08) !important;
+            border: 1px solid rgba(239, 68, 68, 0.25) !important;
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
             cursor: pointer;
+            transition: all 0.15s ease-in-out;
+            text-align: center;
             margin: 0 !important;
         }
 
         .sidebar-logout-btn:hover {
-            background-color: rgba(239, 68, 68, 0.12) !important;
-            color: #f87171 !important;
-            border-color: rgba(239, 68, 68, 0.3) !important;
+            background-color: #ef4444 !important;
+            color: #ffffff !important;
+            border-color: #ef4444 !important;
         }
 
         .sidebar-logout-btn svg {
             stroke: currentColor;
             flex-shrink: 0;
-        }
-
-        .header-logout-btn {
-            background-color: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #ef4444;
-            cursor: pointer;
-            padding: 0.3rem 0.65rem;
-            border-radius: 6px;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.375rem;
-            font-size: 0.8125rem;
-            font-weight: 500;
-            transition: all 0.15s;
-        }
-
-        .header-logout-btn:hover {
-            color: #ffffff;
-            background-color: #ef4444;
-            border-color: #ef4444;
         }
 
         .sidebar-footer {
@@ -4858,14 +4849,6 @@
                     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                 </svg>
             </button>
-            <button class="header-logout-btn" onclick="handleLogout()" title="Đăng xuất khỏi hệ thống">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-                <span>Đăng xuất</span>
-            </button>
         </div>
     </header>
 
@@ -4897,14 +4880,6 @@
                         <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                     </svg>
                     <span>Video Management</span>
-                </button>
-                <button class="sidebar-tab-item sidebar-logout-btn" onclick="handleLogout()" title="Đăng xuất khỏi hệ thống">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                        <polyline points="16 17 21 12 16 7"></polyline>
-                        <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
-                    <span>Đăng xuất</span>
                 </button>
             </nav>
 
