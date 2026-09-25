@@ -307,3 +307,97 @@ def health() -> dict:
         result["state"] = "unavailable"
         result["error"] = str(exc)
     return result
+
+
+def purge_expired_day_folders(retention_days: int = 30) -> dict:
+    """Scan and delete full day folders (cameras/{cam}/{year}/{month}/{day}) on Synology FileStation
+    older than retention_days according to actual calendar dates.
+
+    This ensures that 30-day rolling retention strictly honors calendar dates (including months
+    with 31, 30, or 28/29 days) and purges entire day folders at once to free NAS storage immediately.
+    """
+    if not enabled():
+        return {"status": "disabled", "deleted_folders": [], "errors": []}
+
+    from datetime import datetime, date, timedelta
+    cutoff_date = datetime.now().date() - timedelta(days=retention_days)
+    deleted_folders = []
+    errors = []
+
+    try:
+        base_cameras_path = remote_path("cameras")
+        with client() as api:
+            try:
+                cam_list = api.list_folder(base_cameras_path)
+            except Exception as e:
+                return {"status": "error", "error": f"Cannot list cameras base: {e}", "deleted_folders": []}
+
+            cam_folders = [f["path"] for f in cam_list.get("files", []) if f.get("isdir")]
+
+            for cam_path in cam_folders:
+                try:
+                    year_list = api.list_folder(cam_path)
+                except Exception:
+                    continue
+                for year_item in year_list.get("files", []):
+                    if not year_item.get("isdir") or not str(year_item.get("name", "")).isdigit():
+                        continue
+                    year = int(year_item["name"])
+                    year_path = year_item["path"]
+
+                    try:
+                        month_list = api.list_folder(year_path)
+                    except Exception:
+                        continue
+                    for month_item in month_list.get("files", []):
+                        if not month_item.get("isdir") or not str(month_item.get("name", "")).isdigit():
+                            continue
+                        month = int(month_item["name"])
+                        month_path = month_item["path"]
+
+                        try:
+                            day_list = api.list_folder(month_path)
+                        except Exception:
+                            continue
+                        for day_item in day_list.get("files", []):
+                            if not day_item.get("isdir") or not str(day_item.get("name", "")).isdigit():
+                                continue
+                            day = int(day_item["name"])
+                            day_path = day_item["path"]
+
+                            try:
+                                folder_date = date(year, month, day)
+                            except ValueError:
+                                continue
+
+                            # If the calendar date of the folder is older than cutoff_date, delete the whole day folder
+                            if folder_date < cutoff_date:
+                                try:
+                                    api.delete(day_path)
+                                    deleted_folders.append({
+                                        "path": day_path,
+                                        "date": folder_date.isoformat(),
+                                    })
+                                    print(f"[Synology Retention] Deleted expired day folder: {day_path} ({folder_date} < cutoff {cutoff_date})")
+                                except Exception as exc:
+                                    errors.append({"path": day_path, "error": str(exc)})
+                                    print(f"[Synology Retention Error] Failed to delete {day_path}: {exc}")
+
+                        # Clean up empty month directory if all days are gone
+                        try:
+                            check_month = api.list_folder(month_path)
+                            if not check_month.get("files"):
+                                api.delete(month_path)
+                        except Exception:
+                            pass
+    except Exception as exc:
+        errors.append({"error": str(exc)})
+
+    return {
+        "status": "ok",
+        "cutoff_date": cutoff_date.isoformat(),
+        "retention_days": retention_days,
+        "deleted_count": len(deleted_folders),
+        "deleted_folders": deleted_folders,
+        "errors": errors,
+    }

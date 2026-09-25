@@ -316,8 +316,73 @@ def broadcast_audio_analysis_update(event_id: int):
         event["video_analysis"] = database.get_video_analysis(event_id)
         broadcast_event_sync(event)
 
-def purge_expired_metadata() -> None:
-    filenames = database.delete_expired_events(config.METADATA_RETENTION_DAYS)
+def purge_expired_metadata(retention_days: Optional[int] = None) -> dict:
+    """Execute comprehensive 30-day calendar retention:
+    1. Purge expired day folders on Synology FileStation (cameras/{cam}/{Y}/{M}/{D}).
+    2. Purge expired day folders in local clips cache.
+    3. Purge expired metadata events in SQLite & Postgres.
+    """
+    import shutil
+    days = retention_days if retention_days is not None else config.METADATA_RETENTION_DAYS
+    cutoff_date = datetime.now().date() - timedelta(days=days)
+    
+    # 1. Clean Synology NAS day folders
+    nas_result = {"status": "disabled", "deleted_count": 0}
+    try:
+        from synology_storage import purge_expired_day_folders, enabled as synology_enabled
+        if synology_enabled():
+            nas_result = purge_expired_day_folders(retention_days=days)
+    except Exception as exc:
+        print(f"[Cleanup] Synology folder purge error: {exc}")
+        nas_result = {"status": "error", "error": str(exc), "deleted_count": 0}
+
+    # 2. Clean local clips day folders
+    local_removed_folders = 0
+    try:
+        cameras_dir = config.CLIPS_DIR / "cameras"
+        if cameras_dir.is_dir():
+            for cam_dir in cameras_dir.iterdir():
+                if not cam_dir.is_dir():
+                    continue
+                for year_dir in cam_dir.iterdir():
+                    if not year_dir.is_dir() or not year_dir.name.isdigit():
+                        continue
+                    year = int(year_dir.name)
+                    for month_dir in year_dir.iterdir():
+                        if not month_dir.is_dir() or not month_dir.name.isdigit():
+                            continue
+                        month = int(month_dir.name)
+                        for day_dir in month_dir.iterdir():
+                            if not day_dir.is_dir() or not day_dir.name.isdigit():
+                                continue
+                            day = int(day_dir.name)
+                            try:
+                                folder_date = date(year, month, day)
+                            except ValueError:
+                                continue
+                            if folder_date < cutoff_date:
+                                try:
+                                    shutil.rmtree(day_dir, ignore_errors=True)
+                                    local_removed_folders += 1
+                                    print(f"[Cleanup] Removed local expired day folder: {day_dir}")
+                                except Exception as exc:
+                                    print(f"[Cleanup] Could not remove local folder {day_dir}: {exc}")
+                        # Remove empty month/year folder
+                        try:
+                            if not any(month_dir.iterdir()):
+                                month_dir.rmdir()
+                        except Exception:
+                            pass
+                    try:
+                        if not any(year_dir.iterdir()):
+                            year_dir.rmdir()
+                    except Exception:
+                        pass
+    except Exception as exc:
+        print(f"[Cleanup] Local folder cleanup error: {exc}")
+
+    # 3. Clean database events and any specific orphaned files
+    filenames = database.delete_expired_events(days)
     removed_clips = 0
     for filename in filenames:
         clip_path = resolve_clip_path(filename, fetch_remote=False)
@@ -325,16 +390,22 @@ def purge_expired_metadata() -> None:
             if clip_path.is_file():
                 clip_path.unlink()
                 removed_clips += 1
-        except OSError as exc:
-            print(f"[Cleanup] Could not remove expired clip {clip_path.name}: {exc}")
-        try:
-            from synology_storage import delete_clip, enabled as synology_enabled
-            if synology_enabled():
-                delete_clip(filename)
-        except Exception as exc:
-            print(f"[Cleanup] Could not remove remote clip {filename}: {exc}")
-    if filenames:
-        print(f"[Cleanup] Removed {len(filenames)} expired events and {removed_clips} clips (retention={config.METADATA_RETENTION_DAYS} days).")
+        except OSError:
+            pass
+
+    summary = {
+        "status": "success",
+        "retention_days": days,
+        "cutoff_date": cutoff_date.isoformat(),
+        "expired_events_deleted": len(filenames),
+        "nas_folders_purged": nas_result.get("deleted_count", 0),
+        "local_folders_purged": local_removed_folders,
+        "nas_status": nas_result.get("status", "unknown"),
+    }
+    print(f"[Cleanup] Calendar Retention ({days} days, cutoff < {cutoff_date}): "
+          f"Deleted {len(filenames)} events, {nas_result.get('deleted_count', 0)} NAS day folders, "
+          f"{local_removed_folders} local day folders.")
+    return summary
 
 def metadata_cleanup_loop() -> None:
     while not metadata_cleanup_stop.is_set():
@@ -1651,6 +1722,12 @@ async def update_nvr_config(cfg: NVRConfigModel):
     config.update_global_config(cfg_dict)
     restart_listener_service()
     return {"status": "success", "message": f"Cấu hình kết nối NVR ({cfg.nvr_host}) đã được cập nhật thành công!"}
+
+@app.post("/api/admin/storage/purge-retention")
+async def api_purge_storage_retention(days: Optional[int] = Query(default=None), _: str = Depends(require_session_admin)):
+    """Manual trigger to purge expired video folders on NAS and database events."""
+    summary = purge_expired_metadata(retention_days=days)
+    return summary
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

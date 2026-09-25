@@ -90,7 +90,7 @@ DEFAULT_CONFIG = {
     "pre_buffer_sec": 5,
     "post_buffer_sec": 5,
     "clip_ready_delay_sec": 2,
-    "metadata_retention_days": 3,
+    "metadata_retention_days": int(os.getenv("CAMERAAI_RETENTION_DAYS", "30")),
     "abnormal_event_codes": [
         "Intrusion",
         "Fight",
@@ -176,7 +176,8 @@ PRE_BUFFER_SEC = _current_cfg.get("pre_buffer_sec", 5)
 POST_BUFFER_SEC = _current_cfg.get("post_buffer_sec", 5)
 CLIP_DURATION_SEC = PRE_BUFFER_SEC + POST_BUFFER_SEC
 CLIP_READY_DELAY_SEC = _current_cfg.get("clip_ready_delay_sec", 2)
-METADATA_RETENTION_DAYS = max(1, int(_current_cfg.get("metadata_retention_days", 3)))
+RETENTION_DAYS = max(1, int(os.getenv("CAMERAAI_RETENTION_DAYS", str(_current_cfg.get("metadata_retention_days", 30)))))
+METADATA_RETENTION_DAYS = RETENTION_DAYS
 # Local Edge Denoising & Legacy local models
 USE_DEEPFILTER = os.getenv("USE_DEEPFILTER", "true").strip().lower() in {"1", "true", "yes", "on"}
 COSMOS_AUDIO_URL = os.getenv("COSMOS_AUDIO_URL", "http://127.0.0.1:8765/transcribe")
