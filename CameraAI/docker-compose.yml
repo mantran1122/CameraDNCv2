@@ -33,6 +33,9 @@ services:
     volumes:
       # Mount host storage directory to persist SQLite DB, clips, and NVR config
       - ./storage:/app/storage
+      # Mount templates and main.py to reflect code updates immediately
+      - ./templates:/app/templates:ro
+      - ./main.py:/app/main.py:ro
       # (Tuy chon) Mount o dia NAS truc tiep de luu tru video khong ton dung luong may chu:
       # - /mnt/nas_camera_clips:/app/storage/clips
     env_file:
