@@ -9821,35 +9821,6 @@ user=None`;
                     body: JSON.stringify({ username: user, password: pass })
                 });
 
-                if (resp.status === 404) {
-                    // Fallback if backend server has not been restarted yet
-                    const nvrUser = (NCC_NVR_CONFIG && NCC_NVR_CONFIG.nvr_user) ? NCC_NVR_CONFIG.nvr_user : 'user2';
-                    const isMatch = (
-                        (user === 'admin' && (pass === 'namcantho@168' || pass === 'admin')) ||
-                        (user === nvrUser && (pass === 'namcantho@168' || pass === 'admin' || pass === 'user2'))
-                    );
-                    if (isMatch) {
-                        sessionStorage.setItem('ncc_config_auth', 'true');
-                        sessionStorage.setItem('ncc_config_user', user);
-                        closeNccLoginModal();
-
-                        const cfgBtn = document.getElementById('ncc-btn-config');
-                        if (cfgBtn) cfgBtn.style.display = 'inline-flex';
-                        const lockBtn = document.getElementById('ncc-btn-lock-config');
-                        if (lockBtn) lockBtn.style.display = 'inline-flex';
-
-                        switchSidebarTab('videomanager');
-                        switchNccView('config');
-                        return;
-                    } else {
-                        if (errorMsg) {
-                            errorMsg.textContent = 'Sai tên đăng nhập hoặc mật khẩu quản trị viên.';
-                            errorMsg.style.display = 'block';
-                        }
-                        return;
-                    }
-                }
-
                 const res = await resp.json();
                 if (resp.ok) {
                     sessionStorage.setItem('ncc_config_auth', 'true');

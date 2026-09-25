@@ -489,19 +489,6 @@
                     body: JSON.stringify({ username: user, password: pass })
                 });
 
-                if (false && resp.status === 404) {
-                    // Fallback tương thích
-                    const isMatchAdmin = (user === 'admin' && (pass === 'namcantho@168' || pass === 'admin'));
-                    if (isMatchAdmin) {
-                        onAuthSuccess(user, 'admin', true);
-                        return;
-                    } else if (pass) {
-                        // Tài khoản con thường
-                        onAuthSuccess(user, 'viewer', false);
-                        return;
-                    }
-                }
-
                 const res = await resp.json();
                 if (resp.ok) {
                     onAuthSuccess(user, res.role, res.can_config_nvr);
@@ -514,10 +501,6 @@
                     }
                 }
             } catch (err) {
-                if (false && user === 'admin' && (pass === 'namcantho@168' || pass === 'admin')) {
-                    onAuthSuccess(user, 'admin', true);
-                    return;
-                }
                 showMessage('Lỗi kết nối máy chủ: ' + err.message, true);
             } finally {
                 if (submitBtn) {
@@ -550,18 +533,7 @@
             }, 400);
         }
 
-        // Phím tắt bí mật: Ctrl + Shift + C
         window.addEventListener('keydown', function(e) {
-            if (false && e.ctrlKey && e.shiftKey && (e.key === 'c' || e.key === 'C' || e.keyCode === 67)) {
-                e.preventDefault();
-                const userInput = document.getElementById('inputUsername');
-                const passInput = document.getElementById('inputPassword');
-                if (userInput) userInput.value = 'admin';
-                if (passInput) passInput.value = 'namcantho@168';
-                submitFormLogin();
-                return;
-            }
-
             if (e.key === 'Escape') {
                 const err = document.getElementById('alertError');
                 if (err) err.style.display = 'none';

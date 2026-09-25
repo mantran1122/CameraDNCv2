@@ -3,6 +3,7 @@ import json
 import logging
 import asyncio
 import threading
+from collections import defaultdict
 
 logger = logging.getLogger("CameraAI.main")
 import secrets
@@ -84,7 +85,27 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    if config.SESSION_COOKIE_SECURE:
+
+    # Defensive Content-Security-Policy (CSP)
+    csp_directives = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob:",
+        "media-src 'self' blob:",
+        "connect-src 'self' ws: wss:",
+        "frame-ancestors 'none'",
+    ]
+    response.headers["Content-Security-Policy"] = "; ".join(csp_directives)
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), browsing-topics=()"
+
+    # HSTS when HTTPS is active or behind reverse proxy
+    if (
+        config.SESSION_COOKIE_SECURE
+        or request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto") == "https"
+    ):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
@@ -1488,15 +1509,116 @@ class SubUserModel(BaseModel):
     full_name: str = ""
 
 
+class LoginRateLimiter:
+    """In-memory thread-safe rate limiter and brute-force lockout protector for login endpoints."""
+    def __init__(
+        self,
+        max_requests_per_minute: int = 5,
+        max_failures: int = 5,
+        lockout_seconds: int = 300
+    ):
+        self.max_requests = max_requests_per_minute
+        self.max_failures = max_failures
+        self.lockout_seconds = lockout_seconds
+        self._lock = threading.Lock()
+        self._requests: dict[str, list[float]] = defaultdict(list)
+        self._failed_attempts: dict[str, int] = defaultdict(int)
+        self._locked_until: dict[str, float] = {}
+
+    def get_client_ip(self, request: Request) -> str:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+        if request.client and request.client.host:
+            return request.client.host
+        return "127.0.0.1"
+
+    def check_rate_limit(self, ip: str, username: str = "") -> tuple[bool, str, int]:
+        """
+        Check if the incoming request is allowed.
+        Returns: (is_allowed, error_message, retry_after_seconds)
+        """
+        now = time.time()
+        with self._lock:
+            # Check IP lockout
+            if ip in self._locked_until:
+                if now < self._locked_until[ip]:
+                    rem = int(self._locked_until[ip] - now) + 1
+                    return False, f"Địa chỉ IP tạm thời bị khóa do nhập sai quá 5 lần liên tiếp. Vui lòng thử lại sau {rem} giây.", rem
+                else:
+                    del self._locked_until[ip]
+                    self._failed_attempts[ip] = 0
+
+            # Check username lockout
+            if username and username in self._locked_until:
+                if now < self._locked_until[username]:
+                    rem = int(self._locked_until[username] - now) + 1
+                    return False, f"Tài khoản '{username}' tạm thời bị khóa do nhập sai quá {self.max_failures} lần liên tiếp. Vui lòng thử lại sau {rem} giây.", rem
+                else:
+                    del self._locked_until[username]
+                    self._failed_attempts[username] = 0
+
+            # Prune requests older than 60s
+            reqs = [t for t in self._requests[ip] if now - t < 60.0]
+            self._requests[ip] = reqs
+
+            if len(reqs) >= self.max_requests:
+                oldest = reqs[0]
+                retry_after = max(1, int(60.0 - (now - oldest)))
+                return False, f"Quá nhiều yêu cầu đăng nhập từ thiết bị của bạn (tối đa 5 lần/phút). Vui lòng thử lại sau {retry_after} giây.", retry_after
+
+            self._requests[ip].append(now)
+            return True, "", 0
+
+    def record_failure(self, ip: str, username: str = "") -> None:
+        now = time.time()
+        with self._lock:
+            self._failed_attempts[ip] += 1
+            if self._failed_attempts[ip] >= self.max_failures:
+                self._locked_until[ip] = now + self.lockout_seconds
+
+            if username:
+                self._failed_attempts[username] += 1
+                if self._failed_attempts[username] >= self.max_failures:
+                    self._locked_until[username] = now + self.lockout_seconds
+
+    def record_success(self, ip: str, username: str = "") -> None:
+        with self._lock:
+            self._failed_attempts.pop(ip, None)
+            self._locked_until.pop(ip, None)
+            if username:
+                self._failed_attempts.pop(username, None)
+                self._locked_until.pop(username, None)
+
+    def reset(self) -> None:
+        with self._lock:
+            self._requests.clear()
+            self._failed_attempts.clear()
+            self._locked_until.clear()
+
+login_rate_limiter = LoginRateLimiter(max_requests_per_minute=5, max_failures=5, lockout_seconds=300)
+
+
 @app.post("/api/admin/verify-login")
 async def verify_admin_login(payload: AdminCredentialsModel, request: Request):
+    client_ip = login_rate_limiter.get_client_ip(request)
     u = payload.username.strip()
     p = payload.password.strip()
+
+    allowed, err_msg, retry_after = login_rate_limiter.check_rate_limit(client_ip, u)
+    if not allowed:
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"detail": err_msg},
+            headers={"Retry-After": str(retry_after)},
+        )
+
     expected_user, expected_password = get_admin_credentials()
 
     # 1. Check primary admin or NVR admin
     if (secrets.compare_digest(u, expected_user) and secrets.compare_digest(p, expected_password)) or \
        (config.NVR_USER and config.NVR_PASSWORD and secrets.compare_digest(u, config.NVR_USER) and secrets.compare_digest(p, config.NVR_PASSWORD)):
+        login_rate_limiter.record_success(client_ip, u)
         request.session.clear()
         request.session.update({"username": u, "role": "admin", "can_config_nvr": True})
         return {
@@ -1512,6 +1634,7 @@ async def verify_admin_login(payload: AdminCredentialsModel, request: Request):
     users = get_all_system_users()
     for item in users:
         if secrets.compare_digest(item.get("username", ""), u) and secrets.compare_digest(item.get("password", ""), p):
+            login_rate_limiter.record_success(client_ip, u)
             role = item.get("role", "viewer")
             can_config = (role == "admin")
             request.session.clear()
@@ -1525,6 +1648,7 @@ async def verify_admin_login(payload: AdminCredentialsModel, request: Request):
                 "message": f"Đăng nhập thành công với vai trò {role}."
             }
 
+    login_rate_limiter.record_failure(client_ip, u)
     raise HTTPException(status_code=401, detail="Sai tên đăng nhập hoặc mật khẩu.")
 
 

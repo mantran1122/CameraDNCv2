@@ -7,9 +7,11 @@ import main
 
 class AuthenticationSessionTests(unittest.TestCase):
     def setUp(self):
+        main.login_rate_limiter.reset()
         self.client = TestClient(main.app)
 
     def tearDown(self):
+        main.login_rate_limiter.reset()
         self.client.close()
 
     def test_private_pages_and_apis_require_login(self):
@@ -46,6 +48,32 @@ class AuthenticationSessionTests(unittest.TestCase):
         self.assertEqual(response.headers.get("x-frame-options"), "DENY")
         self.assertEqual(response.headers.get("x-xss-protection"), "1; mode=block")
         self.assertEqual(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin")
+        self.assertIn("content-security-policy", response.headers)
+        self.assertIn("permissions-policy", response.headers)
+
+    def test_login_page_has_no_hardcoded_credentials(self):
+        response = self.client.get("/login")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("namcantho@168", response.text)
+        self.assertNotIn("pass === 'admin'", response.text)
+
+    def test_login_rate_limiting_and_lockout(self):
+        # 5 failed attempts
+        for i in range(5):
+            res = self.client.post(
+                "/api/admin/verify-login",
+                json={"username": "bruteforce_test", "password": f"wrong_{i}"},
+            )
+            self.assertEqual(res.status_code, 401)
+
+        # 6th attempt should be blocked with 429 Too Many Requests
+        res_blocked = self.client.post(
+            "/api/admin/verify-login",
+            json={"username": "bruteforce_test", "password": "wrong_6"},
+        )
+        self.assertEqual(res_blocked.status_code, 429)
+        self.assertIn("Retry-After", res_blocked.headers)
+        self.assertIn("tạm thời bị khóa", res_blocked.json()["detail"])
 
     def test_websocket_requires_authentication(self):
         from starlette.websockets import WebSocketDisconnect
