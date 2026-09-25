@@ -40,6 +40,33 @@ class AuthenticationSessionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertNotIn("cameraai_session", response.cookies)
 
+    def test_security_headers_present_on_responses(self):
+        response = self.client.get("/login")
+        self.assertEqual(response.headers.get("x-content-type-options"), "nosniff")
+        self.assertEqual(response.headers.get("x-frame-options"), "DENY")
+        self.assertEqual(response.headers.get("x-xss-protection"), "1; mode=block")
+        self.assertEqual(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin")
+
+    def test_websocket_requires_authentication(self):
+        from starlette.websockets import WebSocketDisconnect
+
+        # Unauthenticated attempt should be rejected with code 1008
+        with self.assertRaises(WebSocketDisconnect) as cm:
+            with self.client.websocket_connect("/ws"):
+                pass
+        self.assertEqual(cm.exception.code, 1008)
+
+        # Authenticated attempt should succeed
+        username, password = main.get_admin_credentials()
+        login_resp = self.client.post(
+            "/api/admin/verify-login",
+            json={"username": username, "password": password},
+        )
+        self.assertEqual(login_resp.status_code, 200)
+
+        with self.client.websocket_connect("/ws") as ws:
+            ws.send_text("test_ping")
+
 
 if __name__ == "__main__":
     unittest.main()

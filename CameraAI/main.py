@@ -76,6 +76,19 @@ async def require_login_session(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Add defensive security headers to all HTTP responses."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if config.SESSION_COOKIE_SECURE:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 # This is registered after the authorization middleware so the signed session
 # cookie is decoded before require_login_session reads request.session.
 app.add_middleware(
@@ -144,6 +157,10 @@ def get_admin_credentials() -> tuple[str, str]:
             pass
 
     # Default fallback credentials so the UI is always accessible
+    logger.warning(
+        "[SECURITY RISK] Using default fallback admin credentials. "
+        "Set ADMIN_DATABASE_USERNAME and ADMIN_DATABASE_PASSWORD in your .env file before deploying to production!"
+    )
     return "admin", "namcantho@168"
 
 
@@ -1637,6 +1654,12 @@ async def update_nvr_config(cfg: NVRConfigModel):
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    # Enforce authentication: only users with a valid session can listen to real-time events
+    session = websocket.scope.get("session") or {}
+    if not session.get("username"):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required")
+        return
+
     await manager.connect(websocket)
     try:
         while True:
@@ -1646,4 +1669,5 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    is_prod = os.getenv("CAMERAAI_ENVIRONMENT", "development").strip().lower() == "production"
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=not is_prod)

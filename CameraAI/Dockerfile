@@ -5,8 +5,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Ho_Chi_Minh \
-    ADMIN_DATABASE_USERNAME=admin \
-    ADMIN_DATABASE_PASSWORD=namcantho@168 \
+    ADMIN_DATABASE_USERNAME="" \
+    ADMIN_DATABASE_PASSWORD="" \
     QWEN_SERVER_URL=https://llm.ttpmsandbox.us.kg/v1 \
     QWEN_API_KEY="" \
     QWEN_MODEL_NAME=Qwen3.8-27B \
@@ -48,7 +48,7 @@ RUN mkdir -p /app/storage/clips
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8000/search || exit 1
+    CMD curl -f http://localhost:8000/login || exit 1
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 

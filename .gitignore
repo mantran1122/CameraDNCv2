@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 !*.example.env
+!.env.*.example
+!.env.production.example
 **/config.json
 CameraAI/storage/*
 !CameraAI/storage/.gitkeep
