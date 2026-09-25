@@ -5,11 +5,15 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Ho_Chi_Minh \
+    ADMIN_DATABASE_USERNAME="" \
+    ADMIN_DATABASE_PASSWORD="" \
     QWEN_SERVER_URL=https://llm.ttpmsandbox.us.kg/v1 \
+    QWEN_API_KEY="" \
     QWEN_MODEL_NAME=Qwen3.8-27B \
     DENSE_FRAMES_COUNT=8 \
     MAX_VLM_FRAMES=8 \
     INTERNAL_AUDIO_SERVER_URL=https://llm.ttpmsandbox.us.kg/v1/audio \
+    INTERNAL_AUDIO_SERVER_API_KEY="" \
     INTERNAL_AUDIO_MODEL_NAME="Internal Audio AI (Server AI)" \
     USE_DEEPFILTER=true
 
