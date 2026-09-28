@@ -483,6 +483,45 @@ async def data_health_page(request: Request, _: str = Depends(require_database_a
 async def data_health_api(refresh: bool = False, _: str = Depends(require_database_admin)):
     return data_health.get_data_health(force=refresh)
 
+@app.get("/api/admin/listener-status")
+async def get_listener_status_api(request: Request):
+    import synology_storage
+    status_info = nvr_listener.get_status() if nvr_listener else {"is_running": False}
+    return {
+        "listener": status_info,
+        "clip_worker_alive": bool(clip_capture_worker and clip_capture_worker._thread and clip_capture_worker._thread.is_alive()),
+        "queue_size": clip_capture_worker._queue.qsize() if clip_capture_worker else 0,
+        "nas_health": synology_storage.health() if config.STORAGE_BACKEND == "synology" else {"backend": "local"},
+    }
+
+@app.post("/api/admin/sync-nas")
+async def sync_nas_clips_api(request: Request, _: str = Depends(require_session_admin)):
+    import migrate_clips_to_synology
+    import synology_storage
+    if not synology_storage.enabled():
+        return {"status": "error", "message": "Synology NAS is not enabled"}
+    try:
+        clips = migrate_clips_to_synology.local_clips()
+        synced = 0
+        skipped = 0
+        failed = 0
+        with synology_storage.client() as api:
+            existing = migrate_clips_to_synology.remote_paths(api)
+            for ref, path in clips:
+                dest = synology_storage.remote_path(ref)
+                if dest in existing:
+                    skipped += 1
+                    continue
+                try:
+                    api.upload(path, dest)
+                    synced += 1
+                    existing.add(dest)
+                except Exception:
+                    failed += 1
+        return {"status": "ok", "total_local": len(clips), "synced": synced, "skipped": skipped, "failed": failed}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.get("/test-ai", response_class=HTMLResponse)
 async def test_ai_page(request: Request, _: str = Depends(require_database_admin)):
     return templates.TemplateResponse(request=request, name="test_ai.html")

@@ -32,7 +32,8 @@ def _has_expected_duration(output_path: str) -> bool:
             timeout=15,
         )
         duration = float(result.stdout.strip()) if result.returncode == 0 else 0.0
-        return duration >= max(0.0, config.CLIP_DURATION_SEC - 0.5)
+        # Accept clips with >= 2.0s duration to prevent Dahua keyframe rounding drops
+        return duration >= 2.0
     except (OSError, subprocess.SubprocessError, ValueError):
         return False
 

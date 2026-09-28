@@ -43,14 +43,17 @@ class ClipCaptureWorker:
             except queue.Empty:
                 continue
             if event_id is not None:
-                self._capture(event_id)
+                try:
+                    self._capture(event_id)
+                except Exception as exc:
+                    print(f"[CLIP Error] Exception in capture worker for alert={event_id}: {exc}")
 
     def _capture(self, event_id: int) -> None:
         event = database.get_event_by_id(event_id)
         if not event:
             return
         saved = str(event.get("clip_filename") or "")
-        if saved and resolve_clip_path(saved).is_file():
+        if saved and resolve_clip_path(saved, fetch_remote=False).is_file():
             return
         event_time = datetime.strptime(event["timestamp"], "%Y-%m-%d %H:%M:%S")
         delay = config.POST_BUFFER_SEC + config.CLIP_READY_DELAY_SEC - (datetime.now() - event_time).total_seconds()
@@ -58,6 +61,7 @@ class ClipCaptureWorker:
             time.sleep(delay)
         print(f"[CLIP] alert={event_id} capturing 10s evidence")
         filename = build_clip_reference(event["channel"], event_time, event_id)
+        captured_file = None
         for attempt in range(1, 4):
             print(f"[CLIP] alert={event_id} capture attempt={attempt}/3")
             captured = video_clipper.clip_event_video(
@@ -66,16 +70,16 @@ class ClipCaptureWorker:
                 event_type=event["event_type"], event_code=event["event_code"],
             )
             if captured:
+                captured_file = filename
                 break
-            filename = None
             if attempt < 3:
                 time.sleep(5)
-        if filename:
-            database.update_event_clip(event_id, filename)
-            mirrored = mirror_clip(filename)
+        if captured_file:
+            database.update_event_clip(event_id, captured_file)
+            mirrored = mirror_clip(captured_file)
             if config.STORAGE_BACKEND == "synology":
                 print(f"[CLIP] alert={event_id} synology_mirrored={mirrored}")
-            print(f"[CLIP] alert={event_id} evidence={filename}")
+            print(f"[CLIP] alert={event_id} evidence={captured_file}")
         else:
             print(f"[CLIP] alert={event_id} evidence capture failed")
             database.update_audio_analysis(
@@ -84,4 +88,7 @@ class ClipCaptureWorker:
                 error_message="Không thể tạo video evidence 10 giây cho cảnh báo.",
             )
         if self._on_updated:
-            self._on_updated(event_id)
+            try:
+                self._on_updated(event_id)
+            except Exception as exc:
+                print(f"[CLIP Update Error] {exc}")
