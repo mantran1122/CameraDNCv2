@@ -44,37 +44,47 @@ def remote_paths(api: synology_storage.FileStationClient) -> set[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="Upload missing files; default is a read-only inventory")
+    parser.add_argument("--purge-local", action="store_true", help="Safely delete local file only after ensuring it exists on Synology NAS")
     args = parser.parse_args()
 
     clips = local_clips()
     total_bytes = sum(path.stat().st_size for _, path in clips)
-    print(f"local_files={len(clips)} local_bytes={total_bytes} apply={args.apply}", flush=True)
-    if not args.apply:
+    print(f"local_files={len(clips)} local_bytes={total_bytes} apply={args.apply} purge_local={args.purge_local}", flush=True)
+    if not args.apply and not args.purge_local:
         return 0
     if not synology_storage.enabled():
         raise SystemExit("Synology storage is not configured")
 
-    uploaded = skipped = failed = uploaded_bytes = 0
+    uploaded = skipped = failed = uploaded_bytes = purged = 0
     with synology_storage.client() as api:
         existing = remote_paths(api)
         print(f"remote_existing={len(existing)}", flush=True)
         for index, (reference, path) in enumerate(clips, start=1):
             destination = synology_storage.remote_path(reference)
-            if destination in existing:
+            is_on_nas = destination in existing
+            if not is_on_nas and args.apply:
+                try:
+                    api.upload(path, destination)
+                    uploaded += 1
+                    uploaded_bytes += path.stat().st_size
+                    existing.add(destination)
+                    is_on_nas = True
+                    print(f"[{index}/{len(clips)}] uploaded={reference}", flush=True)
+                except Exception as exc:
+                    failed += 1
+                    print(f"[{index}/{len(clips)}] failed={reference} error={exc}", flush=True)
+            elif is_on_nas:
                 skipped += 1
-                continue
-            try:
-                api.upload(path, destination)
-                uploaded += 1
-                uploaded_bytes += path.stat().st_size
-                existing.add(destination)
-                print(f"[{index}/{len(clips)}] uploaded={reference}", flush=True)
-            except Exception as exc:
-                failed += 1
-                print(f"[{index}/{len(clips)}] failed={reference} error={exc}", flush=True)
+
+            if is_on_nas and args.purge_local:
+                try:
+                    path.unlink(missing_ok=True)
+                    purged += 1
+                except Exception as exc:
+                    print(f"[{index}/{len(clips)}] purge_failed={reference} error={exc}", flush=True)
 
     print(
-        f"complete uploaded={uploaded} skipped={skipped} failed={failed} uploaded_bytes={uploaded_bytes}",
+        f"complete uploaded={uploaded} skipped={skipped} failed={failed} purged={purged} uploaded_bytes={uploaded_bytes}",
         flush=True,
     )
     return 1 if failed else 0

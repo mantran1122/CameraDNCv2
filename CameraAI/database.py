@@ -168,7 +168,8 @@ def sync_postgres_outbox(limit: int = 100) -> Dict[str, int]:
 
 def _queue_and_sync(event_id: int, action: str = "upsert") -> None:
     queue_postgres_sync(event_id, action)
-    sync_postgres_outbox(limit=25)
+    # Note: Asynchronous replication is safely handled by postgres_sync_loop in background.
+    # Do not call sync_postgres_outbox synchronously here to avoid blocking camera event ingestion.
 
 def save_event(
     event_code: str,
