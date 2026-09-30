@@ -1849,30 +1849,31 @@ body {
     color: #64748b;
 }
 
-/* Floating Chat Button when sidebar is collapsed */
+/* Top-Right Hamburger Toggle Button (Vị trí 1) when sidebar is collapsed */
 .vss-floating-chat-btn {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: #76b900;
-    color: #000;
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 24px rgba(118, 185, 0, 0.45);
-    display: flex;
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    display: none;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 100;
-    transition: all 0.2s ease;
+    z-index: 50;
+    transition: all 0.15s ease;
 }
 
 .vss-floating-chat-btn:hover {
-    transform: scale(1.1);
-    background: #8ae300;
-    box-shadow: 0 12px 30px rgba(118, 185, 0, 0.65);
+    transform: none;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.14);
+    border-color: #76b900;
 }
 
 /* Scrollbars */
