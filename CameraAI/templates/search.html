@@ -2659,6 +2659,22 @@
             color: #f4f4f5;
         }
 
+        @keyframes cursorBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .typing-cursor {
+            display: inline-block;
+            color: var(--nv-green);
+            font-weight: 700;
+            margin-left: 2px;
+            animation: cursorBlink 0.7s infinite;
+            font-size: 0.9em;
+            vertical-align: baseline;
+            user-select: none;
+        }
+
         /* Grok-Bot Tool/Action Card */
         .chat-action-card {
             border-radius: 16px;
@@ -6789,6 +6805,7 @@ user=None`;
                     </div>
                 ` : '';
 
+                const msgTextId = 'bot-clip-msg-' + Date.now();
                 const assistantMsgHtml = `
                     <div class="chat-msg-row">
                         <div class="bot-avatar-box">
@@ -6812,7 +6829,7 @@ user=None`;
                                     <span class="chat-status-dot"></span>
                                     <span>${escapeHtml(serverTag)} · ${escapeHtml(videoContext.title)}</span>
                                 </div>
-                                <div class="chat-bubble-text">${formatAssistantReply(replyText)}</div>
+                                <div class="chat-bubble-text" id="${msgTextId}"></div>
                                 ${audioCardHtml}
                                 ${reasoningHtml}
                             </div>
@@ -6822,6 +6839,10 @@ user=None`;
 
                 const thinkingEl = document.getElementById(thinkingId);
                 if (thinkingEl) thinkingEl.outerHTML = assistantMsgHtml;
+                const textEl = document.getElementById(msgTextId);
+                if (textEl) {
+                    typewriteAssistantReply(textEl, replyText, container);
+                }
             } catch (err) {
                 console.error('[Video Chat Error]:', err);
                 syncWorkflowStage('error', 'LỖI PHÂN TÍCH VIDEO TỪ SERVER AI');
@@ -7142,6 +7163,73 @@ user=None`;
             return content;
         }
 
+        // Hiệu ứng đánh máy mượt mà (Typewriter Stream Effect)
+        function typewriteAssistantReply(targetEl, rawText, scrollContainer, onDone) {
+            if (!targetEl || !rawText) {
+                if (targetEl) targetEl.innerHTML = formatAssistantReply(rawText || '');
+                if (onDone) onDone();
+                return;
+            }
+
+            // Tách từ kèm dấu cách để giữ nguyên cấu trúc
+            const words = String(rawText).split(/(\s+)/);
+            let idx = 0;
+            let currentText = '';
+            let isCancelled = false;
+
+            // Tốc độ đánh máy thông minh:
+            // Văn bản dài (> 200 từ): 3 từ / tick (~15ms)
+            // Văn bản trung bình (> 100 từ): 2 từ / tick (~15ms)
+            // Văn bản ngắn: 1 từ / tick (~15ms)
+            const step = words.length > 200 ? 3 : (words.length > 100 ? 2 : 1);
+            const intervalMs = 15;
+
+            // Cho phép người dùng click vào bong bóng để hiện toàn bộ văn bản ngay lập tức
+            const finishInstantly = () => {
+                if (isCancelled) return;
+                isCancelled = true;
+                clearInterval(timer);
+                targetEl.innerHTML = formatAssistantReply(rawText);
+                targetEl.style.cursor = 'default';
+                targetEl.title = '';
+                targetEl.removeEventListener('click', finishInstantly);
+                if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                if (onDone) onDone();
+            };
+
+            targetEl.addEventListener('click', finishInstantly);
+            targetEl.title = 'Bấm vào để hiển thị toàn bộ nội dung ngay';
+            targetEl.style.cursor = 'pointer';
+
+            const timer = setInterval(() => {
+                if (isCancelled) return;
+
+                let added = 0;
+                while (idx < words.length && added < step) {
+                    currentText += words[idx];
+                    idx++;
+                    added++;
+                }
+
+                targetEl.innerHTML = formatAssistantReply(currentText) + '<span class="typing-cursor">▋</span>';
+                if (scrollContainer) {
+                    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                }
+
+                if (idx >= words.length) {
+                    clearInterval(timer);
+                    targetEl.innerHTML = formatAssistantReply(rawText);
+                    targetEl.style.cursor = 'default';
+                    targetEl.title = '';
+                    targetEl.removeEventListener('click', finishInstantly);
+                    if (scrollContainer) {
+                        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                    }
+                    if (onDone) onDone();
+                }
+            }, intervalMs);
+        }
+
         // Bấm vào chip sự kiện #14752 trong chat để tìm và phát clip trực tiếp
         async function searchAndPlayEvent(eventId) {
             const searchInput = document.getElementById('search-input');
@@ -7320,6 +7408,7 @@ user=None`;
                     </div>
                 ` : '';
 
+                const msgTextId = 'bot-conv-msg-' + Date.now();
                 const assistantMsgHtml = `
                     <div class="chat-msg-row">
                         <div class="bot-avatar-box">
@@ -7335,7 +7424,7 @@ user=None`;
                                     <span class="chat-status-dot"></span>
                                     <span>${escapeHtml(sourceTag)} (${channelDisplay})</span>
                                 </div>
-                                <div class="chat-bubble-text">${formattedReply}</div>
+                                <div class="chat-bubble-text" id="${msgTextId}"></div>
                                 ${reasoningHtml}
                             </div>
                         </div>
@@ -7344,6 +7433,10 @@ user=None`;
 
                 const thinkingEl = document.getElementById(thinkingId);
                 if (thinkingEl) thinkingEl.outerHTML = assistantMsgHtml;
+                const textEl = document.getElementById(msgTextId);
+                if (textEl) {
+                    typewriteAssistantReply(textEl, replyText, container);
+                }
 
                 // SAU KHI SUY NGHĨ XONG MỚI TRẢ RA VIDEO:
                 if (!isCasual) {

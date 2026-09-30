@@ -1206,6 +1206,67 @@ function formatVssAgentReply(text) {
         .replace(/\n/g, '<br>');
 }
 
+// Hiệu ứng đánh máy mượt mà (Typewriter Stream Effect) cho Vision Agent
+function typewriteVssAgentReply(targetEl, rawText, scrollContainer, onDone) {
+    if (!targetEl || !rawText) {
+        if (targetEl) targetEl.innerHTML = formatVssAgentReply(rawText || '');
+        if (onDone) onDone();
+        return;
+    }
+
+    const words = String(rawText).split(/(\s+)/);
+    let idx = 0;
+    let currentText = '';
+    let isCancelled = false;
+
+    const step = words.length > 200 ? 3 : (words.length > 100 ? 2 : 1);
+    const intervalMs = 15;
+
+    const finishInstantly = () => {
+        if (isCancelled) return;
+        isCancelled = true;
+        clearInterval(timer);
+        targetEl.innerHTML = formatVssAgentReply(rawText);
+        targetEl.style.cursor = 'default';
+        targetEl.title = '';
+        targetEl.removeEventListener('click', finishInstantly);
+        if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        if (onDone) onDone();
+    };
+
+    targetEl.addEventListener('click', finishInstantly);
+    targetEl.title = 'Bấm vào để hiển thị toàn bộ nội dung ngay';
+    targetEl.style.cursor = 'pointer';
+
+    const timer = setInterval(() => {
+        if (isCancelled) return;
+
+        let added = 0;
+        while (idx < words.length && added < step) {
+            currentText += words[idx];
+            idx++;
+            added++;
+        }
+
+        targetEl.innerHTML = formatVssAgentReply(currentText) + '<span class="typing-cursor">▋</span>';
+        if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+
+        if (idx >= words.length) {
+            clearInterval(timer);
+            targetEl.innerHTML = formatVssAgentReply(rawText);
+            targetEl.style.cursor = 'default';
+            targetEl.title = '';
+            targetEl.removeEventListener('click', finishInstantly);
+            if (scrollContainer) {
+                scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            }
+            if (onDone) onDone();
+        }
+    }, intervalMs);
+}
+
 // Vision Agent: Send Message & Chat
 async function sendVssAgentMessage() {
     const input = document.getElementById("vss-agent-input");
@@ -1246,14 +1307,20 @@ async function sendVssAgentMessage() {
         });
         const data = await res.json();
 
+        const msgTextId = "vss-agent-msg-" + Date.now();
         thinkingBubble.className = "vss-chat-bubble agent";
         thinkingBubble.innerHTML = `
             <div class="agent-tag">
                 <span class="chat-status-dot" style="width:7px;height:7px;border-radius:50%;background:#76b900;display:inline-block;flex-shrink:0;"></span>
                 <span>${data.source || 'Vision Agent'} (Kênh ${String(data.channel || currentVssChannel).padStart(2, '0')})</span>
             </div>
-            <div class="agent-msg-text">${formatVssAgentReply(data.reply)}</div>
+            <div class="agent-msg-text" id="${msgTextId}"></div>
         `;
+
+        const textEl = document.getElementById(msgTextId);
+        if (textEl) {
+            typewriteVssAgentReply(textEl, data.reply, conversationArea);
+        }
 
         // Synchronize matched events to the VideoSearchList grid!
         if (data.matched_events && data.matched_events.length > 0) {

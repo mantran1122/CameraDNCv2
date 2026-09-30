@@ -1728,6 +1728,22 @@ body {
     line-height: 1.6;
 }
 
+@keyframes cursorBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+.typing-cursor {
+    display: inline-block;
+    color: var(--nv-green, #76b900);
+    font-weight: 700;
+    margin-left: 2px;
+    animation: cursorBlink 0.7s infinite;
+    font-size: 0.9em;
+    vertical-align: baseline;
+    user-select: none;
+}
+
 .vss-agent-input-container {
     padding: 0.75rem;
     border-top: 1px solid #1c263a;
