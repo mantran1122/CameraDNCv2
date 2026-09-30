@@ -2719,8 +2719,11 @@
             gap: 0.3rem;
         }
 
-        /* Completely hide old arrow handle on divider and bottom floating circle */
-        .sidebar-resize-handle-wrap,
+        /* Keep divider line (.sidebar-resize-handle-wrap) visible, hide only old circular arrow handle and floating button */
+        .sidebar-resize-handle-wrap.closed {
+            display: none !important;
+        }
+
         .chat-collapse-handle,
         .floating-chat-trigger {
             display: none !important;
@@ -6313,10 +6316,12 @@
 
         function openChatSidebar() {
             const sidebar = document.getElementById('vss-chat-sidebar');
+            const divider = document.querySelector('.sidebar-resize-handle-wrap');
             const openTrigger = document.getElementById('chat-open-trigger-btn');
             const floatingBtn = document.getElementById('floating-chat-trigger');
             
             if (sidebar) sidebar.classList.remove('closed');
+            if (divider) divider.classList.remove('closed');
             if (openTrigger) openTrigger.style.display = 'none';
             if (floatingBtn) floatingBtn.style.display = 'none';
             if (typeof updateDetailsPaneDot === 'function') updateDetailsPaneDot();
@@ -6324,10 +6329,12 @@
 
         function closeChatSidebar() {
             const sidebar = document.getElementById('vss-chat-sidebar');
+            const divider = document.querySelector('.sidebar-resize-handle-wrap');
             const openTrigger = document.getElementById('chat-open-trigger-btn');
             const floatingBtn = document.getElementById('floating-chat-trigger');
             
             if (sidebar) sidebar.classList.add('closed');
+            if (divider) divider.classList.add('closed');
             if (openTrigger) openTrigger.style.display = 'inline-flex';
             if (floatingBtn) floatingBtn.style.display = 'none';
             if (typeof updateDetailsPaneDot === 'function') updateDetailsPaneDot();
