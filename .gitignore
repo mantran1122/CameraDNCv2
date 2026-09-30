@@ -75,3 +75,6 @@ CMakeFiles/
 
 # Operator-uploaded prompt profiles stay on the deployed machine, not in Git.
 cosmos_code_base/prompts/profiles/custom_*.txt
+
+# Local analysis folder
+grok-bot-analysis/
