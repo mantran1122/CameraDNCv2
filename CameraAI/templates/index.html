@@ -320,16 +320,15 @@
                     <aside class="vss-chat-sidebar" id="vss-chat-sidebar">
                         <div class="vss-agent-header">
                             <div class="vss-agent-title-wrap">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                                </svg>
+                                <button class="vss-agent-collapse-btn" id="vss-agent-collapse-btn" onclick="toggleVssChatSidebar()" title="Thu gọn / Mở rộng bảng Chat" aria-label="Thu gọn bảng Chat">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                                    </svg>
+                                </button>
                                 <span class="vss-agent-title">Vision Agent</span>
                             </div>
-                            <button class="vss-agent-collapse-btn" onclick="toggleVssChatSidebar()" title="Thu gọn / Mở rộng bảng Chat">
-                                <svg id="vss-agent-chevron-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="9 18 15 12 9 6"></polyline>
-                                </svg>
-                            </button>
                         </div>
 
                         <!-- Conversation Area -->
@@ -361,7 +360,7 @@
                         <!-- Input Bar -->
                         <div class="vss-agent-input-container">
                             <div class="vss-agent-input-bar">
-                                <input type="text" id="vss-agent-input" placeholder="Unlock Vision Agent knowledge and expertise..." onkeydown="if(event.key==='Enter') sendVssAgentMessage()" />
+                                <textarea id="vss-agent-input" rows="1" placeholder="Unlock Vision Agent knowledge and expertise..." aria-label="Nội dung chat Vision Agent"></textarea>
                                 <button class="vss-agent-send-btn" id="vss-agent-send-btn" onclick="sendVssAgentMessage()" title="Gửi câu hỏi">
                                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                                         <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -376,8 +375,10 @@
 
                     <!-- Floating Chat Icon (when sidebar is collapsed) -->
                     <button class="vss-floating-chat-btn" id="vss-floating-chat-btn" style="display:none;" onclick="toggleVssChatSidebar()" title="Mở Vision Agent Chat">
-                        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
                         </svg>
                     </button>
 

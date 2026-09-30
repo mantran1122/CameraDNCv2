@@ -10,7 +10,7 @@ from typing import Callable, Optional
 import config
 import database
 import video_clipper
-from clip_storage import build_clip_reference, mirror_clip, resolve_clip_path
+from clip_storage import build_clip_reference, mirror_clip, resolve_clip_path, storage_timestamp
 
 
 class ClipCaptureWorker:
@@ -60,7 +60,11 @@ class ClipCaptureWorker:
         if delay > 0:
             time.sleep(delay)
         print(f"[CLIP] alert={event_id} capturing 10s evidence")
-        filename = build_clip_reference(event["channel"], event_time, event_id)
+        # Keep the original event time for NVR playback, while putting the
+        # finished evidence in today's local storage folder.  This handles a
+        # capture queue crossing midnight without mixing new files into the
+        # previous day's directory.
+        filename = build_clip_reference(event["channel"], storage_timestamp(), event_id)
         captured_file = None
         for attempt in range(1, 4):
             print(f"[CLIP] alert={event_id} capture attempt={attempt}/3")

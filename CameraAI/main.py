@@ -32,7 +32,7 @@ import video_clipper
 import data_health
 from temporal_parser import parse_query_temporal
 from ai_search_planner import plan_search_intent
-from clip_storage import mirror_clip, resolve_clip_path
+from clip_storage import mirror_clip, resolve_clip_path, storage_timestamp
 from audio_analysis_worker import AudioAnalysisWorker
 from video_analysis_worker import VideoAnalysisWorker
 from qwen_vision_client import (
@@ -535,7 +535,7 @@ async def upload_test_video(video: UploadFile = File(...), _: str = Depends(requ
     if suffix not in allowed_suffixes:
         raise HTTPException(status_code=415, detail="Chỉ nhận MP4, MOV, MKV, AVI hoặc WEBM.")
     max_bytes = max(1, int(os.getenv("CAMERAAI_MANUAL_TEST_MAX_UPLOAD_MB", "2048"))) * 1024 * 1024
-    now = datetime.now()
+    now = storage_timestamp()
     reference = f"manual-tests/{now:%Y}/{now:%m}/{now:%d}/test_{now:%Y%m%dT%H%M%S}_{uuid.uuid4().hex[:12]}{suffix}"
     target = resolve_clip_path(reference)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -787,7 +787,7 @@ async def capture_clip_event_api(event_id: int):
     # 2. Fallback: Generate valid H.264 evidence video if NVR RTSP playback is timed out/offline over WAN
     try:
         event_time = datetime.strptime(event["timestamp"], "%Y-%m-%d %H:%M:%S")
-        ref = build_clip_reference(event["channel"], event_time, event_id)
+        ref = build_clip_reference(event["channel"], storage_timestamp(), event_id)
         full_output_path = str(resolve_clip_path(ref))
         os.makedirs(os.path.dirname(full_output_path), exist_ok=True)
         from video_clipper import generate_synthetic_anomaly_clip

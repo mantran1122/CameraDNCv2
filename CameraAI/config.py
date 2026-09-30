@@ -43,6 +43,9 @@ SYNOLOGY_VERIFY_TLS = os.getenv("CAMERAAI_SYNOLOGY_VERIFY_TLS", "true").strip().
     "1", "true", "yes", "on"
 }
 SYNOLOGY_TIMEOUT_SECONDS = max(5, int(os.getenv("CAMERAAI_SYNOLOGY_TIMEOUT_SECONDS", "60")))
+# Folder names for newly captured evidence use the local operating timezone,
+# rather than an event timestamp that may have been queued before midnight.
+CLIP_STORAGE_TIMEZONE = os.getenv("CAMERAAI_CLIP_STORAGE_TIMEZONE", "Asia/Ho_Chi_Minh").strip() or "Asia/Ho_Chi_Minh"
 
 # Ensure directories exist
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)

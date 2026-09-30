@@ -2028,6 +2028,8 @@
             color: var(--text-main);
             line-height: 1.45;
             font-weight: 400;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
 
         .user-msg-actions {
@@ -2488,12 +2490,12 @@
         /* Chat Input Pill Bar */
         .chat-input-pill-container {
             display: flex;
-            align-items: center;
-            height: 42px;
+            align-items: flex-end;
+            min-height: 42px;
             background-color: var(--input-bg);
             border: 1px solid var(--input-border);
-            border-radius: 6px;
-            padding: 0 0.5rem 0 0.75rem;
+            border-radius: 8px;
+            padding: 0.35rem 0.5rem 0.35rem 0.75rem;
             gap: 0.5rem;
             box-shadow: 0 4px 6px -1px var(--shadow-color);
             transition: border-color 0.15s;
@@ -2521,12 +2523,20 @@
 
         .chat-input-text {
             flex: 1 1 0%;
-            height: 100%;
             background: transparent;
             border: none;
             outline: none;
             color: var(--input-text);
             font-size: 0.8125rem;
+            font-family: inherit;
+            line-height: 1.45;
+            resize: none;
+            min-height: 22px;
+            max-height: 140px;
+            overflow-y: auto;
+            word-break: break-word;
+            white-space: pre-wrap;
+            padding: 2px 0;
         }
 
         .chat-input-text::placeholder {
@@ -5834,7 +5844,7 @@
             <!-- Chat Header -->
             <div class="chat-panel-header">
                 <div class="chat-panel-header-left">
-                    <button class="menu-btn" title="Chat Menu">
+                    <button class="menu-btn" onclick="toggleChatSidebar()" title="Thu gọn / Mở rộng bảng Chat" aria-label="Thu gọn bảng Chat">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="3" y1="12" x2="21" y2="12"></line>
                             <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -5849,11 +5859,6 @@
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                    </button>
-                    <button class="chat-panel-close-btn" onclick="closeChatSidebar()" title="Collapse Panel">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="15 18 9 12 15 6"></polyline>
                         </svg>
                     </button>
                 </div>
@@ -5883,8 +5888,8 @@
                     </button>
                 </div>
 
-                <!-- Feedback Row with Reactions & NVIDIA Logo -->
-                <div class="chat-feedback-row">
+                <!-- Feedback Row with Reactions & NVIDIA Logo (hidden because placeholder) -->
+                <div class="chat-feedback-row" style="display: none;">
                     <div class="chat-feedback-icons-left">
                         <!-- Thumbs up -->
                         <button class="feedback-icon-btn" title="Good response">
@@ -5950,16 +5955,10 @@
                     </button>
                     <input type="file" id="hidden-file-input" style="display: none;" accept=".mp4,.mkv">
 
-                    <input type="text" class="chat-input-text" id="chat-query-input" placeholder="Unlock Vision Agent knowledge and expertise" onkeydown="if(event.key==='Enter') sendNewChatMessage()">
+                    <textarea class="chat-input-text" id="chat-query-input" rows="1" placeholder="Unlock Vision Agent knowledge and expertise" aria-label="Nội dung chat Vision Agent"></textarea>
 
                     <div class="chat-input-actions-right">
-                        <button class="chat-params-btn" title="Model Parameters">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="3"></circle>
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                            </svg>
-                        </button>
-                        <button class="chat-send-arrow-btn" onclick="sendNewChatMessage()" title="Send">
+                        <button class="chat-send-arrow-btn" onclick="sendNewChatMessage()" title="Gửi tin nhắn (Enter)">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
                                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -6445,11 +6444,33 @@ user=None`;
             resetToEmptyState();
         }
 
+        function initSearchChatInput() {
+            const input = document.getElementById('chat-query-input');
+            if (!input || input.dataset.initialized) return;
+            input.dataset.initialized = 'true';
+
+            const adjustHeight = () => {
+                input.style.height = 'auto';
+                const newHeight = Math.min(input.scrollHeight, 140);
+                input.style.height = (newHeight > 22 ? newHeight : 22) + 'px';
+            };
+
+            input.addEventListener('input', adjustHeight);
+
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendNewChatMessage();
+                }
+            });
+        }
+
         async function sendNewChatMessage() {
             const input = document.getElementById('chat-query-input');
             const text = (input?.value || '').trim();
             if (!text) return;
             input.value = '';
+            input.style.height = 'auto';
 
             // Không gán sang search-input! Trò chuyện là trò chuyện, Tìm kiếm là tìm kiếm.
             if (activeChatVideo) {

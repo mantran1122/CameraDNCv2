@@ -688,7 +688,29 @@ function switchTab(tabId) {
 }
 
 // Initialize Vision Search Component & Populate Channel Selectors
+function initVssAgentInput() {
+    const input = document.getElementById("vss-agent-input");
+    if (!input || input.dataset.initialized) return;
+    input.dataset.initialized = "true";
+
+    const adjustHeight = () => {
+        input.style.height = "auto";
+        const newHeight = Math.min(input.scrollHeight, 140);
+        input.style.height = (newHeight > 24 ? newHeight : 24) + "px";
+    };
+
+    input.addEventListener("input", adjustHeight);
+
+    input.addEventListener("keydown", function(e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendVssAgentMessage();
+        }
+    });
+}
+
 function initVssVisionSearch() {
+    initVssAgentInput();
     const channelSelect = document.getElementById("vss-filter-channels");
     const quickSelect = document.getElementById("vss-quick-cam-select");
 
@@ -1093,6 +1115,8 @@ function addVssCardToChat(ev, btn) {
     const input = document.getElementById("vss-agent-input");
     if (input) {
         input.value = `Giải thích sự kiện #${ev.id} (${ev.description}) trên ${ev.video_name}: `;
+        input.style.height = "auto";
+        input.style.height = Math.min(input.scrollHeight, 140) + "px";
         input.focus();
     }
 
@@ -1146,7 +1170,6 @@ function toggleQuickPlayerFullscreen() {
 function toggleVssChatSidebar() {
     const sidebar = document.getElementById("vss-chat-sidebar");
     const floatBtn = document.getElementById("vss-floating-chat-btn");
-    const chevron = document.getElementById("vss-agent-chevron-icon");
 
     vssChatSidebarCollapsed = !vssChatSidebarCollapsed;
 
@@ -1155,9 +1178,6 @@ function toggleVssChatSidebar() {
     }
     if (floatBtn) {
         floatBtn.style.display = vssChatSidebarCollapsed ? "flex" : "none";
-    }
-    if (chevron) {
-        chevron.style.transform = vssChatSidebarCollapsed ? "rotate(180deg)" : "rotate(0deg)";
     }
 }
 
@@ -1187,6 +1207,7 @@ async function sendVssAgentMessage() {
     if (!query) return;
 
     input.value = "";
+    input.style.height = "auto";
 
     const welcomeScreen = document.getElementById("vss-agent-welcome");
     if (welcomeScreen) welcomeScreen.style.display = "none";

@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 import re
+from zoneinfo import ZoneInfo
 
 import config
 
@@ -17,6 +18,19 @@ def camera_code(channel: int) -> str:
     if channel < 1:
         raise ValueError("Camera channel must be positive")
     return f"cam-{channel:03d}"
+
+
+def storage_timestamp() -> datetime:
+    """Return the local calendar time used for newly created clip paths.
+
+    NVR events can wait in the capture queue across midnight.  Their original
+    timestamp remains in the database, but storage is organized by the date
+    the evidence clip is actually created in the configured local timezone.
+    """
+    try:
+        return datetime.now(ZoneInfo(config.CLIP_STORAGE_TIMEZONE))
+    except Exception:
+        return datetime.now().astimezone()
 
 
 def build_clip_reference(channel: int, event_time: datetime, event_id: int) -> str:
