@@ -2490,12 +2490,12 @@
         /* Grok-Bot Skeleton Pill Input Bar (NVIDIA Dark Palette) */
         .chat-input-pill-container {
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             min-height: 48px;
             background-color: #0c1220;
             border: 1px solid rgba(255, 255, 255, 0.16);
-            border-radius: 9999px;
-            padding: 5px 6px 5px 12px;
+            border-radius: 24px;
+            padding: 7px 8px 7px 12px;
             gap: 0.5rem;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
             transition: border-color 0.2s, box-shadow 0.2s;
@@ -2520,6 +2520,7 @@
             transition: all 0.15s;
             flex-shrink: 0;
             padding: 0;
+            margin-bottom: 1px;
         }
 
         .chat-input-upload-btn:hover, .chat-input-plus-btn:hover {
@@ -2535,14 +2536,14 @@
             color: #ffffff;
             font-size: 0.88rem;
             font-family: inherit;
-            line-height: 1.45;
+            line-height: 1.42;
             resize: none;
             min-height: 22px;
-            max-height: 130px;
-            overflow-y: auto;
+            max-height: 66px; /* Tối đa đúng 3 dòng */
+            overflow-y: hidden;
             word-break: break-word;
             white-space: pre-wrap;
-            padding: 4px 2px;
+            padding: 6px 2px;
             scrollbar-width: none;
         }
 
@@ -2624,8 +2625,38 @@
             color: #f1f5f9;
             font-size: 0.88rem;
             line-height: 1.55;
+            white-space: normal;
+            word-break: break-word;
+        }
+
+        .chat-bubble-header {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.72rem;
+            color: var(--nv-green);
+            font-weight: 600;
+            margin-bottom: 0.45rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chat-status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background-color: var(--nv-green);
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        .chat-bubble-text {
             white-space: pre-wrap;
             word-break: break-word;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            color: #f4f4f5;
         }
 
         /* Grok-Bot Tool/Action Card */
@@ -6530,10 +6561,16 @@ user=None`;
             if (!input || input.dataset.initialized) return;
             input.dataset.initialized = 'true';
 
+            const maxThreeLinesHeight = 66; // Tối đa đúng 3 dòng
             const adjustHeight = () => {
                 input.style.height = 'auto';
-                const newHeight = Math.min(input.scrollHeight, 140);
-                input.style.height = (newHeight > 22 ? newHeight : 22) + 'px';
+                if (input.scrollHeight > maxThreeLinesHeight) {
+                    input.style.height = maxThreeLinesHeight + 'px';
+                    input.style.overflowY = 'auto'; // Vượt quá 3 dòng thì đẩy chữ lên
+                } else {
+                    input.style.height = Math.max(input.scrollHeight, 22) + 'px';
+                    input.style.overflowY = 'hidden'; // Dưới hoặc bằng 3 dòng thì tự dãn
+                }
             };
 
             input.addEventListener('input', adjustHeight);
@@ -6552,6 +6589,7 @@ user=None`;
             if (!text) return;
             input.value = '';
             input.style.height = 'auto';
+            input.style.overflowY = 'hidden';
 
             // Không gán sang search-input! Trò chuyện là trò chuyện, Tìm kiếm là tìm kiếm.
             if (activeChatVideo) {
@@ -6770,14 +6808,11 @@ user=None`;
                                 </div>
                             </div>
                             <div class="chat-assistant-bubble">
-                                <div style="font-size: 0.6875rem; color: var(--nv-green); font-weight: 600; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
-                                    <div style="display: flex; align-items: center; gap: 0.4rem;">
-                                        <span style="width: 7px; height: 7px; border-radius: 50%; background-color: var(--nv-green); display: inline-block;"></span>
-                                        ${escapeHtml(serverTag)}
-                                    </div>
-                                    <span style="color: #a1a1aa; font-family: monospace; font-size: 0.625rem;">${escapeHtml(videoContext.title)}</span>
+                                <div class="chat-bubble-header">
+                                    <span class="chat-status-dot"></span>
+                                    <span>${escapeHtml(serverTag)} · ${escapeHtml(videoContext.title)}</span>
                                 </div>
-                                <div style="font-size: 0.875rem; line-height: 1.6; color: #f4f4f5;">${formatAssistantReply(replyText)}</div>
+                                <div class="chat-bubble-text">${formatAssistantReply(replyText)}</div>
                                 ${audioCardHtml}
                                 ${reasoningHtml}
                             </div>
@@ -7296,11 +7331,11 @@ user=None`;
                         <div class="assistant-msg-content-wrap" style="max-width: 86%;">
                             ${actionCardHtml}
                             <div class="chat-assistant-bubble">
-                                <div style="font-size: 0.6875rem; color: var(--nv-green); font-weight: 600; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.4rem;">
-                                    <span style="width: 7px; height: 7px; border-radius: 50%; background-color: var(--nv-green); display: inline-block;"></span>
-                                    ${escapeHtml(sourceTag)} (${channelDisplay})
+                                <div class="chat-bubble-header">
+                                    <span class="chat-status-dot"></span>
+                                    <span>${escapeHtml(sourceTag)} (${channelDisplay})</span>
                                 </div>
-                                <div style="font-size: 0.875rem; line-height: 1.6; color: #f4f4f5;">${formattedReply}</div>
+                                <div class="chat-bubble-text">${formattedReply}</div>
                                 ${reasoningHtml}
                             </div>
                         </div>

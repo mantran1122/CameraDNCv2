@@ -693,10 +693,16 @@ function initVssAgentInput() {
     if (!input || input.dataset.initialized) return;
     input.dataset.initialized = "true";
 
+    const maxThreeLinesHeight = 66; // Tối đa đúng 3 dòng
     const adjustHeight = () => {
         input.style.height = "auto";
-        const newHeight = Math.min(input.scrollHeight, 140);
-        input.style.height = (newHeight > 24 ? newHeight : 24) + "px";
+        if (input.scrollHeight > maxThreeLinesHeight) {
+            input.style.height = maxThreeLinesHeight + "px";
+            input.style.overflowY = "auto"; // Vượt quá 3 dòng thì đẩy chữ lên
+        } else {
+            input.style.height = Math.max(input.scrollHeight, 22) + "px";
+            input.style.overflowY = "hidden"; // Dưới hoặc bằng 3 dòng thì tự dãn
+        }
     };
 
     input.addEventListener("input", adjustHeight);
@@ -1208,6 +1214,7 @@ async function sendVssAgentMessage() {
 
     input.value = "";
     input.style.height = "auto";
+    input.style.overflowY = "hidden";
 
     const welcomeScreen = document.getElementById("vss-agent-welcome");
     if (welcomeScreen) welcomeScreen.style.display = "none";
@@ -1241,8 +1248,11 @@ async function sendVssAgentMessage() {
 
         thinkingBubble.className = "vss-chat-bubble agent";
         thinkingBubble.innerHTML = `
-            <div class="agent-tag">⚡ ${data.source || 'Vision Agent'} (Kênh ${String(data.channel || currentVssChannel).padStart(2, '0')})</div>
-            <div>${formatVssAgentReply(data.reply)}</div>
+            <div class="agent-tag">
+                <span class="chat-status-dot" style="width:7px;height:7px;border-radius:50%;background:#76b900;display:inline-block;flex-shrink:0;"></span>
+                <span>${data.source || 'Vision Agent'} (Kênh ${String(data.channel || currentVssChannel).padStart(2, '0')})</span>
+            </div>
+            <div class="agent-msg-text">${formatVssAgentReply(data.reply)}</div>
         `;
 
         // Synchronize matched events to the VideoSearchList grid!
