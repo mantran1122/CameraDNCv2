@@ -6644,13 +6644,16 @@
             if (framesEl) framesEl.innerText = `32 frames (Server AI)`;
             if (framesEl) framesEl.innerText = `32 frames + Audio (Server AI)`;
 
-            // Pre-fill smart prompt
+            // Pre-fill smart prompt with auto-grow up to max 3 lines
             const input = document.getElementById('chat-query-input');
             if (input) {
-                input.value = `Phân tích toàn diện clip: nhận diện đối tượng, hành động theo mốc giây và đánh giá an ninh.`;
                 input.value = `Phân tích toàn diện clip: nhận diện đối tượng, hành động theo mốc giây và phân tích lời thoại / âm thanh thực tế.`;
+                handleChatInputAutoGrow(input);
+                setTimeout(() => {
+                    handleChatInputAutoGrow(input);
+                    input.selectionStart = input.selectionEnd = input.value.length;
+                }, 50);
                 input.focus();
-                input.select();
             }
         }
 

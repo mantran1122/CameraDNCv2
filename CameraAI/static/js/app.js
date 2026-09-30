@@ -693,26 +693,8 @@ function initVssAgentInput() {
     if (!input || input.dataset.initialized) return;
     input.dataset.initialized = "true";
 
-    const maxThreeLinesHeight = 66; // Tối đa đúng 3 dòng
-    const adjustHeight = () => {
-        input.style.height = "auto";
-        if (input.scrollHeight > maxThreeLinesHeight) {
-            input.style.height = maxThreeLinesHeight + "px";
-            input.style.overflowY = "auto"; // Vượt quá 3 dòng thì đẩy chữ lên
-        } else {
-            input.style.height = Math.max(input.scrollHeight, 22) + "px";
-            input.style.overflowY = "hidden"; // Dưới hoặc bằng 3 dòng thì tự dãn
-        }
-    };
-
-    input.addEventListener("input", adjustHeight);
-
-    input.addEventListener("keydown", function(e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            sendVssAgentMessage();
-        }
-    });
+    input.addEventListener("input", () => handleVssAgentAutoGrow(input));
+    input.addEventListener("keydown", (e) => handleVssAgentKeydown(e, input));
 }
 
 function initVssVisionSearch() {
@@ -1117,12 +1099,15 @@ function addVssCardToChat(ev, btn) {
         toggleVssChatSidebar();
     }
 
-    // Add context to input
+    // Add context to input with auto-grow up to max 3 lines
     const input = document.getElementById("vss-agent-input");
     if (input) {
         input.value = `Giải thích sự kiện #${ev.id} (${ev.description}) trên ${ev.video_name}: `;
-        input.style.height = "auto";
-        input.style.height = Math.min(input.scrollHeight, 140) + "px";
+        handleVssAgentAutoGrow(input);
+        setTimeout(() => {
+            handleVssAgentAutoGrow(input);
+            input.selectionStart = input.selectionEnd = input.value.length;
+        }, 50);
         input.focus();
     }
 
