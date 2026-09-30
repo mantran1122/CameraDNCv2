@@ -1267,6 +1267,39 @@ function typewriteVssAgentReply(targetEl, rawText, scrollContainer, onDone) {
     }, intervalMs);
 }
 
+function handleVssAgentAutoGrow(textarea) {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    const singleLine = 32;
+    const maxThreeLinesHeight = 76; // Tối đa đúng 3 dòng
+    const scrollH = textarea.scrollHeight;
+
+    if (scrollH > maxThreeLinesHeight) {
+        textarea.style.height = maxThreeLinesHeight + 'px';
+        textarea.style.overflowY = 'auto'; // Vượt quá 3 dòng thì đẩy chữ lên
+        textarea.scrollTop = textarea.scrollHeight;
+    } else {
+        textarea.style.height = Math.max(scrollH, singleLine) + 'px';
+        textarea.style.overflowY = 'hidden'; // Dưới hoặc bằng 3 dòng thì tự dãn
+    }
+}
+
+function handleVssAgentKeydown(e, textarea) {
+    if (e.key === 'Enter') {
+        if (e.shiftKey) {
+            // Shift + Enter: Xuống dòng bình thường và co giãn khung
+            setTimeout(() => handleVssAgentAutoGrow(textarea), 0);
+        } else {
+            // Enter: Gửi câu hỏi ngay lập tức!
+            e.preventDefault();
+            sendVssAgentMessage();
+        }
+    }
+}
+
+window.handleVssAgentAutoGrow = handleVssAgentAutoGrow;
+window.handleVssAgentKeydown = handleVssAgentKeydown;
+
 // Vision Agent: Send Message & Chat
 async function sendVssAgentMessage() {
     const input = document.getElementById("vss-agent-input");

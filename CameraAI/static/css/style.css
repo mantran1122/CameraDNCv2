@@ -1800,17 +1800,24 @@ body {
     font-family: inherit;
     line-height: 1.42;
     resize: none;
-    min-height: 22px;
-    max-height: 66px; /* Tối đa đúng 3 dòng */
+    box-sizing: border-box;
+    min-height: 32px;
+    max-height: 76px; /* Tối đa đúng 3 dòng */
     overflow-y: hidden;
     word-break: break-word;
     white-space: pre-wrap;
-    padding: 6px 2px;
-    scrollbar-width: none;
+    padding: 6px 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 #vss-agent-input::-webkit-scrollbar {
-    display: none;
+    width: 4px;
+}
+
+#vss-agent-input::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
 }
 
 #vss-agent-input::placeholder {

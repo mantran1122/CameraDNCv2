@@ -2538,17 +2538,24 @@
             font-family: inherit;
             line-height: 1.42;
             resize: none;
-            min-height: 22px;
-            max-height: 66px; /* Tối đa đúng 3 dòng */
+            box-sizing: border-box;
+            min-height: 32px;
+            max-height: 76px; /* Tối đa đúng 3 dòng */
             overflow-y: hidden;
             word-break: break-word;
             white-space: pre-wrap;
-            padding: 6px 2px;
-            scrollbar-width: none;
+            padding: 6px 4px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
         }
 
         .chat-input-text::-webkit-scrollbar {
-            display: none;
+            width: 4px;
+        }
+
+        .chat-input-text::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
         }
 
         .chat-input-text::placeholder {
@@ -6097,7 +6104,7 @@
                     </button>
                     <input type="file" id="hidden-file-input" style="display: none;" accept=".mp4,.mkv">
 
-                    <textarea class="chat-input-text" id="chat-query-input" rows="1" placeholder="Message Vision Agent..." aria-label="Nội dung chat Vision Agent"></textarea>
+                    <textarea class="chat-input-text" id="chat-query-input" rows="1" placeholder="Message Vision Agent..." aria-label="Nội dung chat Vision Agent" oninput="handleChatInputAutoGrow(this)" onkeydown="handleChatInputKeydown(event, this)"></textarea>
 
                     <button class="chat-send-arrow-btn" id="chat-send-btn" onclick="sendNewChatMessage()" title="Gửi tin nhắn (Enter)">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -6584,31 +6591,49 @@ user=None`;
             resetToEmptyState();
         }
 
+        function handleChatInputAutoGrow(textarea) {
+            if (!textarea) return;
+            textarea.style.height = 'auto';
+            const singleLine = 32;
+            const maxThreeLinesHeight = 76; // Tối đa đúng 3 dòng
+            const scrollH = textarea.scrollHeight;
+
+            if (scrollH > maxThreeLinesHeight) {
+                textarea.style.height = maxThreeLinesHeight + 'px';
+                textarea.style.overflowY = 'auto'; // Vượt quá 3 dòng thì đẩy chữ lên
+                textarea.scrollTop = textarea.scrollHeight;
+            } else {
+                textarea.style.height = Math.max(scrollH, singleLine) + 'px';
+                textarea.style.overflowY = 'hidden'; // Dưới hoặc bằng 3 dòng thì tự dãn
+            }
+        }
+
+        function handleChatInputKeydown(e, textarea) {
+            if (e.key === 'Enter') {
+                if (e.shiftKey) {
+                    // Shift + Enter: Xuống dòng bình thường và co giãn khung
+                    setTimeout(() => handleChatInputAutoGrow(textarea), 0);
+                } else {
+                    // Enter: Gửi câu hỏi ngay lập tức!
+                    e.preventDefault();
+                    sendNewChatMessage();
+                }
+            }
+        }
+
         function initSearchChatInput() {
             const input = document.getElementById('chat-query-input');
             if (!input || input.dataset.initialized) return;
             input.dataset.initialized = 'true';
+            input.addEventListener('input', () => handleChatInputAutoGrow(input));
+            input.addEventListener('keydown', (e) => handleChatInputKeydown(e, input));
+        }
 
-            const maxThreeLinesHeight = 66; // Tối đa đúng 3 dòng
-            const adjustHeight = () => {
-                input.style.height = 'auto';
-                if (input.scrollHeight > maxThreeLinesHeight) {
-                    input.style.height = maxThreeLinesHeight + 'px';
-                    input.style.overflowY = 'auto'; // Vượt quá 3 dòng thì đẩy chữ lên
-                } else {
-                    input.style.height = Math.max(input.scrollHeight, 22) + 'px';
-                    input.style.overflowY = 'hidden'; // Dưới hoặc bằng 3 dòng thì tự dãn
-                }
-            };
-
-            input.addEventListener('input', adjustHeight);
-
-            input.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendNewChatMessage();
-                }
-            });
+        // Tự động khởi tạo ngay khi tài liệu sẵn sàng
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSearchChatInput);
+        } else {
+            initSearchChatInput();
         }
 
         async function sendNewChatMessage() {

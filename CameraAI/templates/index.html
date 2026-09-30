@@ -366,7 +366,7 @@
                                         <line x1="5" y1="12" x2="19" y2="12"></line>
                                     </svg>
                                 </button>
-                                <textarea id="vss-agent-input" rows="1" placeholder="Message Vision Agent..." aria-label="Nội dung chat Vision Agent"></textarea>
+                                <textarea id="vss-agent-input" rows="1" placeholder="Message Vision Agent..." aria-label="Nội dung chat Vision Agent" oninput="handleVssAgentAutoGrow(this)" onkeydown="handleVssAgentKeydown(event, this)"></textarea>
                                 <button class="vss-agent-send-btn" id="vss-agent-send-btn" onclick="sendVssAgentMessage()" title="Gửi câu hỏi (Enter)">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <line x1="12" y1="19" x2="12" y2="5"></line>
