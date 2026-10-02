@@ -46,7 +46,7 @@ services:
       - CAMERAAI_POSTGRES_DUAL_WRITE=true
       - CAMERAAI_POSTGRES_URL=postgresql://camera_user:camera_secure_pass168@postgres:5432/camera_ai
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/search || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/login || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
