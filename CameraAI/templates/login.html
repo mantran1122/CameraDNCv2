@@ -4,8 +4,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Đăng nhập vào SSO - Nam Can Tho University</title>
-    <link rel="icon" type="image/png" href="/static/logo_truong_only.png">
+    <title>Hệ thống Camera AI - Đại học Nam Cần Thơ</title>
+    <link rel="icon" type="image/png" href="/static/logo_don.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -96,30 +96,39 @@
 
         /* Logo */
         .logo-wrap {
-            margin: 0 auto 16px;
+            margin: 0 auto 18px;
             display: inline-block;
         }
 
         .logo-img {
-            height: 64px;
+            height: 95px;
             width: auto;
+            max-width: 100%;
             object-fit: contain;
             display: block;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.04));
+            transition: transform 0.2s ease;
+        }
+
+        .logo-img:hover {
+            transform: scale(1.02);
         }
 
         /* Typography */
         .page-title {
-            font-size: 22px;
-            font-weight: 700;
-            color: #1e293b;
+            font-size: 21px;
+            font-weight: 800;
+            color: #0f172a;
             margin-bottom: 6px;
-            letter-spacing: -0.02em;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
         }
 
         .subtitle {
             font-size: 13.5px;
             color: #64748b;
             margin-bottom: 26px;
+            font-weight: 500;
         }
 
         /* Action Buttons (matching screenshot) */
@@ -354,11 +363,11 @@
             }
 
             .logo-img {
-                height: 56px;
+                height: 75px;
             }
 
             .page-title {
-                font-size: 20px;
+                font-size: 19px;
             }
 
             .bg-blob {
@@ -376,14 +385,14 @@
     <div class="bg-blob bg-blob--bottom-right" aria-hidden="true"></div>
 
     <main class="card">
-        <!-- Logo Trường Nam Cần Thơ -->
+        <!-- Logo Trường Nam Cần Thơ (Login/logo_don.png) -->
         <div class="logo-wrap">
-            <img class="logo-img" src="/static/logo_truong_only.png" alt="DNC" onerror="this.src='/static/logo_truong.png'">
+            <img class="logo-img" src="/static/logo_don.png" alt="Đại học Nam Cần Thơ" onerror="this.src='/static/logo_truong.png'">
         </div>
 
-        <!-- Tiêu đề chính xác như ảnh -->
-        <h1 class="page-title">Đăng nhập vào SSO</h1>
-        <p class="subtitle">Kết nối an toàn với tài khoản của bạn</p>
+        <!-- Tiêu đề mới theo yêu cầu -->
+        <h1 class="page-title">HỆ THỐNG CAMERA AI</h1>
+        <p class="subtitle">Đại học Nam Cần Thơ — Giám sát & Quản lý Thông minh</p>
 
         <!-- Thông báo lỗi / trạng thái -->
         <div class="alert alert-error" id="alertError"></div>
