@@ -134,6 +134,25 @@ class AdminPortalTests(unittest.TestCase):
         del_res = self.client.delete("/api/admin/users/guard_lobby")
         self.assertEqual(del_res.status_code, 200)
 
+    def test_new_user_default_channels_strictly_18_and_19(self):
+        """Newly created accounts without channels specified must default to strictly [18, 19]."""
+        self.login(self.admin_user, self.admin_pass)
+        create_res = self.client.post("/api/admin/users", json={
+            "username": "new_staff_member",
+            "password": "Password789@",
+            "full_name": "Nhân viên mới",
+            "role": "viewer"
+        })
+        self.assertEqual(create_res.status_code, 200)
+
+        users_res = self.client.get("/api/admin/users")
+        new_user = next(u for u in users_res.json() if u["username"] == "new_staff_member")
+        self.assertEqual(sorted(new_user["allowed_channels"]), [18, 19])
+
+        # Test Google SSO new user upsert defaults to strictly [18, 19]
+        google_user = main.upsert_google_system_user("new_google_user@nctu.edu.vn", "Google Staff", "", False)
+        self.assertEqual(sorted(google_user["allowed_channels"]), [18, 19])
+
 
 if __name__ == "__main__":
     unittest.main()

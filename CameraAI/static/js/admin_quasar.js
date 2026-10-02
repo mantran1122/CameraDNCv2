@@ -90,7 +90,7 @@
                     full_name: '',
                     password: '',
                     role: 'viewer',
-                    allowed_channels: []
+                    allowed_channels: [18, 19]
                 }
             });
 
@@ -333,7 +333,7 @@
                     full_name: '',
                     password: '',
                     role: 'viewer',
-                    allowed_channels: [1, 2, 3, 4]
+                    allowed_channels: [18, 19]
                 };
                 showDialogPass.value = false;
                 userDialog.show = true;

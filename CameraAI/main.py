@@ -255,6 +255,7 @@ def require_session_admin(request: Request) -> str:
 
 
 USERS_STORAGE_FILE = config.STORAGE_DIR / "users.json"
+DEFAULT_NEW_USER_CHANNELS = [18, 19]
 
 
 def sanitize_allowed_channels(channels: Any, role: str = "viewer") -> list:
@@ -322,7 +323,7 @@ def get_all_system_users() -> list[dict]:
                     if role == "admin":
                         item["allowed_channels"] = ["*"]
                     elif "allowed_channels" not in item:
-                        item["allowed_channels"] = [11, 18, 19, 20]
+                        item["allowed_channels"] = list(DEFAULT_NEW_USER_CHANNELS)
                     else:
                         item["allowed_channels"] = sanitize_allowed_channels(item.get("allowed_channels"), role)
                     cleaned_data.append(item)
@@ -355,7 +356,7 @@ def upsert_google_system_user(email: str, name: str, picture: str, is_admin: boo
             allowed_channels = ["*"]
         else:
             role = existing_user.get("role", "viewer")
-            allowed_channels = existing_user.get("allowed_channels", [11, 18, 19, 20])
+            allowed_channels = existing_user.get("allowed_channels", DEFAULT_NEW_USER_CHANNELS)
 
         existing_user["full_name"] = name or existing_user.get("full_name", email)
         if picture:
@@ -368,7 +369,7 @@ def upsert_google_system_user(email: str, name: str, picture: str, is_admin: boo
         target_user = existing_user
     else:
         role = "admin" if is_admin else "viewer"
-        allowed_channels = ["*"] if role == "admin" else [11, 18, 19, 20]
+        allowed_channels = ["*"] if role == "admin" else list(DEFAULT_NEW_USER_CHANNELS)
         target_user = {
             "username": email,
             "full_name": name or email,
@@ -2645,7 +2646,12 @@ async def create_system_user(payload: SubUserModel, _: str = Depends(require_ses
     if role not in ("admin", "operator", "viewer"):
         role = "viewer"
 
-    allowed_channels = sanitize_allowed_channels(payload.allowed_channels, role)
+    if role == "admin":
+        allowed_channels = ["*"]
+    elif payload.allowed_channels is None:
+        allowed_channels = list(DEFAULT_NEW_USER_CHANNELS)
+    else:
+        allowed_channels = sanitize_allowed_channels(payload.allowed_channels, role)
 
     new_user = {
         "username": u,
