@@ -45,7 +45,11 @@ SYNOLOGY_VERIFY_TLS = os.getenv("CAMERAAI_SYNOLOGY_VERIFY_TLS", "true").strip().
 SYNOLOGY_TIMEOUT_SECONDS = max(5, int(os.getenv("CAMERAAI_SYNOLOGY_TIMEOUT_SECONDS", "60")))
 # Folder names for newly captured evidence use the local operating timezone,
 # rather than an event timestamp that may have been queued before midnight.
-CLIP_STORAGE_TIMEZONE = os.getenv("CAMERAAI_CLIP_STORAGE_TIMEZONE", "Asia/Ho_Chi_Minh").strip() or "Asia/Ho_Chi_Minh"
+# Google SSO OAuth2 Configuration
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "").strip()
+GOOGLE_ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("GOOGLE_ADMIN_EMAILS", "admin@nctu.edu.vn").split(",") if e.strip()]
 
 # Ensure directories exist
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)

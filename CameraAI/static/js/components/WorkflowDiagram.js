@@ -174,7 +174,7 @@ class WorkflowDiagram {
                     <g class="wf-node" id="node-llm" transform="translate(205, 42)" filter="url(#wf-node-shadow)">
                         <rect width="120" height="66" rx="8" fill="#131926" stroke="#26334a" stroke-width="1.5" />
                         <text x="60" y="24" text-anchor="middle" fill="#f1f5f9" font-size="12" font-weight="700" font-family="'Inter', sans-serif">LLM</text>
-                        <text x="60" y="40" text-anchor="middle" fill="#94a3b8" font-size="9.5" font-family="'Inter', sans-serif">Qwen 3.8-27B</text>
+                        <text x="60" y="40" text-anchor="middle" fill="#94a3b8" font-size="9.5" font-family="'Inter', sans-serif">GLM-5.3-Flash</text>
                         <text x="60" y="54" text-anchor="middle" fill="#84cc16" font-size="9" font-weight="600" font-family="'Inter', sans-serif">Server AI</text>
                     </g>
 
@@ -202,11 +202,11 @@ class WorkflowDiagram {
                         <text x="55" y="54" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="'Inter', sans-serif">Clip Retrieval</text>
                     </g>
 
-                    <!-- 7. VLM (Qwen 3.8-27B Vision Critic) -->
+                    <!-- 7. VLM (GLM-5.3-Flash Vision Critic) -->
                     <g class="wf-node" id="node-vlm" transform="translate(645, 277)" filter="url(#wf-node-shadow)">
                         <rect width="110" height="66" rx="8" fill="#131926" stroke="#26334a" stroke-width="1.5" />
                         <text x="55" y="24" text-anchor="middle" fill="#f1f5f9" font-size="12.5" font-weight="700" font-family="'Inter', sans-serif">VLM</text>
-                        <text x="55" y="40" text-anchor="middle" fill="#94a3b8" font-size="9.5" font-family="'Inter', sans-serif">Qwen 3.8-27B</text>
+                        <text x="55" y="40" text-anchor="middle" fill="#94a3b8" font-size="9.5" font-family="'Inter', sans-serif">GLM-5.3-Flash</text>
                         <text x="55" y="54" text-anchor="middle" fill="#f43f5e" font-size="9" font-weight="600" font-family="'Inter', sans-serif">Server AI</text>
                     </g>
 
@@ -301,7 +301,7 @@ class WorkflowDiagram {
             case 'llm_reasoning':
                 // LLM active on Server AI (pulsing while request is in-flight)
                 this.highlightStage(['node-video-agent', 'node-llm'], ['conn-query-agent', 'conn-agent-llm'], isPulsing, 'node-llm');
-                this.updateStatusText(customStatus || 'BƯỚC 3: SERVER AI (QWEN 3.8-27B) ĐANG SUY LUẬN...');
+                this.updateStatusText(customStatus || 'BƯỚC 3: SERVER AI (GLM-5.3-FLASH) ĐANG SUY LUẬN...');
                 break;
 
             case 'search_retrieval':

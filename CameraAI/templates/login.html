@@ -4,179 +4,208 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Đăng nhập Hệ thống | Đại học Nam Cần Thơ</title>
+    <title>Đăng nhập vào SSO - Nam Can Tho University</title>
     <link rel="icon" type="image/png" href="/static/logo_truong_only.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Identity Services SDK -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        :root {
-            color-scheme: light;
-            --font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            --md-primary: #4f6f9f;
-            --md-primary-hover: #3e5b87;
-            --md-on-primary: #ffffff;
-            --md-primary-container: #e3edf9;
-            --md-on-primary-container: #263c5b;
-            --md-secondary-container: #e9eff7;
-            --md-on-secondary-container: #344355;
-            --md-surface: #f8faff;
-            --md-surface-container: #f0f4fa;
-            --md-surface-container-high: #e8edf5;
-            --md-on-surface: #26313f;
-            --md-on-surface-variant: #5f6b7a;
-            --md-outline: #8c99aa;
-            --md-outline-variant: #cbd5e1;
-            --md-error-container: #fee2e2;
-            --md-on-error-container: #991b1b;
-        }
-
         *,
         *::before,
         *::after {
             box-sizing: border-box;
-        }
-
-        html {
-            min-width: 320px;
-            background: var(--md-surface);
-            font-family: var(--font-family);
-            font-synthesis: none;
-        }
-
-        body,
-        button,
-        input,
-        select,
-        textarea {
-            font-family: var(--font-family);
+            margin: 0;
+            padding: 0;
         }
 
         body {
             min-height: 100vh;
             min-height: 100dvh;
-            margin: 0;
-            padding: 32px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8fafc;
+            background-image: radial-gradient(circle, rgba(148, 163, 184, 0.28) 1.2px, transparent 1.2px);
+            background-size: 22px 22px;
+            color: #1e293b;
+            position: relative;
             overflow-x: hidden;
-            display: grid;
-            place-items: center;
-            position: relative;
-            font-family: inherit;
-            font-size: 15px;
-            line-height: 1.5;
-            color: var(--md-on-surface);
-            background:
-                radial-gradient(circle, rgba(79, 111, 159, .14) 1px, transparent 1.2px) 0 0 / 24px 24px,
-                radial-gradient(circle at 12% 16%, rgba(211, 228, 248, .58) 0 7%, transparent 7.2%),
-                radial-gradient(circle at 88% 84%, rgba(226, 236, 248, .72) 0 10%, transparent 10.2%),
-                linear-gradient(145deg, #f8faff 0%, #fff 48%, #f2f6fb 100%);
+            padding: 20px;
         }
 
-        .background-shape {
+        /* Soft Pastel Background Blobs */
+        .bg-blob {
             position: fixed;
-            z-index: 0;
+            border-radius: 50%;
             pointer-events: none;
-            filter: blur(.2px);
-            opacity: .58;
+            z-index: 0;
+            filter: blur(1px);
         }
 
-        .background-shape--one {
+        .bg-blob--top-left {
+            width: 260px;
+            height: 260px;
+            top: 40px;
+            left: 60px;
+            background: #dbeafe;
+            opacity: 0.75;
+        }
+
+        .bg-blob--bottom-left {
+            width: 200px;
+            height: 200px;
+            bottom: -50px;
+            left: -40px;
+            background: #e2e8f0;
+            opacity: 0.6;
+        }
+
+        .bg-blob--top-right {
             width: 280px;
-            height: 190px;
-            top: -70px;
-            right: -85px;
-            border-radius: 42% 58% 62% 38% / 48% 36% 64% 52%;
-            background: var(--md-primary-container);
-            transform: rotate(12deg);
+            height: 280px;
+            top: -60px;
+            right: -60px;
+            background: #e0f2fe;
+            opacity: 0.7;
         }
 
-        .background-shape--two {
-            width: 230px;
-            height: 230px;
-            bottom: -115px;
-            left: -70px;
-            border-radius: 63% 37% 43% 57% / 42% 61% 39% 58%;
-            background: var(--md-secondary-container);
-            transform: rotate(-18deg);
+        .bg-blob--bottom-right {
+            width: 360px;
+            height: 360px;
+            bottom: -90px;
+            right: -80px;
+            background: #dbeafe;
+            opacity: 0.7;
         }
 
-        .container {
-            width: min(100%, 460px);
+        /* Central Login Card */
+        .card {
             position: relative;
-            z-index: 1;
-            padding: 38px 36px 28px;
-            border: 0;
-            border-radius: 36px;
-            background: #fff;
-            box-shadow: 0 1px 2px rgba(38, 60, 91, .025), 0 12px 36px rgba(38, 60, 91, .055);
-            backdrop-filter: blur(18px);
-        }
-
-        .brand-mark {
-            width: 88px;
-            height: 88px;
-            display: grid;
-            place-items: center;
-            margin: 0 auto 18px;
-            border-radius: 28px 28px 28px 12px;
-            background: #F8FAFC;
-            transform: rotate(-2deg);
-        }
-
-        .logo {
-            display: block;
-            width: auto;
-            height: 64px;
-            transform: rotate(2deg);
-            object-fit: contain;
-        }
-
-        .page-title {
-            display: block;
-            width: 100% !important;
-            margin: 12px 0 24px;
-            color: var(--md-on-surface);
-            font-size: clamp(21px, 5vw, 24px);
-            line-height: 1.2;
-            font-weight: 600;
-            letter-spacing: -.02em;
-            text-align: center !important;
-        }
-
-        .subtitle {
-            max-width: 360px;
-            margin: 0 auto 24px;
-            color: var(--md-on-surface-variant);
-            font-size: 14px;
-            line-height: 1.5;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 40px 36px 30px;
+            box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.02);
             text-align: center;
         }
 
-        /* Form Controls */
-        .login-form {
+        /* Logo */
+        .logo-wrap {
+            margin: 0 auto 16px;
+            display: inline-block;
+        }
+
+        .logo-img {
+            height: 64px;
+            width: auto;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* Typography */
+        .page-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 6px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 13.5px;
+            color: #64748b;
+            margin-bottom: 26px;
+        }
+
+        /* Action Buttons (matching screenshot) */
+        .actions-list {
             display: flex;
             flex-direction: column;
-            gap: 18px;
+            gap: 12px;
             width: 100%;
         }
 
-        .form-group {
+        .sso-btn {
+            position: relative;
             display: flex;
-            flex-direction: column;
-            gap: 7px;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 52px;
+            background: #f1f4f9;
+            border: 1px solid transparent;
+            border-radius: 14px;
+            color: #334155;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            user-select: none;
+        }
+
+        .sso-btn:hover {
+            background: #e8eef6;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        }
+
+        .sso-btn:active {
+            transform: scale(0.98);
+        }
+
+        .sso-btn .btn-icon {
+            position: absolute;
+            left: 18px;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sso-btn .btn-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Guest / Password Login Form (smooth reveal) */
+        .guest-form-container {
+            display: none;
             text-align: left;
+            animation: fadeIn 0.25s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .form-group {
+            margin-bottom: 14px;
         }
 
         .form-label {
-            font-size: 13px;
+            display: block;
+            font-size: 12.5px;
             font-weight: 600;
-            color: var(--md-on-surface);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            color: #475569;
+            margin-bottom: 6px;
         }
 
-        .input-wrapper {
+        .input-box {
             position: relative;
             display: flex;
             align-items: center;
@@ -185,266 +214,344 @@
 
         .input-icon {
             position: absolute;
-            left: 15px;
-            width: 19px;
-            height: 19px;
-            color: var(--md-outline);
+            left: 14px;
+            color: #94a3b8;
             pointer-events: none;
-            transition: color .2s;
+            display: flex;
+            align-items: center;
         }
 
         .form-input {
             width: 100%;
-            height: 48px;
-            padding: 10px 44px 10px 44px;
-            border-radius: 16px;
-            border: 1.5px solid var(--md-outline-variant);
+            height: 46px;
+            padding: 10px 42px 10px 40px;
+            border-radius: 12px;
+            border: 1.5px solid #e2e8f0;
             background: #f8fafc;
-            font-size: 14.5px;
-            color: var(--md-on-surface);
+            font-size: 14px;
+            color: #1e293b;
+            font-family: inherit;
             outline: none;
-            transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
-        }
-
-        .form-input::placeholder {
-            color: #94a3b8;
-            font-size: 13.5px;
+            transition: all 0.2s;
         }
 
         .form-input:focus {
             background: #ffffff;
-            border-color: var(--md-primary);
-            box-shadow: 0 0 0 3.5px rgba(79, 111, 159, .15);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
 
-        .form-input:focus + .input-icon,
-        .input-wrapper:focus-within .input-icon {
-            color: var(--md-primary);
-        }
-
-        .btn-toggle-eye {
+        .btn-eye {
             position: absolute;
             right: 12px;
             background: none;
             border: 0;
-            padding: 6px;
-            display: grid;
-            place-items: center;
-            color: var(--md-outline);
+            color: #94a3b8;
             cursor: pointer;
-            border-radius: 8px;
-            transition: color .15s, background-color .15s;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            border-radius: 6px;
         }
 
-        .btn-toggle-eye:hover {
-            color: var(--md-on-surface);
-            background: rgba(0, 0, 0, .04);
+        .btn-eye:hover {
+            color: #334155;
         }
 
         .btn-submit {
-            min-height: 50px;
-            margin-top: 6px;
-            padding: 12px 24px;
-            border: 0;
-            border-radius: 16px;
-            background: var(--md-primary);
+            width: 100%;
+            height: 48px;
+            background: #2563eb;
             color: #ffffff;
-            font-size: 15px;
+            border: 0;
+            border-radius: 12px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            box-shadow: 0 4px 14px rgba(79, 111, 159, .25);
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            transition: background-color .2s ease, box-shadow .2s ease, transform .15s ease;
+            margin-top: 18px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
         }
 
         .btn-submit:hover {
-            background: var(--md-primary-hover);
-            box-shadow: 0 6px 18px rgba(79, 111, 159, .32);
+            background: #1d4ed8;
             transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
         }
 
         .btn-submit:active {
-            transform: scale(.98);
+            transform: scale(0.98);
         }
 
-        .btn-submit:disabled {
-            opacity: .75;
-            cursor: not-allowed;
-            transform: none !important;
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            background: none;
+            border: none;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 14px;
+            cursor: pointer;
+            padding: 6px;
+            transition: color 0.15s;
         }
 
-        .error,
-        .message {
-            margin-bottom: 18px;
-            padding: 12px 16px;
-            border-radius: 14px;
-            font-size: 13.5px;
+        .btn-back:hover {
+            color: #1e293b;
+        }
+
+        /* Alert notifications */
+        .alert {
+            padding: 11px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.45;
+            margin-bottom: 16px;
             display: none;
-            line-height: 1.4;
+            text-align: left;
         }
 
-        .error {
-            background: var(--md-error-container);
-            color: var(--md-on-error-container);
+        .alert-error {
+            background: #fef2f2;
+            color: #991b1b;
             border: 1px solid #fecaca;
         }
 
-        .message {
+        .alert-info {
             background: #eff6ff;
             color: #1e40af;
-            border: 1px solid #dbeafe;
+            border: 1px solid #bfdbfe;
         }
 
-        .security-note {
-            margin: 22px 0 0;
+        /* Security Note Footer (matching screenshot) */
+        .security-footer {
+            margin-top: 26px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 7px;
-            color: var(--md-outline);
+            gap: 6px;
+            color: #94a3b8;
             font-size: 12px;
-            text-align: center;
         }
 
-        .security-note svg {
-            width: 16px;
-            height: 16px;
-            flex: 0 0 auto;
+        .security-footer svg {
+            width: 15px;
+            height: 15px;
+            stroke: #94a3b8;
         }
 
-        @media (max-width: 560px) {
-            body {
-                padding: 16px 12px;
-                align-items: start;
+        @media (max-width: 480px) {
+            .card {
+                padding: 32px 24px 24px;
+                border-radius: 24px;
             }
 
-            .container {
-                margin: auto 0;
-                padding: 30px 20px 24px;
-                border-radius: 28px;
+            .logo-img {
+                height: 56px;
             }
 
-            .brand-mark {
-                width: 76px;
-                height: 76px;
-                border-radius: 24px 24px 24px 10px;
+            .page-title {
+                font-size: 20px;
             }
 
-            .logo { height: 56px; }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            *,
-            *::before,
-            *::after {
-                scroll-behavior: auto !important;
-                transition-duration: .01ms !important;
+            .bg-blob {
+                opacity: 0.45;
             }
         }
     </style>
 </head>
 
 <body>
-    <div class="background-shape background-shape--one" aria-hidden="true"></div>
-    <div class="background-shape background-shape--two" aria-hidden="true"></div>
+    <!-- Background Pastel Blobs -->
+    <div class="bg-blob bg-blob--top-left" aria-hidden="true"></div>
+    <div class="bg-blob bg-blob--bottom-left" aria-hidden="true"></div>
+    <div class="bg-blob bg-blob--top-right" aria-hidden="true"></div>
+    <div class="bg-blob bg-blob--bottom-right" aria-hidden="true"></div>
 
-    <main class="container">
-        <!-- Brand Mark & Logo ĐNC -->
-        <div class="brand-mark">
-            <img class="logo" src="/static/logo_truong_only.png" alt="ĐNC — Đại học Nam Cần Thơ">
+    <main class="card">
+        <!-- Logo Trường Nam Cần Thơ -->
+        <div class="logo-wrap">
+            <img class="logo-img" src="/static/logo_truong_only.png" alt="DNC" onerror="this.src='/static/logo_truong.png'">
         </div>
 
-        <!-- Tiêu đề trang trung tính, bảo mật -->
-        <h3 class="page-title">Đăng nhập Hệ thống</h3>
+        <!-- Tiêu đề chính xác như ảnh -->
+        <h1 class="page-title">Đăng nhập vào SSO</h1>
+        <p class="subtitle">Kết nối an toàn với tài khoản của bạn</p>
 
-        <!-- Thông báo (Message & Error) -->
-        <div class="message" id="alertMessage"></div>
-        <div class="error" id="alertError"></div>
+        <!-- Thông báo lỗi / trạng thái -->
+        <div class="alert alert-error" id="alertError"></div>
+        <div class="alert alert-info" id="alertInfo"></div>
 
-        <!-- FORM 2 Ô INPUT: USERNAME VÀ PASSWORD -->
-        <form class="login-form" id="loginForm" onsubmit="submitFormLogin(event)">
-            <!-- 1. Tên đăng nhập (Username) -->
-            <div class="form-group">
-                <label class="form-label" for="inputUsername">Tên đăng nhập (Username):</label>
-                <div class="input-wrapper">
-                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- KHỐI 1: BỐ CỤC CHÍNH (Hiện mặc định như ảnh) -->
+        <div class="actions-list" id="ssoButtonsView">
+            <!-- Nút 1: Đăng nhập với Google -->
+            <a class="sso-btn" id="googleLoginBtn" href="/api/auth/google/login" onclick="handleGoogleLoginClick(event)">
+                <span class="btn-icon">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                    </svg>
+                </span>
+                <span>Đăng nhập với Google</span>
+            </a>
+
+            <!-- Nút 2: Đăng nhập bằng tài khoản khách (thay thế nút Facebook, bấm vào sẽ hiện form) -->
+            <button type="button" class="sso-btn" id="guestBtn" onclick="toggleGuestForm(true)">
+                <span class="btn-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                         <circle cx="12" cy="7" r="4"></circle>
                     </svg>
-                    <input 
-                        type="text" 
-                        id="inputUsername" 
-                        class="form-input" 
-                        placeholder="Nhập tên đăng nhập..." 
-                        autocomplete="username" 
-                        required
-                    >
-                </div>
-            </div>
-
-            <!-- 2. Mật khẩu (Password) -->
-            <div class="form-group">
-                <label class="form-label" for="inputPassword">Mật khẩu (Password):</label>
-                <div class="input-wrapper">
-                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                    </svg>
-                    <input 
-                        type="password" 
-                        id="inputPassword" 
-                        class="form-input" 
-                        placeholder="Nhập mật khẩu..." 
-                        autocomplete="current-password" 
-                        required
-                    >
-                    <button type="button" class="btn-toggle-eye" id="btnToggleEye" onclick="togglePasswordVisibility()" aria-label="Hiện/ẩn mật khẩu">
-                        <svg id="eyeIconOpen" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                        <svg id="eyeIconClosed" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                            <line x1="1" y1="1" x2="23" y2="23"></line>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Nút Đăng nhập -->
-            <button type="submit" class="btn-submit" id="btnSubmit">
-                <span id="btnSubmitIcon">🔓</span>
-                <span id="btnSubmitText">Đăng nhập</span>
+                </span>
+                <span>Đăng nhập bằng tài khoản khách</span>
             </button>
-        </form>
+        </div>
 
-        <!-- Security Note Footer -->
-        <p class="security-note">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M12 3 5 6v5c0 4.6 3 8.6 7 10 4-1.4 7-5.4 7-10V6l-7-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                <path d="m9.2 12 1.8 1.8 3.8-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- KHỐI 2: FORM TÀI KHOẢN & MẬT KHẨU (Chỉ hiện khi bấm nút tài khoản khách) -->
+        <div class="guest-form-container" id="guestFormView">
+            <form id="loginForm" onsubmit="submitFormLogin(event)">
+                <div class="form-group">
+                    <label class="form-label" for="inputUsername">Tên đăng nhập:</label>
+                    <div class="input-box">
+                        <span class="input-icon">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                        </span>
+                        <input type="text" id="inputUsername" class="form-input" placeholder="Tên tài khoản hoặc email..." autocomplete="username" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="inputPassword">Mật khẩu:</label>
+                    <div class="input-box">
+                        <span class="input-icon">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                            </svg>
+                        </span>
+                        <input type="password" id="inputPassword" class="form-input" placeholder="Nhập mật khẩu..." autocomplete="current-password" required>
+                        <button type="button" class="btn-eye" onclick="togglePasswordVisibility()" aria-label="Ẩn/Hiện mật khẩu">
+                            <svg id="eyeIconOpen" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            <svg id="eyeIconClosed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                <line x1="1" y1="1" x2="23" y2="23"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit" id="btnSubmit">
+                    <span id="btnSubmitText">Đăng nhập</span>
+                </button>
+            </form>
+
+            <button type="button" class="btn-back" onclick="toggleGuestForm(false)">
+                ← Quay lại lựa chọn đăng nhập
+            </button>
+        </div>
+
+        <!-- Footer bảo vệ bởi SSO (y hệt ảnh) -->
+        <div class="security-footer">
+            <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 3 5 6v5c0 4.6 3 8.6 7 10 4-1.4 7-5.4 7-10V6l-7-3Z" stroke-linejoin="round"/>
+                <path d="m9.2 12 1.8 1.8 3.8-4" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Phiên đăng nhập bảo mật bởi DNC AI Camera
-        </p>
+            <span>Phiên đăng nhập được bảo vệ bởi SSO</span>
+        </div>
     </main>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const userInput = document.getElementById('inputUsername');
-            if (userInput) userInput.focus();
+        let googleAuthConfig = { client_id: '', configured: false };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const params = new URLSearchParams(window.location.search);
+            const err = params.get('error');
+            const msg = params.get('message');
+            if (err) showAlert(decodeURIComponent(err), true);
+            if (msg) showAlert(decodeURIComponent(msg), false);
+
+            try {
+                const res = await fetch('/api/auth/google/config');
+                if (res.ok) {
+                    googleAuthConfig = await res.json();
+                    if (googleAuthConfig.client_id && typeof google !== 'undefined' && google.accounts) {
+                        initGoogleIdentity(googleAuthConfig.client_id);
+                    }
+                }
+            } catch (e) {
+                console.warn('[Google SSO] Config check:', e);
+            }
         });
 
-        function showMessage(msg, isError = false) {
-            const el = document.getElementById(isError ? 'alertError' : 'alertMessage');
-            const otherEl = document.getElementById(isError ? 'alertMessage' : 'alertError');
-            otherEl.style.display = 'none';
-            el.textContent = msg;
-            el.style.display = 'block';
-            if (!isError) {
-                setTimeout(() => { el.style.display = 'none'; }, 3000);
+        function initGoogleIdentity(clientId) {
+            try {
+                google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: handleGoogleCredentialResponse,
+                    auto_select: false,
+                    cancel_on_tap_outside: true
+                });
+                google.accounts.id.prompt();
+            } catch (e) {
+                console.warn('[Google SSO] Init failed:', e);
+            }
+        }
+
+        async function handleGoogleCredentialResponse(response) {
+            if (!response || !response.credential) return;
+            showAlert('Đang xác thực tài khoản Google...', false);
+            try {
+                const res = await fetch('/api/auth/google/verify-credential', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential: response.credential })
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    onAuthSuccess(data.username, data.role, data.can_config_nvr);
+                } else {
+                    showAlert(data.detail || 'Xác thực Google thất bại.', true);
+                }
+            } catch (err) {
+                showAlert('Lỗi kết nối máy chủ khi xác thực Google: ' + err.message, true);
+            }
+        }
+
+        function handleGoogleLoginClick(e) {
+            if (!googleAuthConfig.configured) {
+                e.preventDefault();
+                showAlert('Chưa cấu hình GOOGLE_CLIENT_ID & SECRET. Vui lòng kiểm tra file cấu hình .env.', true);
+            }
+        }
+
+        function toggleGuestForm(showForm) {
+            const ssoView = document.getElementById('ssoButtonsView');
+            const formView = document.getElementById('guestFormView');
+            clearAlert();
+
+            if (showForm) {
+                ssoView.style.display = 'none';
+                formView.style.display = 'block';
+                const userInput = document.getElementById('inputUsername');
+                if (userInput) userInput.focus();
+            } else {
+                formView.style.display = 'none';
+                ssoView.style.display = 'flex';
             }
         }
 
@@ -469,17 +576,15 @@
             const pass = (document.getElementById('inputPassword')?.value || '').trim();
             const submitBtn = document.getElementById('btnSubmit');
             const submitText = document.getElementById('btnSubmitText');
-            const submitIcon = document.getElementById('btnSubmitIcon');
 
             if (!user || !pass) {
-                showMessage('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.', true);
+                showAlert('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.', true);
                 return;
             }
 
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitText.textContent = 'Đang xác thực...';
-                submitIcon.textContent = '⏳';
             }
 
             try {
@@ -493,7 +598,7 @@
                 if (resp.ok) {
                     onAuthSuccess(user, res.role, res.can_config_nvr);
                 } else {
-                    showMessage(res.detail || 'Sai tên đăng nhập hoặc mật khẩu.', true);
+                    showAlert(res.detail || 'Sai tên đăng nhập hoặc mật khẩu.', true);
                     const passInput = document.getElementById('inputPassword');
                     if (passInput) {
                         passInput.select();
@@ -501,14 +606,39 @@
                     }
                 }
             } catch (err) {
-                showMessage('Lỗi kết nối máy chủ: ' + err.message, true);
+                showAlert('Lỗi kết nối máy chủ: ' + err.message, true);
             } finally {
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitText.textContent = 'Đăng nhập';
-                    submitIcon.textContent = '🔓';
                 }
             }
+        }
+
+        function showAlert(msg, isError = false) {
+            const errEl = document.getElementById('alertError');
+            const infoEl = document.getElementById('alertInfo');
+            if (isError) {
+                if (infoEl) infoEl.style.display = 'none';
+                if (errEl) {
+                    errEl.textContent = msg;
+                    errEl.style.display = 'block';
+                }
+            } else {
+                if (errEl) errEl.style.display = 'none';
+                if (infoEl) {
+                    infoEl.textContent = msg;
+                    infoEl.style.display = 'block';
+                    setTimeout(() => { infoEl.style.display = 'none'; }, 4000);
+                }
+            }
+        }
+
+        function clearAlert() {
+            const errEl = document.getElementById('alertError');
+            const infoEl = document.getElementById('alertInfo');
+            if (errEl) errEl.style.display = 'none';
+            if (infoEl) infoEl.style.display = 'none';
         }
 
         function onAuthSuccess(user, role, can_config_nvr) {
@@ -517,31 +647,20 @@
             sessionStorage.setItem('ncc_user_role', role || (can_config_nvr ? 'admin' : 'viewer'));
 
             if (can_config_nvr) {
-                // Chỉ tài khoản admin mới được cấp quyền Cấu hình NVR
                 sessionStorage.setItem('ncc_config_auth', 'true');
-                sessionStorage.removeItem('ncc_auto_open_config');
-                showMessage('Xác thực Quản trị viên thành công! Đang vào hệ thống...', false);
             } else {
-                // Tài khoản khác: Ẩn hoàn toàn cấu hình NVR, chỉ vào xem camera
                 sessionStorage.removeItem('ncc_config_auth');
-                sessionStorage.removeItem('ncc_auto_open_config');
-                showMessage('Đăng nhập thành công! Đang chuyển đến màn hình giám sát...', false);
             }
 
+            showAlert('Đăng nhập thành công! Đang chuyển hướng...', false);
             setTimeout(() => {
                 window.location.href = '/search';
-            }, 400);
+            }, 300);
         }
 
         window.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                const err = document.getElementById('alertError');
-                if (err) err.style.display = 'none';
-                const passInput = document.getElementById('inputPassword');
-                if (passInput) {
-                    passInput.value = '';
-                    passInput.focus();
-                }
+                toggleGuestForm(false);
             }
         });
     </script>

@@ -78,3 +78,5 @@ cosmos_code_base/prompts/profiles/custom_*.txt
 
 # Local analysis folder
 grok-bot-analysis/
+quasar-admin/
+kehoachadmin.md

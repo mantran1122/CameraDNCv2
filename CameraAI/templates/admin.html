@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trung tâm Quản trị Quasar - Camera AI DNC</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Material+Icons&family=Material+Icons+Outlined&display=swap" rel="stylesheet">
+    
+    <!-- Quasar CSS (Local Vendor with CDN fallback) -->
+    <link rel="stylesheet" href="/static/vendor/quasar/quasar.prod.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/quasar@2.16.0/dist/quasar.prod.css';">
+    
+    <!-- Custom Admin Theme Styling (Metropolis Cyan Dark Palette) -->
+    <style>
+        [v-cloak] {
+            display: none !important;
+        }
+
+        :root {
+            --q-primary: #00d2d3;
+            --q-secondary: #0abde3;
+            --q-accent: #5f27cd;
+            --q-dark: #0a1120;
+            --q-dark-page: #070c17;
+            --q-positive: #10b981;
+            --q-negative: #ef4444;
+            --q-info: #0ea5e9;
+            --q-warning: #f59e0b;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--q-dark-page);
+            color: #e2e8f0;
+            margin: 0;
+            padding: 0;
+        }
+
+        .bg-metropolis-header {
+            background: linear-gradient(135deg, #0d1b2a 0%, #112240 100%) !important;
+            border-bottom: 1px solid rgba(0, 210, 211, 0.2);
+        }
+
+        .bg-metropolis-drawer {
+            background: #0a1222 !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }
+
+        .bg-metropolis-card {
+            background: #111d33 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .bg-metropolis-card:hover {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        .stat-card {
+            border-left: 4px solid var(--q-primary);
+        }
+
+        .stat-card.stat-green { border-left-color: #10b981; }
+        .stat-card.stat-purple { border-left-color: #8b5cf6; }
+        .stat-card.stat-amber { border-left-color: #f59e0b; }
+        .stat-card.stat-cyan { border-left-color: #00d2d3; }
+
+        .drawer-item-active {
+            background: linear-gradient(90deg, rgba(0, 210, 211, 0.18) 0%, rgba(0, 210, 211, 0.04) 100%) !important;
+            color: #00d2d3 !important;
+            font-weight: 700;
+            border-left: 4px solid #00d2d3;
+        }
+
+        .camera-matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 10px;
+            max-height: 480px;
+            overflow-y: auto;
+            padding: 10px 4px;
+        }
+
+        .camera-matrix-item {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .camera-matrix-item:hover {
+            border-color: rgba(0, 210, 211, 0.5);
+            background: rgba(0, 210, 211, 0.06);
+        }
+
+        .camera-matrix-item.selected {
+            background: rgba(0, 210, 211, 0.15);
+            border-color: #00d2d3;
+            box-shadow: 0 0 10px rgba(0, 210, 211, 0.2);
+        }
+
+        .q-table__card {
+            background: #111d33 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+        }
+
+        .q-table thead tr th {
+            background: #0d1728 !important;
+            color: #94a3b8;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.78rem;
+            letter-spacing: 0.5px;
+        }
+
+        .q-table tbody tr:hover {
+            background: rgba(0, 210, 211, 0.04) !important;
+        }
+
+        /* Scrollbar aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #070c17;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+
+        .code-preview {
+            background: #070c17;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.82rem;
+            color: #38bdf8;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .pulse-online {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #10b981;
+            box-shadow: 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulse-green 2s infinite;
+        }
+
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+    </style>
+</head>
+<body class="body--dark">
+    <div id="q-app" v-cloak>
+    {% raw %}
+        <q-layout view="lHh Lpr lFf">
+            
+            <!-- HEADER -->
+            <q-header elevated class="bg-metropolis-header text-white">
+                <q-toolbar class="q-py-sm">
+                    <q-btn flat dense round icon="menu" aria-label="Menu" @click="leftDrawerOpen = !leftDrawerOpen"></q-btn>
+
+                    <q-avatar size="36px" class="q-ml-sm q-mr-xs">
+                        <img src="/static/logo_don.png" alt="Logo DNC">
+                    </q-avatar>
+
+                    <q-toolbar-title class="row items-center no-wrap">
+                        <span class="text-weight-bolder text-cyan-4 text-h6 q-mr-sm">Camera AI DNC</span>
+                        <q-badge color="cyan-9" text-color="white" label="CONTROL CENTER" class="q-mr-md text-weight-bold"></q-badge>
+                        <div class="row items-center gt-sm q-gutter-xs">
+                            <span :class="nvrStatus.isDemo ? 'text-amber' : (nvrStatus.connected ? 'text-positive' : 'text-negative')" class="text-caption text-weight-medium">
+                                <span class="pulse-online q-mr-xs" v-if="nvrStatus.connected && !nvrStatus.isDemo"></span>
+                                <q-icon name="videocam" class="q-mr-xs"></q-icon>
+                                {{ nvrStatus.statusText }}
+                            </span>
+                        </div>
+                    </q-toolbar-title>
+
+                    <q-space></q-space>
+
+                    <!-- Header Quick Actions -->
+                    <div class="q-gutter-sm row items-center no-wrap">
+                        <!-- Return to Live / Search -->
+                        <q-btn flat dense color="cyan-3" icon="live_tv" label="Xem Trực Tiếp" href="/" class="gt-xs">
+                            <q-tooltip>Trở về Màn hình Giám sát Camera</q-tooltip>
+                        </q-btn>
+                        
+                        <q-btn flat dense color="amber-3" icon="search" label="Tra cứu AI" href="/search" class="gt-xs">
+                            <q-tooltip>Mở Không gian Tìm kiếm Thị giác AI</q-tooltip>
+                        </q-btn>
+
+                        <!-- Active Sessions Chip -->
+                        <q-chip clickable @click="activeTab = 'security'" color="blue-grey-9" text-color="cyan-3" icon="devices" class="q-ma-none">
+                            <b>{{ activeSessions.length }}</b>&nbsp;máy online
+                            <q-tooltip>Nhấn để xem IP và các phiên đang đăng nhập</q-tooltip>
+                        </q-chip>
+
+                        <!-- Admin Profile Dropdown -->
+                        <q-btn-dropdown flat dense no-caps>
+                            <template v-slot:label>
+                                <q-avatar size="30px" color="cyan-8" text-color="white" class="q-mr-xs">
+                                    <q-icon name="admin_panel_settings"></q-icon>
+                                </q-avatar>
+                                <span class="text-weight-bold text-white gt-xs">{{ adminUsername }}</span>
+                            </template>
+                            <q-list class="bg-metropolis-card text-white" style="min-width: 220px;">
+                                <q-item>
+                                    <q-item-section avatar>
+                                        <q-icon name="verified_user" color="cyan"></q-icon>
+                                    </q-item-section>
+                                    <q-item-section>
+                                        <q-item-label class="text-weight-bold">{{ adminUsername }}</q-item-label>
+                                        <q-item-label caption class="text-cyan-3">Quản trị viên Hệ thống</q-item-label>
+                                    </q-item-section>
+                                </q-item>
+                                <q-separator dark></q-separator>
+                                <q-item clickable v-close-popup @click="openChangeAdminPassDialog">
+                                    <q-item-section avatar><q-icon name="key" color="amber"></q-icon></q-item-section>
+                                    <q-item-section>Đổi mật khẩu Quản trị</q-item-section>
+                                </q-item>
+                                <q-item clickable v-close-popup href="/admin/database" target="_blank">
+                                    <q-item-section avatar><q-icon name="storage" color="primary"></q-icon></q-item-section>
+                                    <q-item-section>Tra cứu CSDL SQL</q-item-section>
+                                </q-item>
+                                <q-item clickable v-close-popup href="/admin/data-health" target="_blank">
+                                    <q-item-section avatar><q-icon name="monitor_heart" color="positive"></q-icon></q-item-section>
+                                    <q-item-section>Kiểm tra Data Health</q-item-section>
+                                </q-item>
+                                <q-separator dark></q-separator>
+                                <q-item clickable v-close-popup @click="logout" class="text-negative">
+                                    <q-item-section avatar><q-icon name="logout" color="negative"></q-icon></q-item-section>
+                                    <q-item-section>Đăng xuất Quản trị</q-item-section>
+                                </q-item>
+                            </q-list>
+                        </q-btn-dropdown>
+                    </div>
+                </q-toolbar>
+            </q-header>
+
+            <!-- SIDEBAR DRAWER -->
+            <q-drawer v-model="leftDrawerOpen" show-if-above bordered class="bg-metropolis-drawer text-white" :width="280">
+                <div class="q-pa-md text-center" style="background: rgba(0, 210, 211, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <q-avatar size="64px" color="blue-grey-10" text-color="cyan-4" class="q-mb-sm shadow-3">
+                        <q-icon name="shield" size="36px"></q-icon>
+                    </q-avatar>
+                    <div class="text-subtitle1 text-weight-bold text-white">Quản Trị Viên DNC</div>
+                    <div class="text-caption text-cyan-3">Quyền hạn Cấp 1 (Full Access)</div>
+                </div>
+
+                <q-list padding class="text-grey-4">
+                    <q-item-label header class="text-uppercase text-weight-bold text-cyan-5 text-caption">
+                        CÁC PHÂN HỆ QUẢN TRỊ
+                    </q-item-label>
+
+                    <q-item clickable v-ripple :active="activeTab === 'nvr'" active-class="drawer-item-active" @click="activeTab = 'nvr'">
+                        <q-item-section avatar>
+                            <q-icon name="settings_input_composite" size="24px"></q-icon>
+                        </q-item-section>
+                        <q-item-section>
+                            <q-item-label class="text-weight-medium">1. Cấu hình NVR & Lưu trữ</q-item-label>
+                            <q-item-label caption class="text-grey-5">Đầu ghi Dahua & NAS</q-item-label>
+                        </q-item-section>
+                    </q-item>
+
+                    <q-item clickable v-ripple :active="activeTab === 'users'" active-class="drawer-item-active" @click="activeTab = 'users'">
+                        <q-item-section avatar>
+                            <q-icon name="manage_accounts" size="24px"></q-icon>
+                        </q-item-section>
+                        <q-item-section>
+                            <q-item-label class="text-weight-medium">2. Tài khoản & Quyền Cam</q-item-label>
+                            <q-item-label caption class="text-grey-5">Ma trận RBAC 32 Kênh</q-item-label>
+                        </q-item-section>
+                        <q-item-section side>
+                            <q-badge color="cyan-8" :label="systemUsers.length"></q-badge>
+                        </q-item-section>
+                    </q-item>
+
+                    <q-item clickable v-ripple :active="activeTab === 'security'" active-class="drawer-item-active" @click="activeTab = 'security'">
+                        <q-item-section avatar>
+                            <q-icon name="security" size="24px"></q-icon>
+                        </q-item-section>
+                        <q-item-section>
+                            <q-item-label class="text-weight-medium">3. Giám sát IP & Phiên</q-item-label>
+                            <q-item-label caption class="text-grey-5">Audit Log & Mở khóa IP</q-item-label>
+                        </q-item-section>
+                        <q-item-section side v-if="lockouts.length > 0">
+                            <q-badge color="negative" :label="lockouts.length" rounded></q-badge>
+                        </q-item-section>
+                    </q-item>
+
+                    <q-item clickable v-ripple :active="activeTab === 'ai'" active-class="drawer-item-active" @click="activeTab = 'ai'">
+                        <q-item-section avatar>
+                            <q-icon name="psychology" size="24px"></q-icon>
+                        </q-item-section>
+                        <q-item-section>
+                            <q-item-label class="text-weight-medium">4. Cấu hình AI & Prompt</q-item-label>
+                            <q-item-label caption class="text-grey-5">Server VLM & Cosmos Prompt</q-item-label>
+                        </q-item-section>
+                    </q-item>
+
+                    <q-separator dark class="q-my-md"></q-separator>
+
+                    <q-item-label header class="text-uppercase text-weight-bold text-cyan-5 text-caption">
+                        CÔNG CỤ HỆ THỐNG
+                    </q-item-label>
+
+                    <q-item clickable v-ripple href="/admin/database" target="_blank">
+                        <q-item-section avatar><q-icon name="table_chart"></q-icon></q-item-section>
+                        <q-item-section>Quản lý CSDL SQLite</q-item-section>
+                        <q-item-section side><q-icon name="open_in_new" size="16px"></q-icon></q-item-section>
+                    </q-item>
+
+                    <q-item clickable v-ripple href="/admin/data-health" target="_blank">
+                        <q-item-section avatar><q-icon name="monitor_heart"></q-icon></q-item-section>
+                        <q-item-section>Giám sát Sức khỏe Data</q-item-section>
+                        <q-item-section side><q-icon name="open_in_new" size="16px"></q-icon></q-item-section>
+                    </q-item>
+
+                    <q-item clickable v-ripple href="/" target="_blank">
+                        <q-item-section avatar><q-icon name="dashboard"></q-icon></q-item-section>
+                        <q-item-section>Màn hình Live Camera</q-item-section>
+                        <q-item-section side><q-icon name="launch" size="16px"></q-icon></q-item-section>
+                    </q-item>
+                </q-list>
+
+                <div class="absolute-bottom q-pa-md text-caption text-grey-6 text-center" style="border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                    CameraDNCv2 Enterprise &copy; 2026<br>Phiên bản Quasar Admin v2.0
+                </div>
+            </q-drawer>
+
+            <!-- MAIN CONTENT AREA -->
+            <q-page-container>
+                <q-page class="q-pa-lg">
+
+                    <!-- TOP KPI SUMMARY CARDS (QUASAR ADMIN STYLE) -->
+                    <div class="row q-col-gutter-md q-mb-lg">
+                        <!-- Card 1: NVR Status -->
+                        <div class="col-12 col-sm-6 col-md-3">
+                            <q-card class="bg-metropolis-card stat-card stat-cyan text-white q-pa-sm">
+                                <q-card-section class="row items-center no-wrap">
+                                    <q-avatar size="48px" font-size="28px" color="cyan-10" text-color="cyan-3" icon="videocam"></q-avatar>
+                                    <div class="q-ml-md">
+                                        <div class="text-caption text-grey-4 text-uppercase">Đầu ghi NVR</div>
+                                        <div class="text-h6 text-weight-bold">{{ nvrStatus.isDemo ? 'Giả lập' : (nvrStatus.connected ? 'Trực tuyến' : 'Ngoại tuyến') }}</div>
+                                        <div class="text-caption text-cyan-3">{{ nvrForm.nvr_host }}:{{ nvrForm.nvr_port }}</div>
+                                    </div>
+                                </q-card-section>
+                            </q-card>
+                        </div>
+
+                        <!-- Card 2: Camera Matrix -->
+                        <div class="col-12 col-sm-6 col-md-3">
+                            <q-card class="bg-metropolis-card stat-card stat-green text-white q-pa-sm">
+                                <q-card-section class="row items-center no-wrap">
+                                    <q-avatar size="48px" font-size="28px" color="green-10" text-color="green-3" icon="grid_view"></q-avatar>
+                                    <div class="q-ml-md">
+                                        <div class="text-caption text-grey-4 text-uppercase">Hệ thống Camera</div>
+                                        <div class="text-h6 text-weight-bold">{{ allCameras.length }} Kênh Đầu Ghi</div>
+                                        <div class="text-caption text-positive">{{ activeChannelsCount }} kênh đang phát</div>
+                                    </div>
+                                </q-card-section>
+                            </q-card>
+                        </div>
+
+                        <!-- Card 3: Active Client Sessions -->
+                        <div class="col-12 col-sm-6 col-md-3">
+                            <q-card class="bg-metropolis-card stat-card stat-purple text-white q-pa-sm">
+                                <q-card-section class="row items-center no-wrap">
+                                    <q-avatar size="48px" font-size="28px" color="deep-purple-10" text-color="purple-3" icon="devices"></q-avatar>
+                                    <div class="q-ml-md">
+                                        <div class="text-caption text-grey-4 text-uppercase">Thiết Bị Đang Vào</div>
+                                        <div class="text-h6 text-weight-bold">{{ activeSessions.length }} Phiên IP</div>
+                                        <div class="text-caption text-purple-3">{{ systemUsers.length }} người dùng cấu hình</div>
+                                    </div>
+                                </q-card-section>
+                            </q-card>
+                        </div>
+
+                        <!-- Card 4: AI & Security Status -->
+                        <div class="col-12 col-sm-6 col-md-3">
+                            <q-card class="bg-metropolis-card stat-card stat-amber text-white q-pa-sm">
+                                <q-card-section class="row items-center no-wrap">
+                                    <q-avatar size="48px" font-size="28px" color="amber-10" text-color="amber-3" icon="bolt"></q-avatar>
+                                    <div class="q-ml-md">
+                                        <div class="text-caption text-grey-4 text-uppercase">Mô hình AI Thị Giác</div>
+                                        <div class="text-h6 text-weight-bold">{{ geminiConfig.selected_model || 'GLM-5.3-Flash' }}</div>
+                                        <div class="text-caption text-amber-3">Cosmos: {{ cosmosPrompt.selected || 'student_affairs' }}</div>
+                                    </div>
+                                </q-card-section>
+                            </q-card>
+                        </div>
+                    </div>
+
+                    <!-- TAB 1: NVR & LƯU TRỮ (NVR & STORAGE) -->
+                    <div v-show="activeTab === 'nvr'">
+                        <div class="row q-col-gutter-lg">
+                            <!-- NVR Connection Form -->
+                            <div class="col-12 col-lg-7">
+                                <q-card class="bg-metropolis-card text-white">
+                                    <q-card-section class="row items-center justify-between">
+                                        <div class="text-h6 text-weight-bold text-cyan-3">
+                                            <q-icon name="dns" class="q-mr-sm"></q-icon>
+                                            Cấu hình Kết nối Đầu ghi Dahua NVR (WAN / LAN)
+                                        </div>
+                                        <q-badge :color="nvrForm.demo_mode ? 'amber-9' : 'positive'" :label="nvrForm.demo_mode ? 'Chế độ Demo Giả lập' : 'Kết nối Trực tiếp NVR'"></q-badge>
+                                    </q-card-section>
+
+                                    <q-separator dark></q-separator>
+
+                                    <q-card-section>
+                                        <q-form @submit.prevent="saveNVRConfig" class="q-gutter-md">
+                                            <div class="row q-col-gutter-md">
+                                                <div class="col-12 col-md-8">
+                                                    <q-input v-model="nvrForm.nvr_host" label="Địa chỉ IP / Tên miền DDNS NVR *" dark outlined dense :rules="[val => !!val || 'Không được để trống']">
+                                                        <template v-slot:prepend><q-icon name="public" color="cyan"></q-icon></template>
+                                                    </q-input>
+                                                </div>
+                                                <div class="col-12 col-md-4">
+                                                    <q-input v-model.number="nvrForm.nvr_port" type="number" label="Cổng HTTP / HTTPS *" dark outlined dense :rules="[val => !!val || 'Không được để trống']">
+                                                        <template v-slot:prepend><q-icon name="router" color="cyan"></q-icon></template>
+                                                    </q-input>
+                                                </div>
+                                            </div>
+
+                                            <div class="row q-col-gutter-md">
+                                                <div class="col-12 col-md-4">
+                                                    <q-input v-model.number="nvrForm.rtsp_port" type="number" label="Cổng RTSP Video (554) *" dark outlined dense>
+                                                        <template v-slot:prepend><q-icon name="stream" color="cyan"></q-icon></template>
+                                                    </q-input>
+                                                </div>
+                                                <div class="col-12 col-md-4">
+                                                    <q-input v-model="nvrForm.nvr_user" label="Tài khoản NVR *" dark outlined dense :rules="[val => !!val || 'Không được để trống']">
+                                                        <template v-slot:prepend><q-icon name="person" color="cyan"></q-icon></template>
+                                                    </q-input>
+                                                </div>
+                                                <div class="col-12 col-md-4">
+                                                    <q-input v-model="nvrForm.nvr_password" :type="showNvrPassword ? 'text' : 'password'" label="Mật khẩu NVR" dark outlined dense>
+                                                        <template v-slot:prepend><q-icon name="lock" color="cyan"></q-icon></template>
+                                                        <template v-slot:append>
+                                                            <q-icon :name="showNvrPassword ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showNvrPassword = !showNvrPassword"></q-icon>
+                                                        </template>
+                                                    </q-input>
+                                                </div>
+                                            </div>
+
+                                            <div class="row items-center q-gutter-md q-pt-sm">
+                                                <q-toggle v-model="nvrForm.use_https" label="Bật giao thức bảo mật HTTPS (SSL/TLS)" color="cyan" dark></q-toggle>
+                                                <q-toggle v-model="nvrForm.demo_mode" label="Chế độ Demo Giả lập (Không cần NVR thật)" color="amber" dark></q-toggle>
+                                            </div>
+
+                                            <!-- Test Result Alert Box -->
+                                            <div v-if="testResult" class="q-mt-md">
+                                                <q-banner rounded :class="testResult.success ? 'bg-positive text-white' : 'bg-negative text-white'">
+                                                    <template v-slot:avatar>
+                                                        <q-icon :name="testResult.success ? 'check_circle' : 'error'"></q-icon>
+                                                    </template>
+                                                    <div class="text-weight-bold">{{ testResult.message }}</div>
+                                                    <div v-if="testResult.device_model" class="text-caption q-mt-xs">
+                                                        Model: <b>{{ testResult.device_model }}</b> | Serial: <b>{{ testResult.serial_number }}</b> | Firmware: <b>{{ testResult.firmware }}</b>
+                                                    </div>
+                                                </q-banner>
+                                            </div>
+
+                                            <div class="row justify-between items-center q-pt-md">
+                                                <q-btn outline color="cyan-3" icon="network_check" label="Kiểm tra Kết nối (Test NVR)" :loading="testingNVR" @click="testNVRConnection"></q-btn>
+                                                <q-btn unelevated color="cyan-8" icon="save" label="Lưu Cấu Hình NVR" type="submit" :loading="savingNVR"></q-btn>
+                                            </div>
+                                        </q-form>
+                                    </q-card-section>
+                                </q-card>
+                            </div>
+
+                            <!-- Listener Service & NAS Retention Purge -->
+                            <div class="col-12 col-lg-5">
+                                <!-- Service Status Card -->
+                                <q-card class="bg-metropolis-card text-white q-mb-md">
+                                    <q-card-section>
+                                        <div class="text-subtitle1 text-weight-bold text-cyan-3">
+                                            <q-icon name="hub" class="q-mr-sm"></q-icon>
+                                            Trạng thái Tiến trình Lắng nghe (Dahua NVR Listener)
+                                        </div>
+                                    </q-card-section>
+                                    <q-separator dark></q-separator>
+                                    <q-card-section class="q-gutter-sm">
+                                        <div class="row justify-between items-center">
+                                            <span class="text-grey-4">Tiến trình bắt sự kiện:</span>
+                                            <q-badge :color="listenerStatus.listener?.is_running ? 'positive' : 'negative'" :label="listenerStatus.listener?.is_running ? 'Đang chạy (Online)' : 'Dừng (Offline)'"></q-badge>
+                                        </div>
+                                        <div class="row justify-between items-center">
+                                            <span class="text-grey-4">Hàng đợi cắt clip (Worker):</span>
+                                            <span class="text-weight-bold text-cyan-3">{{ listenerStatus.queue_size || 0 }} clip đang đợi</span>
+                                        </div>
+                                        <div class="row justify-between items-center">
+                                            <span class="text-grey-4">Lưu trữ Synology NAS:</span>
+                                            <q-badge color="primary" :label="listenerStatus.nas_health?.backend || 'Local Storage'"></q-badge>
+                                        </div>
+                                        <div class="q-pt-sm">
+                                            <q-btn outline dense color="cyan-4" icon="refresh" label="Làm mới trạng thái Service" @click="fetchListenerStatus" class="full-width"></q-btn>
+                                        </div>
+                                    </q-card-section>
+                                </q-card>
+
+                                <!-- Storage Retention Card -->
+                                <q-card class="bg-metropolis-card text-white">
+                                    <q-card-section>
+                                        <div class="text-subtitle1 text-weight-bold text-amber-3">
+                                            <q-icon name="cleaning_services" class="q-mr-sm"></q-icon>
+                                            Quản lý Chu kỳ Lưu trữ & Dọn rác (Retention Purge)
+                                        </div>
+                                    </q-card-section>
+                                    <q-separator dark></q-separator>
+                                    <q-card-section>
+                                        <div class="text-caption text-grey-4 q-mb-md">
+                                            Hệ thống tự động lưu trữ video và metadata trong 30 ngày. Bạn có thể kích hoạt dọn dẹp các clip và dữ liệu đã quá hạn ngay lập tức để giải phóng dung lượng đĩa.
+                                        </div>
+                                        <div class="row items-center q-col-gutter-sm">
+                                            <div class="col-8">
+                                                <q-input v-model.number="retentionDays" type="number" label="Thời gian giữ (ngày)" dark outlined dense></q-input>
+                                            </div>
+                                            <div class="col-4">
+                                                <q-btn unelevated color="amber-9" text-color="white" icon="delete_sweep" label="Dọn dẹp" class="full-width" @click="confirmPurgeStorage" :loading="purgingStorage"></q-btn>
+                                            </div>
+                                        </div>
+                                        <div v-if="purgeResult" class="q-mt-sm text-caption text-positive">
+                                            ✅ Đã dọn dẹp: {{ purgeResult.deleted_events || 0 }} sự kiện, {{ purgeResult.deleted_clips || 0 }} file clip.
+                                        </div>
+                                    </q-card-section>
+                                </q-card>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: QUẢN LÝ TÀI KHOẢN & MA TRẬN CAMERA (USER & RBAC) -->
+                    <div v-show="activeTab === 'users'">
+                        <q-card class="bg-metropolis-card text-white">
+                            <q-card-section class="row items-center justify-between">
+                                <div>
+                                    <div class="text-h6 text-weight-bold text-cyan-3">
+                                        <q-icon name="group" class="q-mr-sm"></q-icon>
+                                        Danh sách Tài khoản & Phân quyền Kênh Camera (Channel RBAC)
+                                    </div>
+                                    <div class="text-caption text-grey-4">
+                                        Tài khoản con chỉ xem được camera và sự kiện nằm trong danh sách được cấp phép.
+                                    </div>
+                                </div>
+                                <div class="row q-gutter-sm">
+                                    <q-btn outline color="cyan-3" icon="refresh" label="Tải lại" @click="fetchUsers"></q-btn>
+                                    <q-btn unelevated color="cyan-8" icon="person_add" label="Thêm Tài khoản Mới" @click="openCreateUserDialog"></q-btn>
+                                </div>
+                            </q-card-section>
+
+                            <q-separator dark></q-separator>
+
+                            <!-- USERS TABLE -->
+                            <q-card-section class="q-pa-none">
+                                <q-table
+                                    :rows="systemUsers"
+                                    :columns="userColumns"
+                                    row-key="username"
+                                    dark
+                                    flat
+                                    :pagination="{ rowsPerPage: 10 }"
+                                    no-data-label="Chưa có người dùng nào được tạo"
+                                >
+                                    <template v-slot:body-cell-username="props">
+                                        <q-td :props="props">
+                                            <div class="row items-center no-wrap">
+                                                <q-avatar size="28px" class="q-mr-sm" v-if="props.row.avatar_url">
+                                                    <img :src="props.row.avatar_url" referrerpolicy="no-referrer">
+                                                </q-avatar>
+                                                <q-avatar size="28px" class="q-mr-sm" :color="props.row.auth_provider === 'google' ? 'red-9' : 'blue-grey-8'" text-color="white" :icon="props.row.auth_provider === 'google' ? 'mail' : 'person'" v-else></q-avatar>
+                                                <div>
+                                                    <div class="text-weight-bold text-white">{{ props.row.username }}</div>
+                                                    <div class="row items-center q-gutter-xs">
+                                                        <q-badge v-if="props.row.auth_provider === 'google'" color="red-9" text-color="white" size="xs">
+                                                            Google SSO
+                                                        </q-badge>
+                                                        <q-badge v-else color="blue-grey-8" text-color="grey-3" size="xs">
+                                                            Nội bộ
+                                                        </q-badge>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </q-td>
+                                    </template>
+
+                                    <template v-slot:body-cell-role="props">
+                                        <q-td :props="props">
+                                            <q-badge :color="props.row.role === 'admin' ? 'negative' : (props.row.role === 'operator' ? 'primary' : 'teal')" :label="props.row.role.toUpperCase()"></q-badge>
+                                        </q-td>
+                                    </template>
+
+                                    <template v-slot:body-cell-channels="props">
+                                        <q-td :props="props">
+                                            <div v-if="props.row.role === 'admin' || props.row.allowed_channels.includes('*')">
+                                                <q-chip color="cyan-9" text-color="white" dense icon="star">
+                                                    Toàn quyền (Tất cả 32 Kênh)
+                                                </q-chip>
+                                            </div>
+                                            <div v-else-if="props.row.allowed_channels.length === 0">
+                                                <q-chip color="red-10" text-color="red-3" dense icon="block">
+                                                    Chưa cấp kênh nào
+                                                </q-chip>
+                                            </div>
+                                            <div v-else class="row items-center q-gutter-xs">
+                                                <q-chip color="blue-grey-9" text-color="cyan-3" dense icon="videocam">
+                                                    {{ props.row.allowed_channels.length }} Kênh Camera
+                                                </q-chip>
+                                                <span class="text-caption text-grey-5 gt-sm">
+                                                    (Kênh {{ props.row.allowed_channels.slice(0, 6).join(', ') }}{{ props.row.allowed_channels.length > 6 ? '...' : '' }})
+                                                </span>
+                                            </div>
+                                        </q-td>
+                                    </template>
+
+                                    <template v-slot:body-cell-actions="props">
+                                        <q-td :props="props" class="q-gutter-xs">
+                                            <q-btn flat dense round color="cyan" icon="edit" @click="openEditUserDialog(props.row)">
+                                                <q-tooltip>Chỉnh sửa thông tin & Phân quyền camera</q-tooltip>
+                                            </q-btn>
+                                            <q-btn flat dense round color="negative" icon="delete" v-if="props.row.username !== 'aicamera'" @click="confirmDeleteUser(props.row)">
+                                                <q-tooltip>Xóa tài khoản</q-tooltip>
+                                            </q-btn>
+                                            <q-icon name="lock" color="grey-6" size="20px" v-else>
+                                                <q-tooltip>Tài khoản Quản trị viên chính được bảo vệ vĩnh viễn</q-tooltip>
+                                            </q-icon>
+                                        </q-td>
+                                    </template>
+                                </q-table>
+                            </q-card-section>
+                        </q-card>
+                    </div>
+
+                    <!-- TAB 3: GIÁM SÁT BẢO MẬT & IP TRUY CẬP (SECURITY & IP AUDIT) -->
+                    <div v-show="activeTab === 'security'">
+                        <div class="row q-col-gutter-lg">
+                            <!-- Left: Live Active Sessions -->
+                            <div class="col-12 col-xl-7">
+                                <q-card class="bg-metropolis-card text-white q-mb-lg">
+                                    <q-card-section class="row items-center justify-between">
+                                        <div>
+                                            <div class="text-h6 text-weight-bold text-cyan-3">
+                                                <q-icon name="wifi_tethering" class="q-mr-sm text-positive"></q-icon>
+                                                Các Máy Đang Truy Cập (Live Active Sessions)
+                                            </div>
+                                            <div class="text-caption text-grey-4">
+                                                Địa chỉ IP LAN/WAN và trình duyệt đang mở phiên đăng nhập trong hệ thống.
+                                            </div>
+                                        </div>
+                                        <q-btn outline color="cyan-3" icon="refresh" label="Làm mới" @click="fetchSecurityData"></q-btn>
+                                    </q-card-section>
+                                    <q-separator dark></q-separator>
+                                    <q-card-section class="q-pa-none">
+                                        <q-table
+                                            :rows="activeSessions"
+                                            :columns="sessionColumns"
+                                            row-key="session_key"
+                                            dark
+                                            flat
+                                            :pagination="{ rowsPerPage: 5 }"
+                                            no-data-label="Hiện chưa có máy nào truy cập ngoài phiên của bạn"
+                                        >
+                                            <template v-slot:body-cell-client_ip="props">
+                                                <q-td :props="props">
+                                                    <q-badge color="cyan-10" text-color="cyan-3" class="text-weight-bold q-pa-xs">
+                                                        <q-icon name="laptop" class="q-mr-xs"></q-icon>
+                                                        {{ props.row.client_ip }}
+                                                    </q-badge>
+                                                </q-td>
+                                            </template>
+
+                                            <template v-slot:body-cell-user_agent="props">
+                                                <q-td :props="props">
+                                                    <span class="text-caption text-grey-4" style="max-width: 250px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="props.row.user_agent">
+                                                        {{ props.row.user_agent }}
+                                                    </span>
+                                                </q-td>
+                                            </template>
+
+                                            <template v-slot:body-cell-actions="props">
+                                                <q-td :props="props">
+                                                    <q-btn outline dense color="negative" icon="block" label="Đăng xuất từ xa" @click="revokeSession(props.row)">
+                                                        <q-tooltip>Hủy phiên làm việc của IP này ngay lập tức</q-tooltip>
+                                                    </q-btn>
+                                                </q-td>
+                                            </template>
+                                        </q-table>
+                                    </q-card-section>
+                                </q-card>
+
+                                <!-- Lockouts Manager -->
+                                <q-card class="bg-metropolis-card text-white">
+                                    <q-card-section class="row items-center justify-between">
+                                        <div>
+                                            <div class="text-h6 text-weight-bold text-amber-4">
+                                                <q-icon name="lock_person" class="q-mr-sm text-amber"></q-icon>
+                                                Danh Sách IP Bị Khóa Tạm Thời (Rate-Limit Lockout)
+                                            </div>
+                                            <div class="text-caption text-grey-4">
+                                                Các IP nhập sai mật khẩu quá 5 lần sẽ bị khóa tự động 5 phút. Admin có thể gỡ khóa ngay lập tức.
+                                            </div>
+                                        </div>
+                                    </q-card-section>
+                                    <q-separator dark></q-separator>
+                                    <q-card-section>
+                                        <div v-if="lockouts.length === 0" class="text-center q-pa-md text-grey-5">
+                                            <q-icon name="verified" size="32px" color="positive" class="q-mb-xs"></q-icon>
+                                            <div>Hiện không có địa chỉ IP hoặc tài khoản nào bị khóa. Hệ thống an toàn!</div>
+                                        </div>
+                                        <div v-else class="q-gutter-sm">
+                                            <div v-for="item in lockouts" :key="item.target" class="row items-center justify-between q-pa-sm bg-grey-10 rounded-borders" style="border: 1px solid rgba(245, 158, 11, 0.3);">
+                                                <div>
+                                                    <span class="text-weight-bold text-amber-3">{{ item.target }}</span>
+                                                    <span class="text-caption text-grey-4 q-ml-sm">Sai {{ item.failed_attempts }} lần | Khóa còn: {{ item.remaining_seconds }}s</span>
+                                                </div>
+                                                <q-btn unelevated dense color="positive" icon="lock_open" label="Gỡ khóa ngay" @click="unblockTarget(item.target)"></q-btn>
+                                            </div>
+                                        </div>
+                                    </q-card-section>
+                                </q-card>
+                            </div>
+
+                            <!-- Right: Access Audit Log -->
+                            <div class="col-12 col-xl-5">
+                                <q-card class="bg-metropolis-card text-white">
+                                    <q-card-section class="row items-center justify-between">
+                                        <div>
+                                            <div class="text-h6 text-weight-bold text-cyan-3">
+                                                <q-icon name="history" class="q-mr-sm"></q-icon>
+                                                Nhật Ký Truy Cập (Security Audit Log)
+                                            </div>
+                                            <div class="text-caption text-grey-4">50 lần thử đăng nhập gần nhất</div>
+                                        </div>
+                                        <q-btn outline color="cyan-3" icon="refresh" dense round @click="fetchAuditLogs"></q-btn>
+                                    </q-card-section>
+                                    <q-separator dark></q-separator>
+                                    <q-card-section class="q-pa-none">
+                                        <q-table
+                                            :rows="auditLogs"
+                                            :columns="auditColumns"
+                                            row-key="id"
+                                            dark
+                                            flat
+                                            :pagination="{ rowsPerPage: 10 }"
+                                            no-data-label="Chưa có nhật ký đăng nhập nào được ghi nhận"
+                                        >
+                                            <template v-slot:body-cell-status="props">
+                                                <q-td :props="props">
+                                                    <q-badge :color="props.row.status === 'success' ? 'positive' : (props.row.status === 'failed_password' ? 'negative' : 'warning')">
+                                                        {{ props.row.status === 'success' ? 'Thành công' : (props.row.status === 'failed_password' ? 'Sai Pass' : 'Bị Khóa') }}
+                                                    </q-badge>
+                                                </q-td>
+                                            </template>
+                                        </q-table>
+                                    </q-card-section>
+                                </q-card>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 4: CẤU HÌNH AI & PROMPT PROFILES (AI SETTINGS) -->
+                    <div v-show="activeTab === 'ai'">
+                        <div class="row q-col-gutter-lg">
+                            <!-- Gemini AI Configuration -->
+                            <div class="col-12 col-md-6">
+                                <q-card class="bg-metropolis-card text-white q-mb-md">
+                                    <q-card-section>
+                                        <div class="text-h6 text-weight-bold text-cyan-3">
+                                            <q-icon name="smart_toy" class="q-mr-sm"></q-icon>
+                                            Mô hình Thị giác VLM (GLM / Qwen)
+                                        </div>
+                                        <div class="text-caption text-grey-4">
+                                            Phân tích video đa khung hình và đánh giá rủi ro an ninh qua Server VLM
+                                        </div>
+                                    </q-card-section>
+                                    <q-separator dark></q-separator>
+                                    <q-card-section>
+                                        <q-form @submit.prevent="saveGeminiConfig" class="q-gutter-md">
+                                            <q-select
+                                                v-model="geminiConfig.selected_model"
+                                                :options="geminiModelOptions"
+                                                label="Chọn Mô hình VLM *"
+                                                dark
+                                                outlined
+                                                dense
+                                            >
+                                                <template v-slot:prepend><q-icon name="psychology" color="cyan"></q-icon></template>
+                                            </q-select>
+
+                                            <q-input
+                                                v-model="geminiConfig.api_key"
+                                                :type="showGeminiKey ? 'text' : 'password'"
+                                                label="Khóa API VLM (Bỏ trống nếu không đổi)"
+                                                placeholder="Nhập khóa API mới nếu muốn cập nhật"
+                                                dark
+                                                outlined
+                                                dense
+                                            >
+                                                <template v-slot:prepend><q-icon name="vpn_key" color="cyan"></q-icon></template>
+                                                <template v-slot:append>
+                                                    <q-icon :name="showGeminiKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showGeminiKey = !showGeminiKey"></q-icon>
+                                                </template>
+                                            </q-input>
+
+                                            <div class="row items-center justify-between text-caption text-grey-4">
+                                                <span>Trạng thái khóa: <b>{{ geminiConfig.has_api_key ? 'Đã cài đặt API Key' : 'Chưa có Key' }}</b></span>
+                                                <span>Nguồn: <b>{{ geminiConfig.source || 'Cục bộ' }}</b></span>
+                                            </div>
+
+                                            <div class="row justify-end q-pt-sm">
+                                                <q-btn unelevated color="cyan-8" icon="save" label="Lưu Cấu hình VLM" type="submit" :loading="savingGemini"></q-btn>
+                                            </div>
+                                        </q-form>
+                                    </q-card-section>
+                                </q-card>
+
+                                <!-- AI Cluster Health Card -->
+                                <q-card class="bg-metropolis-card text-white">
+                                    <q-card-section>
+                                        <div class="text-subtitle1 text-weight-bold text-positive">
+                                            <q-icon name="memory" class="q-mr-sm"></q-icon>
+                                            Cụm Máy chủ AI Nội bộ (Local Inference Cluster)
+                                        </div>
+                                    </q-card-section>
+                                    <q-separator dark></q-separator>
+                                    <q-card-section class="q-gutter-sm text-caption">
+                                        <div class="row justify-between items-center">
+                                            <span class="text-grey-4">SGLang Qwen2.5-VL Backend:</span>
+                                            <q-badge color="positive" label="Sẵn sàng (Port 30000)"></q-badge>
+                                        </div>
+                                        <div class="row justify-between items-center">
+                                            <span class="text-grey-4">DeepFilterNet / PhoWhisper:</span>
+                                            <q-badge color="cyan-9" label="Bộ lọc âm thanh kích hoạt"></q-badge>
+                                        </div>
+                                        <div class="row justify-between items-center">
+                                            <span class="text-grey-4">Vector Search VSS Engine:</span>
+                                            <q-badge color="primary" label="ChromaDB / SQLite VSS Active"></q-badge>
+                                        </div>
+                                    </q-card-section>
+                                </q-card>
+                            </div>
+
+                            <!-- Cosmos Vision Prompt Profile -->
+                            <div class="col-12 col-md-6">
+                                <q-card class="bg-metropolis-card text-white">
+                                    <q-card-section>
+                                        <div class="text-h6 text-weight-bold text-cyan-3">
+                                            <q-icon name="description" class="q-mr-sm"></q-icon>
+                                            Hồ sơ Phân tích Cosmos (Prompt Profiles)
+                                        </div>
+                                        <div class="text-caption text-grey-4">
+                                            Lựa chọn hướng dẫn AI nhận diện hành vi đặc thù tại trường học
+                                        </div>
+                                    </q-card-section>
+                                    <q-separator dark></q-separator>
+                                    <q-card-section class="q-gutter-md">
+                                        <div class="row q-col-gutter-sm items-center">
+                                            <div class="col-8">
+                                                <q-select
+                                                    v-model="cosmosPrompt.selected"
+                                                    :options="cosmosPrompt.profiles"
+                                                    label="Hồ sơ Prompt đang kích hoạt"
+                                                    dark
+                                                    outlined
+                                                    dense
+                                                    @update:model-value="onPromptProfileChange"
+                                                >
+                                                    <template v-slot:prepend><q-icon name="tune" color="cyan"></q-icon></template>
+                                                </q-select>
+                                            </div>
+                                            <div class="col-4">
+                                                <q-btn unelevated color="cyan-8" icon="save" label="Áp dụng" class="full-width" @click="saveCosmosPrompt" :loading="savingCosmos"></q-btn>
+                                            </div>
+                                        </div>
+
+                                        <!-- Preview Box -->
+                                        <div>
+                                            <div class="text-caption text-grey-4 q-mb-xs">Nội dung Prompt hiện tại:</div>
+                                            <div class="code-preview">{{ currentPromptText || 'Đang tải nội dung prompt...' }}</div>
+                                        </div>
+
+                                        <!-- Custom Prompt Upload -->
+                                        <div class="q-pt-sm" style="border-top: 1px dashed rgba(255, 255, 255, 0.1);">
+                                            <div class="text-caption text-weight-bold text-cyan-4 q-mb-xs">Tải lên file prompt mới (.txt):</div>
+                                            <div class="row q-col-gutter-sm items-center">
+                                                <div class="col-8">
+                                                    <q-file v-model="uploadPromptFile" label="Chọn file .txt" dark outlined dense accept=".txt">
+                                                        <template v-slot:prepend><q-icon name="attach_file" color="cyan"></q-icon></template>
+                                                    </q-file>
+                                                </div>
+                                                <div class="col-4">
+                                                    <q-btn outline color="cyan-3" icon="upload" label="Tải lên" class="full-width" @click="uploadPrompt" :loading="uploadingPrompt"></q-btn>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </q-card-section>
+                                </q-card>
+                            </div>
+                        </div>
+                    </div>
+
+                </q-page>
+            </q-page-container>
+
+            <!-- DIALOG: THÊM / SỬA NGƯỜI DÙNG & MA TRẬN 32 CAMERA -->
+            <q-dialog v-model="userDialog.show" persistent maximized transition-show="slide-up" transition-hide="slide-down">
+                <q-card class="bg-metropolis-card text-white column">
+                    <q-card-section class="row items-center justify-between" style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                        <div class="row items-center">
+                            <q-avatar size="36px" color="cyan-10" text-color="cyan-3" class="q-mr-sm">
+                                <q-icon :name="userDialog.isEdit ? 'manage_accounts' : 'person_add'"></q-icon>
+                            </q-avatar>
+                            <div>
+                                <div class="text-h6 text-weight-bold text-cyan-3">
+                                    {{ userDialog.isEdit ? 'Chỉnh Sửa Tài Khoản & Phân Quyền Camera' : 'Tạo Tài Khoản Mới & Phân Quyền Camera' }}
+                                </div>
+                                <div class="text-caption text-grey-4">
+                                    {{ userDialog.isEdit ? 'Cập nhật quyền hạn cho tài khoản: ' + userDialog.form.username : 'Thiết lập thông tin đăng nhập và chọn camera cho phép xem' }}
+                                </div>
+                            </div>
+                        </div>
+                        <q-btn flat round dense icon="close" v-close-popup></q-btn>
+                    </q-card-section>
+
+                    <q-card-section class="col q-pa-lg scroll">
+                        <div class="row q-col-gutter-lg">
+                            <!-- Left: User Details Form -->
+                            <div class="col-12 col-md-4">
+                                <q-card class="bg-dark text-white q-pa-md" style="border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;">
+                                    <div class="text-subtitle1 text-weight-bold text-cyan-4 q-mb-md">Thông Tin Đăng Nhập</div>
+                                    
+                                    <div class="q-gutter-md">
+                                        <q-input
+                                            v-model="userDialog.form.username"
+                                            label="Tên đăng nhập *"
+                                            dark
+                                            outlined
+                                            dense
+                                            :disable="userDialog.isEdit"
+                                            :rules="[val => !!val || 'Vui lòng nhập tên đăng nhập']"
+                                        >
+                                            <template v-slot:prepend><q-icon name="account_circle" color="cyan"></q-icon></template>
+                                        </q-input>
+
+                                        <q-input
+                                            v-model="userDialog.form.full_name"
+                                            label="Họ và tên / Phòng ban"
+                                            placeholder="Ví dụ: Nguyễn Văn A - P. Quản lý HSSV"
+                                            dark
+                                            outlined
+                                            dense
+                                        >
+                                            <template v-slot:prepend><q-icon name="badge" color="cyan"></q-icon></template>
+                                        </q-input>
+
+                                        <q-input
+                                            v-model="userDialog.form.password"
+                                            :type="showDialogPass ? 'text' : 'password'"
+                                            :label="userDialog.isEdit ? 'Mật khẩu mới (Để trống nếu giữ nguyên)' : 'Mật khẩu đăng nhập *'"
+                                            dark
+                                            outlined
+                                            dense
+                                            :rules="userDialog.isEdit ? [] : [val => !!val || 'Vui lòng nhập mật khẩu']"
+                                        >
+                                            <template v-slot:prepend><q-icon name="lock" color="cyan"></q-icon></template>
+                                            <template v-slot:append>
+                                                <q-icon :name="showDialogPass ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showDialogPass = !showDialogPass"></q-icon>
+                                            </template>
+                                        </q-input>
+
+                                        <q-select
+                                            v-model="userDialog.form.role"
+                                            :options="roleOptions"
+                                            emit-value
+                                            map-options
+                                            label="Vai trò tài khoản *"
+                                            dark
+                                            outlined
+                                            dense
+                                        >
+                                            <template v-slot:prepend><q-icon name="admin_panel_settings" color="cyan"></q-icon></template>
+                                        </q-select>
+
+                                        <div v-if="userDialog.form.role === 'admin'" class="q-pa-sm bg-cyan-10 text-cyan-2 rounded-borders text-caption">
+                                            <q-icon name="info" class="q-mr-xs"></q-icon>
+                                            Tài khoản Quản trị viên (Admin) có toàn quyền xem tất cả 32 camera và quản trị hệ thống.
+                                        </div>
+                                    </div>
+                                </q-card>
+                            </div>
+
+                            <!-- Right: 32 Camera RBAC Checkbox Matrix -->
+                            <div class="col-12 col-md-8">
+                                <q-card class="bg-dark text-white q-pa-md" style="border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px;">
+                                    <div class="row items-center justify-between q-mb-sm">
+                                        <div>
+                                            <div class="text-subtitle1 text-weight-bold text-cyan-4">
+                                                <q-icon name="grid_view" class="q-mr-xs"></q-icon>
+                                                Ma Trận Phân Quyền Camera (1 - 32 Kênh)
+                                            </div>
+                                            <div class="text-caption text-grey-4">
+                                                Đã chọn: <b class="text-cyan-3">{{ userDialog.form.role === 'admin' ? 32 : userDialog.form.allowed_channels.length }} / 32</b> Camera
+                                            </div>
+                                        </div>
+
+                                        <!-- Quick Presets Toolbar -->
+                                        <div class="row q-gutter-xs" v-if="userDialog.form.role !== 'admin'">
+                                            <q-btn outline dense size="sm" color="cyan-3" label="Tất cả 32 Kênh" icon="select_all" @click="applyPreset('all')"></q-btn>
+                                            <q-btn outline dense size="sm" color="grey-5" label="Bỏ chọn hết" icon="clear" @click="applyPreset('none')"></q-btn>
+                                            <q-btn outline dense size="sm" color="amber-3" label="Sảnh (Cam 18-20)" icon="store" @click="applyPreset('lobby')"></q-btn>
+                                            <q-btn outline dense size="sm" color="green-3" label="Phòng ban (1-16)" icon="apartment" @click="applyPreset('office')"></q-btn>
+                                            <q-btn outline dense size="sm" color="purple-3" label="Hành lang (21-24)" icon="meeting_room" @click="applyPreset('corridor')"></q-btn>
+                                        </div>
+                                    </div>
+
+                                    <q-separator dark class="q-mb-md"></q-separator>
+
+                                    <!-- 32 Camera Checkbox Matrix Grid -->
+                                    <div class="camera-matrix-grid">
+                                        <div
+                                            v-for="cam in allCameras"
+                                            :key="cam.channel"
+                                            class="camera-matrix-item"
+                                            :class="{
+                                                'selected': userDialog.form.role === 'admin' || userDialog.form.allowed_channels.includes(cam.channel)
+                                            }"
+                                            @click="toggleCamera(cam.channel)"
+                                        >
+                                            <div class="row items-center justify-between no-wrap">
+                                                <div class="row items-center no-wrap" style="overflow: hidden;">
+                                                    <q-checkbox
+                                                        :model-value="userDialog.form.role === 'admin' || userDialog.form.allowed_channels.includes(cam.channel)"
+                                                        :disable="userDialog.form.role === 'admin'"
+                                                        color="cyan"
+                                                        dense
+                                                        class="q-mr-xs"
+                                                        @update:model-value="toggleCamera(cam.channel)"
+                                                    ></q-checkbox>
+                                                    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                        <div class="text-caption text-weight-bold text-white">{{ cam.name }}</div>
+                                                        <div class="text-grey-5" style="font-size: 0.72rem;">{{ cam.category }}</div>
+                                                    </div>
+                                                </div>
+                                                <q-badge v-if="cam.is_active" color="cyan-9" label="ON" size="xs"></q-badge>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </q-card>
+                            </div>
+                        </div>
+                    </q-card-section>
+
+                    <q-separator dark></q-separator>
+
+                    <!-- Dialog Footer -->
+                    <q-card-actions align="right" class="q-pa-md bg-metropolis-header">
+                        <q-btn flat label="Hủy Bỏ" color="grey-4" v-close-popup></q-btn>
+                        <q-btn unelevated label="Lưu Tài Khoản & Phân Quyền" color="cyan-8" icon="check" @click="submitUserDialog" :loading="savingUser"></q-btn>
+                    </q-card-actions>
+                </q-card>
+            </q-dialog>
+
+            <!-- DIALOG: ĐỔI MẬT KHẨU ADMIN -->
+            <q-dialog v-model="changeAdminPassDialog.show">
+                <q-card class="bg-metropolis-card text-white" style="min-width: 380px;">
+                    <q-card-section class="row items-center">
+                        <q-avatar icon="key" color="amber-10" text-color="amber-3" class="q-mr-sm"></q-avatar>
+                        <div class="text-h6 text-weight-bold">Đổi Mật Khẩu Quản Trị Viên</div>
+                    </q-card-section>
+                    <q-separator dark></q-separator>
+                    <q-card-section class="q-gutter-md">
+                        <q-input v-model="changeAdminPassDialog.username" label="Tên tài khoản" dark outlined dense readonly></q-input>
+                        <q-input v-model="changeAdminPassDialog.newPassword" type="password" label="Mật khẩu mới *" dark outlined dense :rules="[val => !!val || 'Vui lòng nhập mật khẩu mới']"></q-input>
+                    </q-card-section>
+                    <q-card-actions align="right" class="q-pa-md">
+                        <q-btn flat label="Đóng" color="grey-4" v-close-popup></q-btn>
+                        <q-btn unelevated label="Lưu Mật Khẩu" color="amber-9" @click="submitChangeAdminPass" :loading="savingAdminPass"></q-btn>
+                    </q-card-actions>
+                </q-card>
+            </q-dialog>
+
+        </q-layout>
+    {% endraw %}
+    </div>
+
+    <!-- Vue 3 & Quasar JS (Local Vendor with CDN fallback) -->
+    <script src="/static/vendor/vue/vue.global.prod.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js';"></script>
+    <script src="/static/vendor/quasar/quasar.umd.prod.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/quasar@2.16.0/dist/quasar.umd.prod.js';"></script>
+    
+    <!-- Admin Quasar Application Logic -->
+    <script src="/static/js/admin_quasar.js"></script>
+</body>
+</html>
+

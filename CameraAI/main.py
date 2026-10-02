@@ -11,7 +11,7 @@ import uuid
 import re
 from pathlib import Path
 from urllib.parse import quote
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any, Union
 from datetime import date, datetime
 from datetime import date, datetime, timedelta
 import requests
@@ -64,16 +64,40 @@ app = FastAPI(
 
 @app.middleware("http")
 async def require_login_session(request: Request, call_next):
-    """Require a verified session outside public login assets."""
+    """Require a verified session outside public login assets, with remote revocation and active tracking."""
     path = request.url.path
     public = (
-        path in {"/", "/login", "/api/admin/verify-login", "/favicon.ico"}
+        path in {
+            "/", "/login", "/api/admin/verify-login", "/favicon.ico",
+            "/api/auth/google/login", "/api/auth/google/callback",
+            "/api/auth/google/verify-credential", "/api/auth/google/config",
+            "/logo_truong_only.png", "/admin/logo_truong_only.png",
+            "/logo_don.png", "/admin/logo_don.png",
+            "/logo_truong.png", "/admin/logo_truong.png",
+            "/admin/favicon.ico"
+        }
         or path.startswith("/static/")
+        or path.startswith("/admin/assets/")
+        or path.startswith("/admin/icons/")
+        or path.startswith("/admin/img/")
     )
-    if not public and not request.session.get("username"):
+    username = request.session.get("username")
+    if not public and not username:
         if path.startswith("/api/") or path.startswith("/clips/"):
             return JSONResponse(status_code=401, content={"detail": "Authentication required"})
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+
+    if username:
+        client_ip = login_rate_limiter.get_client_ip(request)
+        if active_session_tracker.is_revoked(username, client_ip):
+            request.session.clear()
+            if path.startswith("/api/") or path.startswith("/clips/"):
+                return JSONResponse(status_code=401, content={"detail": "Phiên làm việc đã bị Quản trị viên chấm dứt từ xa."})
+            return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+        role = request.session.get("role", "viewer")
+        ua = request.headers.get("user-agent", "")
+        active_session_tracker.update_session(username, role, client_ip, ua)
+
     return await call_next(request)
 
 
@@ -128,14 +152,31 @@ templates_dir.mkdir(exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+quasar_spa_dir = Path(__file__).resolve().parent.parent / "quasar-admin" / "dist" / "spa"
+if (quasar_spa_dir / "assets").is_dir():
+    app.mount("/admin/assets", StaticFiles(directory=str(quasar_spa_dir / "assets")), name="quasar_assets")
+if (quasar_spa_dir / "icons").is_dir():
+    app.mount("/admin/icons", StaticFiles(directory=str(quasar_spa_dir / "icons")), name="quasar_icons")
+if (quasar_spa_dir / "img").is_dir():
+    app.mount("/admin/img", StaticFiles(directory=str(quasar_spa_dir / "img")), name="quasar_img")
+
 templates = Jinja2Templates(directory=str(templates_dir))
 admin_security = HTTPBasic(auto_error=False)
 _gemini_quota_exceeded_until: float = 0.0
 
 
 @app.get("/clips/{clip_reference:path}")
-async def serve_clip(clip_reference: str):
-    """Serve a cached clip, fetching it from Synology when necessary."""
+@app.get("/api/clips/{clip_reference:path}")
+async def serve_clip(clip_reference: str, request: Request):
+    """Serve a cached clip, fetching it from Synology when necessary, with Channel-Level RBAC."""
+    allowed = get_current_user_allowed_channels(request)
+    if allowed is not None:
+        clip_ch = get_clip_channel(clip_reference)
+        if clip_ch is not None and clip_ch not in allowed:
+            raise HTTPException(status_code=403, detail="Bạn không có quyền xem video clip từ camera này.")
+        if clip_ch is None:
+            raise HTTPException(status_code=403, detail="Không thể xác thực quyền truy cập cho video clip này.")
+
     try:
         clip_path = await asyncio.to_thread(resolve_clip_path, clip_reference)
     except ValueError:
@@ -185,8 +226,10 @@ def get_admin_credentials() -> tuple[str, str]:
     return "admin", "namcantho@168"
 
 
-def require_database_admin(credentials: Optional[HTTPBasicCredentials] = Depends(admin_security)):
-    """Protect the database viewer with credentials kept outside source code."""
+def require_database_admin(request: Request, credentials: Optional[HTTPBasicCredentials] = Depends(admin_security)):
+    """Protect admin APIs and database viewer with session or HTTP Basic credentials."""
+    if request.session.get("role") == "admin":
+        return str(request.session.get("username", "admin"))
     expected_user, expected_password = get_admin_credentials()
     is_valid = (
         credentials is not None
@@ -208,24 +251,243 @@ def require_session_admin(request: Request) -> str:
     return str(request.session.get("username", ""))
 
 
+USERS_STORAGE_FILE = config.STORAGE_DIR / "users.json"
+
+
+def sanitize_allowed_channels(channels: Any, role: str = "viewer") -> list:
+    if role == "admin":
+        return ["*"]
+    if not channels:
+        return []
+    result = []
+    for c in channels:
+        if str(c).strip() == "*":
+            return ["*"]
+        try:
+            val = int(c)
+            if 1 <= val <= 64:
+                result.append(val)
+        except (ValueError, TypeError):
+            continue
+    return sorted(list(set(result)))
+
+
+def get_all_system_users() -> list[dict]:
+    expected_user, expected_password = get_admin_credentials()
+    default_users = [
+        {
+            "username": expected_user,
+            "password": expected_password,
+            "role": "admin",
+            "full_name": "Quản trị viên Hệ thống",
+            "can_config_nvr": True,
+            "allowed_channels": ["*"],
+            "created_at": "2026-09-21T00:00:00"
+        }
+    ]
+    if not USERS_STORAGE_FILE.is_file():
+        try:
+            USERS_STORAGE_FILE.write_text(json.dumps(default_users, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        return default_users
+
+    try:
+        data = json.loads(USERS_STORAGE_FILE.read_text(encoding="utf-8"))
+        if isinstance(data, list) and len(data) > 0:
+            cleaned_data = []
+            for item in data:
+                username = str(item.get("username", ""))
+                password = str(item.get("password", ""))
+                is_legacy_viewer = username == "user" and password == "123"
+                is_legacy_admin = (
+                    expected_user != "admin"
+                    and username == "admin"
+                    and password in {"admin", "namcantho@168"}
+                )
+                if not is_legacy_viewer and not is_legacy_admin:
+                    role = str(item.get("role", "viewer")).lower()
+                    if role == "admin":
+                        item["allowed_channels"] = ["*"]
+                    elif "allowed_channels" not in item:
+                        item["allowed_channels"] = [11, 18, 19, 20]
+                    else:
+                        item["allowed_channels"] = sanitize_allowed_channels(item.get("allowed_channels"), role)
+                    cleaned_data.append(item)
+            data = cleaned_data
+            has_admin = any(u.get("username") == expected_user for u in data)
+            if not has_admin:
+                data.insert(0, default_users[0])
+            try:
+                save_system_users(data)
+            except Exception:
+                pass
+            return data
+    except Exception:
+        pass
+    return default_users
+
+
+def save_system_users(users: list[dict]):
+    USERS_STORAGE_FILE.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def upsert_google_system_user(email: str, name: str, picture: str, is_admin: bool) -> dict:
+    """Register or update a Google SSO user in users.json to ensure they appear in admin management."""
+    users = get_all_system_users()
+    existing_user = next((item for item in users if item.get("username") == email), None)
+
+    if existing_user:
+        if is_admin:
+            role = "admin"
+            allowed_channels = ["*"]
+        else:
+            role = existing_user.get("role", "viewer")
+            allowed_channels = existing_user.get("allowed_channels", [11, 18, 19, 20])
+
+        existing_user["full_name"] = name or existing_user.get("full_name", email)
+        if picture:
+            existing_user["avatar_url"] = picture
+        existing_user["auth_provider"] = "google"
+        existing_user["role"] = role
+        existing_user["can_config_nvr"] = (role == "admin")
+        existing_user["allowed_channels"] = ["*"] if role == "admin" else sanitize_allowed_channels(allowed_channels, role)
+        existing_user["last_login"] = datetime.now().isoformat(timespec="seconds")
+        target_user = existing_user
+    else:
+        role = "admin" if is_admin else "viewer"
+        allowed_channels = ["*"] if role == "admin" else [11, 18, 19, 20]
+        target_user = {
+            "username": email,
+            "full_name": name or email,
+            "role": role,
+            "can_config_nvr": (role == "admin"),
+            "allowed_channels": allowed_channels,
+            "auth_provider": "google",
+            "avatar_url": picture,
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "last_login": datetime.now().isoformat(timespec="seconds")
+        }
+        users.append(target_user)
+
+    save_system_users(users)
+    return target_user
+
+
+def get_user_allowed_channels_by_name(username: str) -> Optional[List[int]]:
+    """
+    Returns None if admin (full access to all channels, "*").
+    Returns List[int] of channels if subuser.
+    Returns [] if unauthenticated or user not found.
+    """
+    if not username:
+        return []
+    expected_user, _ = get_admin_credentials()
+    if username == expected_user or (config.NVR_USER and username == config.NVR_USER):
+        return None
+    users = get_all_system_users()
+    for item in users:
+        if item.get("username") == username:
+            if item.get("role") == "admin":
+                return None
+            channels = item.get("allowed_channels")
+            if channels is None:
+                return []
+            if isinstance(channels, list):
+                if "*" in channels:
+                    return None
+                return [int(c) for c in channels if str(c).isdigit()]
+    return []
+
+
+def get_current_user_allowed_channels(request: Request) -> Optional[List[int]]:
+    """
+    Returns None if admin (full access to all channels, "*").
+    Returns List[int] of channels if subuser.
+    Returns [] if unauthenticated.
+    """
+    username = request.session.get("username")
+    if not username:
+        return []
+    role = request.session.get("role")
+    if role == "admin":
+        return None
+    return get_user_allowed_channels_by_name(username)
+
+
+def get_clip_channel(clip_reference: str) -> Optional[int]:
+    """Extract camera channel from clip reference path or database events record."""
+    if not clip_reference:
+        return None
+    normalized = clip_reference.replace("\\", "/")
+    # 1. Match patterns like cam-011, cam-11, cam11, channel_11, etc.
+    m = re.search(r"(?:cam|channel|kênh|kenh)[-_]?0*(\d+)", normalized, re.IGNORECASE)
+    if m:
+        try:
+            return int(m.group(1))
+        except (ValueError, TypeError):
+            pass
+
+    # 2. Match in database events table
+    try:
+        conn = database.get_db_connection()
+        cur = conn.cursor()
+        basename = Path(normalized).name
+        cur.execute(
+            "SELECT channel FROM events WHERE clip_filename = ? OR clip_filename LIKE ? LIMIT 1",
+            (clip_reference, f"%{basename}%")
+        )
+        row = cur.fetchone()
+        conn.close()
+        if row and row["channel"] is not None:
+            return int(row["channel"])
+    except Exception:
+        pass
+    return None
+
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: dict[WebSocket, dict] = {}
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, user_info: Optional[dict] = None):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        self.active_connections[websocket] = user_info or {}
 
     def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+        self.active_connections.pop(websocket, None)
 
     async def broadcast(self, message: dict):
-        for connection in list(self.active_connections):
+        event_ch = message.get("channel")
+        for connection, user_info in list(self.active_connections.items()):
+            role = user_info.get("role")
+            username = user_info.get("username", "")
+
+            # Admin receives all broadcasts
+            if role == "admin":
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    self.disconnect(connection)
+                continue
+
+            # Check user's permitted channels
+            allowed = get_user_allowed_channels_by_name(username)
+            if allowed is None or "*" in allowed:
+                pass
+            elif event_ch is not None and event_ch in allowed:
+                pass
+            elif event_ch is None:
+                # General notification without specific channel
+                pass
+            else:
+                # Disallowed camera channel
+                continue
+
             try:
                 await connection.send_json(message)
             except Exception:
                 self.disconnect(connection)
+
 
 manager = ConnectionManager()
 
@@ -463,6 +725,71 @@ async def search_page(request: Request):
     return templates.TemplateResponse(request=request, name="search.html")
 
 
+@app.get("/logo_truong_only.png")
+@app.get("/admin/logo_truong_only.png")
+async def serve_school_logo():
+    logo_path = Path(__file__).resolve().parent / "static" / "logo_truong_only.png"
+    if not logo_path.is_file():
+        logo_path = Path(__file__).resolve().parent / "static" / "logo_don.png"
+    if logo_path.is_file():
+        return FileResponse(logo_path)
+    raise HTTPException(status_code=404, detail="Logo not found")
+
+
+@app.get("/logo_don.png")
+@app.get("/admin/logo_don.png")
+async def serve_admin_logo_don():
+    logo_path = Path(__file__).resolve().parent / "static" / "logo_don.png"
+    if logo_path.is_file():
+        return FileResponse(logo_path)
+    raise HTTPException(status_code=404, detail="Logo not found")
+
+
+@app.get("/logo_truong.png")
+@app.get("/admin/logo_truong.png")
+async def serve_admin_logo_truong():
+    logo_path = Path(__file__).resolve().parent / "static" / "logo_truong.png"
+    if logo_path.is_file():
+        return FileResponse(logo_path)
+    raise HTTPException(status_code=404, detail="Logo not found")
+
+
+@app.get("/admin/favicon.ico")
+async def serve_admin_favicon():
+    fav_path = quasar_spa_dir / "favicon.ico"
+    if fav_path.is_file():
+        return FileResponse(fav_path)
+    return FileResponse(Path(__file__).resolve().parent / "static" / "favicon.ico")
+
+
+@app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin/", response_class=HTMLResponse)
+@app.get("/admin/control-center", response_class=HTMLResponse)
+async def admin_portal_page(request: Request):
+    """Serve the centralized Quasar-Admin Control Center for Admin only."""
+    role = request.session.get("role")
+    if role != "admin":
+        if not request.session.get("username"):
+            return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Truy cập bị từ chối: Chỉ tài khoản Quản trị viên mới có quyền vào Cổng Quản trị."
+        )
+    spa_index = quasar_spa_dir / "index.html"
+    if spa_index.is_file():
+        return HTMLResponse(content=spa_index.read_text(encoding="utf-8"))
+    return templates.TemplateResponse(request=request, name="admin.html")
+
+
+@app.get("/admin/legacy", response_class=HTMLResponse)
+async def admin_legacy_page(request: Request):
+    """Fallback legacy UMD page."""
+    role = request.session.get("role")
+    if role != "admin":
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    return templates.TemplateResponse(request=request, name="admin.html")
+
+
 @app.get("/admin/database", response_class=HTMLResponse)
 async def database_admin_page(request: Request, _: str = Depends(require_database_admin)):
     return templates.TemplateResponse(request=request, name="admin_database.html")
@@ -565,16 +892,25 @@ async def upload_test_video(video: UploadFile = File(...), _: str = Depends(requ
 
 @app.get("/api/events")
 async def get_events_api(
+    request: Request,
     event_type: Optional[str] = None,
     channel: Optional[int] = None,
     only_anomalies: bool = False,
     limit: int = 50
 ):
+    allowed_channels = get_current_user_allowed_channels(request)
+    if allowed_channels is not None:
+        if len(allowed_channels) == 0:
+            return {"events": [], "count": 0}
+        if channel is not None and channel not in allowed_channels:
+            return {"events": [], "count": 0}
+
     events = database.get_events(
         event_type=event_type,
         channel=channel,
         limit=limit,
-        only_anomalies=only_anomalies
+        only_anomalies=only_anomalies,
+        allowed_channels=allowed_channels,
     )
     for event in events:
         event["audio_analysis"] = database.get_audio_analysis(event["id"])
@@ -622,16 +958,19 @@ async def get_events_api(
     return {"events": events, "count": len(events)}
 
 @app.get("/api/events/{event_id}")
-async def get_event_detail(event_id: int):
+async def get_event_detail(event_id: int, request: Request):
     ev = database.get_event_by_id(event_id)
     if not ev:
         return JSONResponse(status_code=404, content={"error": "Event not found"})
+    allowed_channels = get_current_user_allowed_channels(request)
+    if allowed_channels is not None and ev.get("channel") not in allowed_channels:
+        return JSONResponse(status_code=403, content={"error": "Bạn không có quyền truy cập sự kiện của camera này."})
     ev["audio_analysis"] = database.get_audio_analysis(event_id)
     ev["video_analysis"] = database.get_video_analysis(event_id)
     return ev
 
 @app.post("/api/events/{event_id}/audio-analysis")
-async def request_audio_analysis(event_id: int):
+async def request_audio_analysis(event_id: int, request: Request):
     """Queue speech-to-text for the anomaly clip selected by an operator."""
     event = database.get_event_by_id(event_id)
     if not event:
@@ -671,7 +1010,7 @@ class VideoAnalysisOptions(BaseModel):
 
 
 @app.post("/api/events/{event_id}/video-analysis")
-async def request_video_analysis(event_id: int, options: Optional[VideoAnalysisOptions] = None):
+async def request_video_analysis(event_id: int, request: Request, options: Optional[VideoAnalysisOptions] = None):
     """Queue manual visual analysis of representative frames from an event clip."""
     event = database.get_event_by_id(event_id)
     if not event:
@@ -710,7 +1049,7 @@ async def request_video_analysis(event_id: int, options: Optional[VideoAnalysisO
 
 
 @app.post("/api/events/{event_id}/llm-analysis")
-async def request_llm_analysis(event_id: int, _: str = Depends(require_database_admin)):
+async def request_llm_analysis(event_id: int, request: Request, _: str = Depends(require_database_admin)):
     """Combine saved Cosmos and PhoWhisper evidence into one Gemini report."""
     event = database.get_event_by_id(event_id)
     if not event:
@@ -745,17 +1084,21 @@ async def get_daily_summary_api(date_str: Optional[str] = None):
     return summary
 
 @app.get("/api/dashboard/kibana-stats")
-async def get_kibana_stats_api(filter_mode: str = "all"):
+async def get_kibana_stats_api(request: Request, filter_mode: str = "all"):
     """Return live real-time statistics from SQLite database for the Camera AI Dashboard."""
-    return database.get_kibana_figure5_stats(filter_mode=filter_mode)
+    allowed = get_current_user_allowed_channels(request)
+    return database.get_kibana_figure5_stats(filter_mode=filter_mode, allowed_channels=allowed)
 
 
 @app.post("/api/events/{event_id}/capture-clip")
-async def capture_clip_event_api(event_id: int):
+async def capture_clip_event_api(event_id: int, request: Request):
     """Trích xuất hoặc tạo video clip 10s cho sự kiện từ NVR Dahua hoặc Evidence Generator."""
     event = database.get_event_by_id(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Không tìm thấy sự kiện.")
+    allowed_channels = get_current_user_allowed_channels(request)
+    if allowed_channels is not None and event.get("channel") not in allowed_channels:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền truy cập sự kiện của camera này.")
 
     clip_filename = event.get("clip_filename")
     clip_path = resolve_clip_path(str(clip_filename)) if clip_filename else None
@@ -812,11 +1155,14 @@ async def capture_clip_event_api(event_id: int):
 
 
 @app.post("/api/events/{event_id}/quick-analyze")
-async def quick_analyze_event_api(event_id: int):
+async def quick_analyze_event_api(event_id: int, request: Request):
     """Run full Multi-modal Analysis (Cosmos Video + PhoWhisper Audio + Gemini Environmental Grounding) on an event."""
     event = database.get_event_by_id(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Không tìm thấy sự kiện.")
+    allowed_channels = get_current_user_allowed_channels(request)
+    if allowed_channels is not None and event.get("channel") not in allowed_channels:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền truy cập sự kiện của camera này.")
 
     clip_filename = event.get("clip_filename")
     clip_path = resolve_clip_path(str(clip_filename)) if clip_filename else None
@@ -920,11 +1266,23 @@ class AgentQueryModel(BaseModel):
 
 
 @app.post("/api/agent/query")
-async def agent_query_api(req: AgentQueryModel):
+async def agent_query_api(req: AgentQueryModel, request: Request):
     """Vision Agent conversational AI endpoint with dynamic DB retrieval and multi-modal grounding."""
+    allowed_channels = get_current_user_allowed_channels(request)
+    if allowed_channels is not None:
+        if req.channel is not None and req.channel not in allowed_channels:
+            return {
+                "reply": f"Bạn không có quyền truy cập dữ liệu của Camera Kênh {req.channel:02d}.",
+                "channel": req.channel,
+                "matched_events": [],
+                "event_ids": []
+            }
+        active_channels = sorted(list(set(allowed_channels).intersection(set(config.ACTIVE_CHANNELS)))) or allowed_channels
+    else:
+        active_channels = config.ACTIVE_CHANNELS
+
     query_text = req.query.strip()
     lowered = query_text.lower()
-    active_channels = [11, 18, 19, 20]
     req_top_k = int(req.top_k or 10)
     if req_top_k < 1:
         req_top_k = 10
@@ -943,7 +1301,15 @@ async def agent_query_api(req: AgentQueryModel):
     search_kw = plan.get("search_kw")
     event_codes = plan.get("event_codes")
 
-    ch_label = f"Camera Kênh {ch:02d}" if ch else f"toàn bộ các Camera (Kênh {', '.join(str(c) for c in active_channels)})"
+    if allowed_channels is not None and ch is not None and ch not in allowed_channels:
+        return {
+            "reply": f"Bạn không có quyền truy cập dữ liệu của Camera Kênh {ch:02d}.",
+            "channel": ch,
+            "matched_events": [],
+            "event_ids": []
+        }
+
+    ch_label = f"Camera Kênh {ch:02d}" if ch else f"các Camera được phân quyền (Kênh {', '.join(str(c) for c in active_channels)})"
 
     if not query_text:
         return {
@@ -954,9 +1320,9 @@ async def agent_query_api(req: AgentQueryModel):
         }
 
     # 2. Get Real Statistics from SQLite Database (ch=None returns stats across all channels)
-    db_stats = database.get_channel_event_stats(ch, date_str=target_date)
+    db_stats = database.get_channel_event_stats(ch, date_str=target_date, allowed_channels=allowed_channels)
     if db_stats.get("total_events", 0) == 0 and target_date and not plan.get("is_date_filtered"):
-        overall_stats = database.get_channel_event_stats(ch)
+        overall_stats = database.get_channel_event_stats(ch, allowed_channels=allowed_channels)
         if overall_stats.get("total_events", 0) > 0:
             db_stats = overall_stats
             target_date = None
@@ -967,7 +1333,8 @@ async def agent_query_api(req: AgentQueryModel):
     if target_event_id:
         single_ev = database.get_event_by_id(target_event_id)
         if single_ev:
-            matched_events = [single_ev]
+            if allowed_channels is None or single_ev.get("channel") in allowed_channels:
+                matched_events = [single_ev]
 
     elif is_time_filtered:
         # STRICT TIME WINDOW: User requested specific hours (e.g. 7h - 8h, lúc 10h45)
@@ -980,7 +1347,8 @@ async def agent_query_api(req: AgentQueryModel):
             only_anomalies=only_anomalies,
             event_codes=event_codes,
             has_clip=True,
-            limit=fetch_limit
+            limit=fetch_limit,
+            allowed_channels=allowed_channels,
         )
         time_all = database.get_events(
             channel=ch,
@@ -989,7 +1357,8 @@ async def agent_query_api(req: AgentQueryModel):
             keyword=search_kw,
             only_anomalies=only_anomalies,
             event_codes=event_codes,
-            limit=fetch_limit
+            limit=fetch_limit,
+            allowed_channels=allowed_channels,
         )
         seen_ids = set()
         matched_events = []
@@ -1015,14 +1384,16 @@ async def agent_query_api(req: AgentQueryModel):
             date_str=target_date,
             event_codes=alarm_codes,
             has_clip=True,
-            limit=fetch_limit
+            limit=fetch_limit,
+            allowed_channels=allowed_channels,
         )
         # 2. Retrieve other alarm events for context
         alarms_all = database.get_events(
             channel=ch,
             date_str=target_date,
             event_codes=alarm_codes,
-            limit=fetch_limit
+            limit=fetch_limit,
+            allowed_channels=allowed_channels,
         )
         seen_ids = set()
         matched_events = []
@@ -1037,13 +1408,15 @@ async def agent_query_api(req: AgentQueryModel):
             keyword=search_kw,
             date_str=target_date,
             has_clip=True,
-            limit=fetch_limit
+            limit=fetch_limit,
+            allowed_channels=allowed_channels,
         )
         kw_all = database.get_events(
             channel=ch,
             keyword=search_kw,
             date_str=target_date,
-            limit=fetch_limit
+            limit=fetch_limit,
+            allowed_channels=allowed_channels,
         )
         seen_ids = set()
         matched_events = []
@@ -1058,13 +1431,15 @@ async def agent_query_api(req: AgentQueryModel):
             date_str=target_date,
             event_codes=event_codes,
             has_clip=True,
-            limit=fetch_limit
+            limit=fetch_limit,
+            allowed_channels=allowed_channels,
         )
         ev_all = database.get_events(
             channel=ch,
             date_str=target_date,
             event_codes=event_codes,
-            limit=fetch_limit
+            limit=fetch_limit,
+            allowed_channels=allowed_channels,
         )
         seen_ids = set()
         matched_events = []
@@ -1080,7 +1455,8 @@ async def agent_query_api(req: AgentQueryModel):
             date_str=target_date,
             limit_per_code=max(5, req_top_k // 2),
             total_limit=fetch_limit,
-            has_clip=True
+            has_clip=True,
+            allowed_channels=allowed_channels,
         )
 
     # CRITICAL: Filter matched_events to ONLY those with real, physically existing clip files on disk!
@@ -1099,7 +1475,12 @@ async def agent_query_api(req: AgentQueryModel):
         matched_events = events_with_clips
     else:
         # If no clips found in specific search, fetch recent verified clips from database
-        recent_verified = database.get_diverse_channel_events(channel=ch, total_limit=fetch_limit, has_clip=True)
+        recent_verified = database.get_diverse_channel_events(
+            channel=ch,
+            total_limit=fetch_limit,
+            has_clip=True,
+            allowed_channels=allowed_channels,
+        )
         matched_events = [e for e in recent_verified if _has_physical_clip(e)]
 
     daily_summary = summary_engine.generate_daily_summary()
@@ -1225,11 +1606,12 @@ class VSSChatVideoRequest(BaseModel):
 
 
 @app.post("/api/vss/chat-video")
-async def vss_chat_video_api(req: VSSChatVideoRequest):
+async def vss_chat_video_api(req: VSSChatVideoRequest, request: Request):
     """
     Direct Multimodal Video Chat:
     Cắt dense frames từ clip video và gửi kèm câu hỏi của người dùng lên Server AI (Qwen3.8-27B).
     """
+    allowed_channels = get_current_user_allowed_channels(request)
     clip_path = None
     event_id = req.event_id
 
@@ -1310,9 +1692,10 @@ class VSSSearchRequest(BaseModel):
 
 
 @app.post("/api/vss/search")
-async def vss_search_api(req: VSSSearchRequest):
+async def vss_search_api(req: VSSSearchRequest, request: Request):
     """VSS Blueprint Agentic Search endpoint with Critic Agent verification."""
     from vss_search_engine import search_vss_archive
+    allowed_channels = get_current_user_allowed_channels(request)
     filters = {
         "source_type": req.source_type,
         "video_sources": req.video_sources,
@@ -1321,7 +1704,8 @@ async def vss_search_api(req: VSSSearchRequest):
         "from_time": req.from_time,
         "to_time": req.to_time,
         "min_cosine_similarity": req.min_cosine_similarity,
-        "top_k": req.top_k or 10
+        "top_k": req.top_k or 10,
+        "allowed_channels": allowed_channels,
     }
     return await asyncio.to_thread(search_vss_archive, req.query, filters)
 
@@ -1379,7 +1763,10 @@ def generate_frames(channel: int):
         cap.release()
 
 @app.get("/api/stream/live/{channel}")
-async def live_stream(channel: int):
+async def live_stream(channel: int, request: Request):
+    allowed_channels = get_current_user_allowed_channels(request)
+    if allowed_channels is not None and channel not in allowed_channels:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền xem luồng trực tiếp của camera này.")
     return StreamingResponse(generate_frames(channel), media_type="multipart/x-mixed-replace; boundary=frame")
 
 class NVRConfigModel(BaseModel):
@@ -1451,10 +1838,168 @@ async def get_cosmos_prompt_profile(_: str = Depends(require_database_admin)):
     return {"selected": config.COSMOS_PROMPT_PROFILE, "profiles": _available_cosmos_prompt_profiles()}
 
 
+class AIConfigUpdateModel(BaseModel):
+    vlm_server_url: Optional[str] = None
+    vlm_api_key: Optional[str] = None
+    vlm_model_name: Optional[str] = None
+    dense_frames_count: Optional[int] = None
+    max_vlm_frames: Optional[int] = None
+    audio_server_url: Optional[str] = None
+    audio_api_key: Optional[str] = None
+    audio_model_name: Optional[str] = None
+    use_deepfilter: Optional[bool] = None
+
+
+@app.get("/api/admin/ai-config")
+async def get_ai_config_api(_: str = Depends(require_database_admin)):
+    """Return actual Server AI (VLM + Audio) configuration from config/.env."""
+    return {
+        "status": "success",
+        "vlm": {
+            "server_url": config.QWEN_SERVER_URL,
+            "model_name": config.QWEN_MODEL_NAME,
+            "has_api_key": bool(config.QWEN_API_KEY),
+            "dense_frames_count": config.DENSE_FRAMES_COUNT,
+            "max_vlm_frames": config.MAX_VLM_FRAMES,
+            "available_models": [
+                "GLM-5.3-Flash",
+                "Qwen3.8-27B",
+                "Qwen2.5-VL-72B-Instruct",
+                "Qwen2.5-VL-7B-Instruct",
+                "Qwen2.5-72B-Instruct"
+            ]
+        },
+        "audio": {
+            "server_url": config.INTERNAL_AUDIO_SERVER_URL,
+            "model_name": config.INTERNAL_AUDIO_MODEL_NAME,
+            "has_api_key": bool(config.INTERNAL_AUDIO_SERVER_API_KEY),
+            "use_deepfilter": config.USE_DEEPFILTER
+        }
+    }
+
+
+@app.post("/api/admin/ai-config")
+async def set_ai_config_api(payload: AIConfigUpdateModel, _: str = Depends(require_database_admin)):
+    """Update internal Server AI configuration in memory and persist to CameraAI/.env."""
+    env_updates = {}
+    if payload.vlm_server_url is not None and payload.vlm_server_url.strip():
+        config.QWEN_SERVER_URL = payload.vlm_server_url.strip().rstrip("/")
+        os.environ["QWEN_SERVER_URL"] = config.QWEN_SERVER_URL
+        env_updates["QWEN_SERVER_URL"] = config.QWEN_SERVER_URL
+
+    if payload.vlm_model_name is not None and payload.vlm_model_name.strip():
+        config.QWEN_MODEL_NAME = payload.vlm_model_name.strip()
+        os.environ["QWEN_MODEL_NAME"] = config.QWEN_MODEL_NAME
+        env_updates["QWEN_MODEL_NAME"] = config.QWEN_MODEL_NAME
+
+    if payload.vlm_api_key is not None and payload.vlm_api_key.strip():
+        config.QWEN_API_KEY = payload.vlm_api_key.strip()
+        os.environ["QWEN_API_KEY"] = config.QWEN_API_KEY
+        env_updates["QWEN_API_KEY"] = config.QWEN_API_KEY
+
+    if payload.dense_frames_count is not None:
+        config.DENSE_FRAMES_COUNT = max(2, min(16, payload.dense_frames_count))
+        os.environ["DENSE_FRAMES_COUNT"] = str(config.DENSE_FRAMES_COUNT)
+        env_updates["DENSE_FRAMES_COUNT"] = str(config.DENSE_FRAMES_COUNT)
+
+    if payload.max_vlm_frames is not None:
+        config.MAX_VLM_FRAMES = max(2, min(16, payload.max_vlm_frames))
+        os.environ["MAX_VLM_FRAMES"] = str(config.MAX_VLM_FRAMES)
+        env_updates["MAX_VLM_FRAMES"] = str(config.MAX_VLM_FRAMES)
+
+    if payload.audio_server_url is not None and payload.audio_server_url.strip():
+        config.INTERNAL_AUDIO_SERVER_URL = payload.audio_server_url.strip().rstrip("/")
+        os.environ["INTERNAL_AUDIO_SERVER_URL"] = config.INTERNAL_AUDIO_SERVER_URL
+        env_updates["INTERNAL_AUDIO_SERVER_URL"] = config.INTERNAL_AUDIO_SERVER_URL
+
+    if payload.audio_model_name is not None and payload.audio_model_name.strip():
+        config.INTERNAL_AUDIO_MODEL_NAME = payload.audio_model_name.strip()
+        os.environ["INTERNAL_AUDIO_MODEL_NAME"] = config.INTERNAL_AUDIO_MODEL_NAME
+        env_updates["INTERNAL_AUDIO_MODEL_NAME"] = config.INTERNAL_AUDIO_MODEL_NAME
+
+    if payload.audio_api_key is not None and payload.audio_api_key.strip():
+        config.INTERNAL_AUDIO_SERVER_API_KEY = payload.audio_api_key.strip()
+        os.environ["INTERNAL_AUDIO_SERVER_API_KEY"] = config.INTERNAL_AUDIO_SERVER_API_KEY
+        env_updates["INTERNAL_AUDIO_SERVER_API_KEY"] = config.INTERNAL_AUDIO_SERVER_API_KEY
+
+    if payload.use_deepfilter is not None:
+        config.USE_DEEPFILTER = payload.use_deepfilter
+        os.environ["USE_DEEPFILTER"] = "true" if config.USE_DEEPFILTER else "false"
+        env_updates["USE_DEEPFILTER"] = "true" if config.USE_DEEPFILTER else "false"
+
+    # Persist to CameraAI/.env
+    env_file = config.BASE_DIR / ".env"
+    if env_file.is_file() and env_updates:
+        lines = env_file.read_text(encoding="utf-8").splitlines()
+        new_lines = []
+        seen = set()
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and "=" in stripped:
+                k, _ = stripped.split("=", 1)
+                k = k.strip()
+                if k in env_updates:
+                    new_lines.append(f"{k}={env_updates[k]}")
+                    seen.add(k)
+                    continue
+            new_lines.append(line)
+        for k, v in env_updates.items():
+            if k not in seen:
+                new_lines.append(f"{k}={v}")
+        env_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+    return {
+        "status": "success",
+        "message": f"Đã cập nhật cấu hình Server AI ({config.QWEN_MODEL_NAME}) thành công!",
+        "vlm": {
+            "server_url": config.QWEN_SERVER_URL,
+            "model_name": config.QWEN_MODEL_NAME,
+            "dense_frames_count": config.DENSE_FRAMES_COUNT
+        }
+    }
+
+
+@app.post("/api/admin/ai-config/test-vlm")
+async def test_vlm_connection_api(_: str = Depends(require_database_admin)):
+    """Test ping to Internal VLM Server and return latency + response."""
+    import time
+    t0 = time.time()
+    try:
+        res = await asyncio.to_thread(
+            call_qwen_chat,
+            [{"role": "user", "content": "Xin chào, phản hồi ngắn gọn xác nhận kết nối."}],
+            max_tokens=60,
+            temperature=0.1,
+            timeout=15
+        )
+        latency_ms = int((time.time() - t0) * 1000)
+        return {
+            "status": "success",
+            "connected": True,
+            "latency_ms": latency_ms,
+            "model": res.get("model", config.QWEN_MODEL_NAME),
+            "reply": res.get("reply", ""),
+            "server_url": config.QWEN_SERVER_URL
+        }
+    except Exception as e:
+        latency_ms = int((time.time() - t0) * 1000)
+        return {
+            "status": "error",
+            "connected": False,
+            "latency_ms": latency_ms,
+            "error": str(e),
+            "server_url": config.QWEN_SERVER_URL
+        }
+
+
 @app.get("/api/admin/gemini-config")
 async def get_gemini_config(_: str = Depends(require_database_admin)):
-    """Expose status only; never send the saved API key back to the browser."""
-    return get_gemini_public_config()
+    """Legacy compatibility endpoint returning the active VLM model from config/.env."""
+    return {
+        "configured": bool(config.QWEN_API_KEY),
+        "model": config.QWEN_MODEL_NAME,
+        "source": "Server VLM"
+    }
 
 
 @app.post("/api/admin/gemini-config")
@@ -1484,61 +2029,7 @@ async def set_admin_credentials_api(payload: AdminCredentialsModel, _: str = Dep
     return {"message": "Đã lưu tài khoản quản trị mới thành công."}
 
 
-USERS_STORAGE_FILE = config.STORAGE_DIR / "users.json"
-
-
-def get_all_system_users() -> list[dict]:
-    expected_user, expected_password = get_admin_credentials()
-    default_users = [
-        {
-            "username": expected_user,
-            "password": expected_password,
-            "role": "admin",
-            "full_name": "Quản trị viên Hệ thống",
-            "can_config_nvr": True,
-            "created_at": "2026-09-21T00:00:00"
-        }
-    ]
-    if not USERS_STORAGE_FILE.is_file():
-        try:
-            USERS_STORAGE_FILE.write_text(json.dumps(default_users, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception:
-            pass
-        return default_users
-
-    try:
-        data = json.loads(USERS_STORAGE_FILE.read_text(encoding="utf-8"))
-        if isinstance(data, list) and len(data) > 0:
-            # Remove credentials that shipped as development/demo defaults before
-            # the service was made reachable from other computers.
-            cleaned_data = []
-            for item in data:
-                username = str(item.get("username", ""))
-                password = str(item.get("password", ""))
-                is_legacy_viewer = username == "user" and password == "123"
-                is_legacy_admin = (
-                    expected_user != "admin"
-                    and username == "admin"
-                    and password in {"admin", "namcantho@168"}
-                )
-                if not is_legacy_viewer and not is_legacy_admin:
-                    cleaned_data.append(item)
-            data = cleaned_data
-            has_admin = any(u.get("username") == expected_user for u in data)
-            if not has_admin:
-                data.insert(0, default_users[0])
-            try:
-                save_system_users(data)
-            except Exception:
-                pass
-            return data
-    except Exception:
-        pass
-    return default_users
-
-
-def save_system_users(users: list[dict]):
-    USERS_STORAGE_FILE.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+# (Users storage helpers defined above)
 
 
 class SubUserModel(BaseModel):
@@ -1546,7 +2037,72 @@ class SubUserModel(BaseModel):
     password: str
     role: str = "viewer"
     full_name: str = ""
+    allowed_channels: Optional[List[Union[int, str]]] = None
 
+
+class SubUserUpdateModel(BaseModel):
+    password: Optional[str] = None
+    role: Optional[str] = None
+    full_name: Optional[str] = None
+    allowed_channels: Optional[List[Union[int, str]]] = None
+
+
+class ActiveSessionTracker:
+    """Thread-safe in-memory registry of active authenticated sessions for security audit."""
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._sessions: dict[str, dict] = {}  # key -> info
+        self._revoked_keys: set[str] = set()
+
+    def update_session(self, username: str, role: str, ip: str, user_agent: str) -> None:
+        key = f"{username}_{ip}"
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with self._lock:
+            # Re-allow if legitimate activity
+            self._revoked_keys.discard(key)
+            if key not in self._sessions:
+                self._sessions[key] = {
+                    "key": key,
+                    "username": username,
+                    "role": role,
+                    "ip": ip,
+                    "user_agent": user_agent,
+                    "login_time": now_str,
+                    "last_active": now_str,
+                }
+            else:
+                self._sessions[key]["last_active"] = now_str
+                self._sessions[key]["user_agent"] = user_agent
+                self._sessions[key]["role"] = role
+
+    def is_revoked(self, username: str, ip: str) -> bool:
+        key = f"{username}_{ip}"
+        with self._lock:
+            return key in self._revoked_keys
+
+    def revoke_session(self, key: str) -> bool:
+        with self._lock:
+            self._revoked_keys.add(key)
+            removed = self._sessions.pop(key, None)
+            return removed is not None or key in self._revoked_keys
+
+    def remove_session(self, username: str, ip: str) -> None:
+        key = f"{username}_{ip}"
+        with self._lock:
+            self._sessions.pop(key, None)
+            self._revoked_keys.discard(key)
+
+    def get_active_sessions(self) -> list[dict]:
+        with self._lock:
+            return sorted(list(self._sessions.values()), key=lambda x: x.get("last_active", ""), reverse=True)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._sessions.clear()
+            self._revoked_keys.clear()
+
+
+active_session_tracker = ActiveSessionTracker()
 
 class LoginRateLimiter:
     """In-memory thread-safe rate limiter and brute-force lockout protector for login endpoints."""
@@ -1635,6 +2191,34 @@ class LoginRateLimiter:
             self._failed_attempts.clear()
             self._locked_until.clear()
 
+    def get_locked_entities(self) -> list[dict]:
+        now = time.time()
+        results = []
+        with self._lock:
+            for entity, lock_time in list(self._locked_until.items()):
+                if now < lock_time:
+                    rem = int(lock_time - now) + 1
+                    is_ip = "." in entity or ":" in entity
+                    results.append({
+                        "target": entity,
+                        "type": "ip" if is_ip else "username",
+                        "remaining_seconds": rem,
+                        "failed_attempts": self._failed_attempts.get(entity, self.max_failures),
+                    })
+                else:
+                    self._locked_until.pop(entity, None)
+                    self._failed_attempts.pop(entity, None)
+        return results
+
+    def unblock(self, target: str) -> bool:
+        with self._lock:
+            removed = (target in self._locked_until or target in self._failed_attempts)
+            self._locked_until.pop(target, None)
+            self._failed_attempts.pop(target, None)
+            if target in self._requests:
+                self._requests.pop(target, None)
+            return removed
+
 login_rate_limiter = LoginRateLimiter(max_requests_per_minute=5, max_failures=5, lockout_seconds=300)
 
 
@@ -1646,6 +2230,13 @@ async def verify_admin_login(payload: AdminCredentialsModel, request: Request):
 
     allowed, err_msg, retry_after = login_rate_limiter.check_rate_limit(client_ip, u)
     if not allowed:
+        database.log_login_attempt(
+            ip_address=client_ip,
+            username=u,
+            status="locked_out" if "khóa" in err_msg else "rate_limited",
+            user_agent=request.headers.get("user-agent", ""),
+            detail=err_msg
+        )
         return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             content={"detail": err_msg},
@@ -1658,13 +2249,27 @@ async def verify_admin_login(payload: AdminCredentialsModel, request: Request):
     if (secrets.compare_digest(u, expected_user) and secrets.compare_digest(p, expected_password)) or \
        (config.NVR_USER and config.NVR_PASSWORD and secrets.compare_digest(u, config.NVR_USER) and secrets.compare_digest(p, config.NVR_PASSWORD)):
         login_rate_limiter.record_success(client_ip, u)
+        database.log_login_attempt(
+            ip_address=client_ip,
+            username=u,
+            status="success",
+            user_agent=request.headers.get("user-agent", ""),
+            detail="Đăng nhập Quản trị viên thành công"
+        )
+        active_session_tracker.update_session(u, "admin", client_ip, request.headers.get("user-agent", ""))
         request.session.clear()
-        request.session.update({"username": u, "role": "admin", "can_config_nvr": True})
+        request.session.update({
+            "username": u,
+            "role": "admin",
+            "can_config_nvr": True,
+            "allowed_channels": ["*"]
+        })
         return {
             "status": "success",
             "username": u,
             "role": "admin",
             "can_config_nvr": True,
+            "allowed_channels": ["*"],
             "full_name": "Quản trị viên Hệ thống",
             "message": "Xác thực Quản trị viên thành công."
         }
@@ -1676,25 +2281,322 @@ async def verify_admin_login(payload: AdminCredentialsModel, request: Request):
             login_rate_limiter.record_success(client_ip, u)
             role = item.get("role", "viewer")
             can_config = (role == "admin")
+            allowed_channels = ["*"] if role == "admin" else item.get("allowed_channels", [])
+            database.log_login_attempt(
+                ip_address=client_ip,
+                username=u,
+                status="success",
+                user_agent=request.headers.get("user-agent", ""),
+                detail=f"Đăng nhập thành công với vai trò {role}"
+            )
+            active_session_tracker.update_session(u, role, client_ip, request.headers.get("user-agent", ""))
             request.session.clear()
-            request.session.update({"username": u, "role": role, "can_config_nvr": can_config})
+            request.session.update({
+                "username": u,
+                "role": role,
+                "can_config_nvr": can_config,
+                "allowed_channels": allowed_channels
+            })
             return {
                 "status": "success",
                 "username": u,
                 "role": role,
                 "can_config_nvr": can_config,
+                "allowed_channels": allowed_channels,
                 "full_name": item.get("full_name", u),
                 "message": f"Đăng nhập thành công với vai trò {role}."
             }
 
     login_rate_limiter.record_failure(client_ip, u)
+    database.log_login_attempt(
+        ip_address=client_ip,
+        username=u,
+        status="failed_password",
+        user_agent=request.headers.get("user-agent", ""),
+        detail="Sai tên đăng nhập hoặc mật khẩu"
+    )
     raise HTTPException(status_code=401, detail="Sai tên đăng nhập hoặc mật khẩu.")
+
+
+class GoogleVerifyCredentialModel(BaseModel):
+    credential: str
+
+
+@app.get("/api/auth/google/config")
+async def get_google_auth_config():
+    """Return public Google Client ID configuration for frontend SSO buttons."""
+    return {
+        "client_id": config.GOOGLE_CLIENT_ID or "",
+        "configured": bool(config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET)
+    }
+
+
+@app.get("/api/auth/google/login")
+async def google_login_redirect(request: Request):
+    """Redirect user to Google OAuth 2.0 consent screen."""
+    import urllib.parse
+    if not config.GOOGLE_CLIENT_ID:
+        err_msg = "Chưa cấu hình GOOGLE_CLIENT_ID trong file .env. Vui lòng cung cấp Client ID & Client Secret từ Google Cloud Console."
+        return RedirectResponse(
+            url="/login?error=" + urllib.parse.quote(err_msg),
+            status_code=status.HTTP_302_FOUND
+        )
+
+    redirect_uri = config.GOOGLE_REDIRECT_URI
+    if not redirect_uri:
+        redirect_uri = f"{str(request.base_url).rstrip('/')}/api/auth/google/callback"
+
+    state = secrets.token_urlsafe(16)
+    request.session["google_oauth_state"] = state
+
+    params = {
+        "client_id": config.GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "online",
+        "prompt": "select_account"
+    }
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+    return RedirectResponse(url=auth_url, status_code=status.HTTP_302_FOUND)
+
+
+@app.get("/api/auth/google/callback")
+async def google_auth_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
+    """Handle Google OAuth 2.0 authorization code callback."""
+    import urllib.parse
+    import httpx
+
+    if error:
+        return RedirectResponse(url=f"/login?error={urllib.parse.quote('Đăng nhập Google thất bại: ' + error)}", status_code=status.HTTP_302_FOUND)
+
+    if not code:
+        return RedirectResponse(url=f"/login?error={urllib.parse.quote('Mã xác thực Google không hợp lệ.')}", status_code=status.HTTP_302_FOUND)
+
+    redirect_uri = config.GOOGLE_REDIRECT_URI or f"{str(request.base_url).rstrip('/')}/api/auth/google/callback"
+    client_ip = login_rate_limiter.get_client_ip(request)
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            token_resp = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": config.GOOGLE_CLIENT_ID,
+                    "client_secret": config.GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code"
+                }
+            )
+            if token_resp.status_code != 200:
+                err_detail = token_resp.text
+                return RedirectResponse(
+                    url=f"/login?error={urllib.parse.quote('Không thể xác thực token Google: ' + err_detail[:100])}",
+                    status_code=status.HTTP_302_FOUND
+                )
+            token_data = token_resp.json()
+            access_token = token_data.get("access_token")
+
+            # Fetch user profile from Google
+            userinfo_resp = await client.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            if userinfo_resp.status_code != 200:
+                return RedirectResponse(
+                    url=f"/login?error={urllib.parse.quote('Không thể lấy thông tin tài khoản Google.')}",
+                    status_code=status.HTTP_302_FOUND
+                )
+            user_info = userinfo_resp.json()
+
+        email = user_info.get("email", "").strip().lower()
+        name = user_info.get("name", email)
+        picture = user_info.get("picture", "")
+
+        is_admin = (
+            email in config.GOOGLE_ADMIN_EMAILS
+            or any(email == admin_em for admin_em in config.GOOGLE_ADMIN_EMAILS)
+            or email.startswith("admin@")
+        )
+        user_record = upsert_google_system_user(email, name, picture, is_admin)
+        role = user_record.get("role", "viewer")
+        allowed_channels = user_record.get("allowed_channels", [])
+        display_name = user_record.get("full_name") or name
+        avatar = user_record.get("avatar_url") or picture
+
+        login_rate_limiter.record_success(client_ip, email)
+        database.log_login_attempt(
+            ip_address=client_ip,
+            username=email,
+            status="success",
+            user_agent=request.headers.get("user-agent", ""),
+            detail=f"Đăng nhập thành công qua Google SSO ({role})"
+        )
+        active_session_tracker.update_session(email, role, client_ip, request.headers.get("user-agent", ""))
+
+        request.session.clear()
+        request.session.update({
+            "username": email,
+            "role": role,
+            "can_config_nvr": (role == "admin"),
+            "allowed_channels": allowed_channels,
+            "full_name": display_name,
+            "avatar_url": avatar,
+            "auth_provider": "google"
+        })
+
+        return RedirectResponse(url="/search", status_code=status.HTTP_302_FOUND)
+
+    except Exception as exc:
+        return RedirectResponse(
+            url=f"/login?error={urllib.parse.quote('Lỗi kết nối máy chủ Google: ' + str(exc))}",
+            status_code=status.HTTP_302_FOUND
+        )
+
+
+@app.post("/api/auth/google/verify-credential")
+async def verify_google_credential(payload: GoogleVerifyCredentialModel, request: Request):
+    """Verify Google Identity Services credential JWT from frontend."""
+    import httpx
+    client_ip = login_rate_limiter.get_client_ip(request)
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"id_token": payload.credential}
+            )
+            if resp.status_code != 200:
+                raise HTTPException(status_code=401, detail="Token xác thực Google không hợp lệ hoặc đã hết hạn.")
+            data = resp.json()
+
+        email = data.get("email", "").strip().lower()
+        name = data.get("name", email)
+        picture = data.get("picture", "")
+
+        is_admin = (
+            email in config.GOOGLE_ADMIN_EMAILS
+            or any(email == admin_em for admin_em in config.GOOGLE_ADMIN_EMAILS)
+            or email.startswith("admin@")
+        )
+        user_record = upsert_google_system_user(email, name, picture, is_admin)
+        role = user_record.get("role", "viewer")
+        allowed_channels = user_record.get("allowed_channels", [])
+        display_name = user_record.get("full_name") or name
+        avatar = user_record.get("avatar_url") or picture
+
+        login_rate_limiter.record_success(client_ip, email)
+        database.log_login_attempt(
+            ip_address=client_ip,
+            username=email,
+            status="success",
+            user_agent=request.headers.get("user-agent", ""),
+            detail=f"Đăng nhập Google One-Tap SSO ({role})"
+        )
+        active_session_tracker.update_session(email, role, client_ip, request.headers.get("user-agent", ""))
+
+        request.session.clear()
+        request.session.update({
+            "username": email,
+            "role": role,
+            "can_config_nvr": (role == "admin"),
+            "allowed_channels": allowed_channels,
+            "full_name": display_name,
+            "avatar_url": avatar,
+            "auth_provider": "google"
+        })
+
+        return {
+            "status": "success",
+            "username": email,
+            "full_name": display_name,
+            "role": role,
+            "can_config_nvr": (role == "admin"),
+            "redirect": "/search"
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Lỗi xác thực Google: {exc}")
 
 
 @app.post("/api/logout")
 async def logout(request: Request):
+    username = request.session.get("username", "")
+    client_ip = login_rate_limiter.get_client_ip(request)
+    if username:
+        active_session_tracker.remove_session(username, client_ip)
     request.session.clear()
     return {"status": "success"}
+
+
+@app.get("/api/user/allowed-cameras")
+async def get_user_allowed_cameras_api(request: Request):
+    """Return the list of allowed cameras for the current logged-in user with standardized names."""
+    allowed = get_current_user_allowed_channels(request)
+    if allowed is None:
+        channel_ids = sorted(config.ACTIVE_CHANNELS)
+    else:
+        channel_ids = sorted(allowed)
+
+    cameras = []
+    for ch in channel_ids:
+        raw_name = config.CAMERA_NAMES.get(str(ch)) or f"Kênh {ch:02d}"
+        display_name = f"D{ch:02d} - {raw_name}" if not raw_name.startswith(f"D{ch:02d}") else raw_name
+        cameras.append({
+            "channel": ch,
+            "name": display_name,
+            "raw_name": raw_name,
+        })
+    return {
+        "status": "success",
+        "username": request.session.get("username", ""),
+        "role": request.session.get("role", "viewer"),
+        "is_admin": request.session.get("role") == "admin",
+        "cameras": cameras,
+    }
+
+
+@app.get("/api/admin/cameras/all")
+async def get_all_system_cameras_api(_: str = Depends(require_session_admin)):
+    """Return all 32 channels with names, categories, and presets for RBAC matrix assignment."""
+    cameras = []
+    lobby_channels = {18, 19, 20}
+    office_channels = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+    corridor_channels = {21, 22, 23, 24}
+
+    for ch in range(1, 33):
+        raw_name = config.CAMERA_NAMES.get(str(ch)) or f"Kênh {ch:02d}"
+        display_name = f"D{ch:02d} - {raw_name}" if not raw_name.startswith(f"D{ch:02d}") else raw_name
+        category = "Khác"
+        if ch in lobby_channels:
+            category = "Sảnh & Công cộng"
+        elif ch in office_channels:
+            category = "Phòng ban & Đào tạo"
+        elif ch in corridor_channels:
+            category = "Hành lang & Ban Giám Hiệu"
+        elif ch == 17:
+            category = "Phòng họp"
+
+        cameras.append({
+            "channel": ch,
+            "name": display_name,
+            "raw_name": raw_name,
+            "category": category,
+            "is_active": ch in config.ACTIVE_CHANNELS,
+        })
+    return {
+        "status": "success",
+        "total": len(cameras),
+        "cameras": cameras,
+        "presets": {
+            "all": list(range(1, 33)),
+            "lobby": [18, 19, 20],
+            "office": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+            "corridor": [21, 22, 23, 24],
+            "active_now": sorted(list(config.ACTIVE_CHANNELS)),
+        },
+    }
 
 
 @app.get("/api/admin/users")
@@ -1706,7 +2608,11 @@ async def list_system_users(_: str = Depends(require_session_admin)):
             "role": u.get("role", "viewer"),
             "full_name": u.get("full_name", ""),
             "can_config_nvr": (u.get("role") == "admin"),
-            "created_at": u.get("created_at", "")
+            "allowed_channels": ["*"] if u.get("role") == "admin" else u.get("allowed_channels", []),
+            "created_at": u.get("created_at", ""),
+            "auth_provider": u.get("auth_provider", "local"),
+            "avatar_url": u.get("avatar_url", ""),
+            "last_login": u.get("last_login", "")
         }
         for u in users
     ]
@@ -1727,17 +2633,125 @@ async def create_system_user(payload: SubUserModel, _: str = Depends(require_ses
     if role not in ("admin", "operator", "viewer"):
         role = "viewer"
 
+    allowed_channels = sanitize_allowed_channels(payload.allowed_channels, role)
+
     new_user = {
         "username": u,
         "password": p,
         "role": role,
         "full_name": payload.full_name.strip() or u,
         "can_config_nvr": (role == "admin"),
+        "allowed_channels": allowed_channels,
         "created_at": datetime.now().isoformat(timespec="seconds")
     }
     users.append(new_user)
     save_system_users(users)
     return {"status": "success", "message": f"Đã tạo tài khoản con '{u}' thành công."}
+
+
+@app.put("/api/admin/users/{username}")
+async def update_system_user(username: str, payload: SubUserUpdateModel, _: str = Depends(require_session_admin)):
+    u = username.strip()
+    expected_user, _ = get_admin_credentials()
+    users = get_all_system_users()
+    target_idx = None
+    for idx, item in enumerate(users):
+        if item.get("username") == u:
+            target_idx = idx
+            break
+
+    if target_idx is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản để cập nhật.")
+
+    user_obj = users[target_idx]
+
+    if payload.role is not None:
+        new_role = payload.role.strip().lower()
+        if new_role in ("admin", "operator", "viewer"):
+            if u == expected_user and new_role != "admin":
+                raise HTTPException(status_code=400, detail="Không thể đổi vai trò Quản trị viên của tài khoản chính.")
+            user_obj["role"] = new_role
+            user_obj["can_config_nvr"] = (new_role == "admin")
+
+    if payload.full_name is not None:
+        user_obj["full_name"] = payload.full_name.strip()
+
+    if payload.password is not None and payload.password.strip():
+        user_obj["password"] = payload.password.strip()
+
+    curr_role = user_obj.get("role", "viewer")
+    if curr_role == "admin":
+        user_obj["allowed_channels"] = ["*"]
+    elif payload.allowed_channels is not None:
+        user_obj["allowed_channels"] = sanitize_allowed_channels(payload.allowed_channels, curr_role)
+
+    users[target_idx] = user_obj
+    save_system_users(users)
+    return {
+        "status": "success",
+        "message": f"Đã cập nhật tài khoản '{u}' thành công.",
+        "user": {
+            "username": user_obj.get("username"),
+            "role": user_obj.get("role"),
+            "full_name": user_obj.get("full_name"),
+            "allowed_channels": user_obj.get("allowed_channels"),
+        }
+    }
+
+
+class RevokeSessionModel(BaseModel):
+    session_key: str
+
+
+class UnblockModel(BaseModel):
+    target: str
+
+
+@app.get("/api/admin/security/active-sessions")
+async def get_active_sessions_api(_: str = Depends(require_session_admin)):
+    """Return all currently active authenticated sessions across IP addresses."""
+    return {
+        "status": "success",
+        "sessions": active_session_tracker.get_active_sessions()
+    }
+
+
+@app.post("/api/admin/security/revoke-session")
+async def revoke_session_api(payload: RevokeSessionModel, _: str = Depends(require_session_admin)):
+    """Remotely terminate an active session by session_key."""
+    key = payload.session_key.strip()
+    active_session_tracker.revoke_session(key)
+    return {"status": "success", "message": f"Đã hủy phiên làm việc '{key}' thành công."}
+
+
+@app.get("/api/admin/security/audit-logs")
+async def get_security_audit_logs_api(
+    limit: int = Query(default=50, ge=1, le=200),
+    ip_filter: Optional[str] = None,
+    username_filter: Optional[str] = None,
+    _: str = Depends(require_session_admin)
+):
+    """Return recent authentication audit trail logs."""
+    logs = database.get_login_audit_logs(limit=limit, ip_filter=ip_filter, username_filter=username_filter)
+    return {"status": "success", "logs": logs}
+
+
+@app.get("/api/admin/security/lockouts")
+async def get_lockouts_api(_: str = Depends(require_session_admin)):
+    """Return IPs and accounts currently blocked by brute-force protection."""
+    lockouts = login_rate_limiter.get_locked_entities()
+    return {"status": "success", "lockouts": lockouts}
+
+
+@app.post("/api/admin/security/unblock")
+async def unblock_target_api(payload: UnblockModel, _: str = Depends(require_session_admin)):
+    """Instantly remove an IP address or username from the rate-limit lockout table."""
+    target = payload.target.strip()
+    removed = login_rate_limiter.unblock(target)
+    return {
+        "status": "success",
+        "message": f"Đã mở khóa thành công cho '{target}'." if removed else f"'{target}' không nằm trong danh sách khóa."
+    }
 
 
 @app.delete("/api/admin/users/{username}")
@@ -1893,14 +2907,20 @@ async def api_purge_storage_retention(days: Optional[int] = Query(default=None),
     return summary
 
 @app.websocket("/ws")
+@app.websocket("/ws/events")
 async def websocket_endpoint(websocket: WebSocket):
     # Enforce authentication: only users with a valid session can listen to real-time events
     session = websocket.scope.get("session") or {}
-    if not session.get("username"):
+    username = session.get("username")
+    if not username:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required")
         return
 
-    await manager.connect(websocket)
+    user_info = {
+        "username": username,
+        "role": session.get("role", "viewer"),
+    }
+    await manager.connect(websocket, user_info)
     try:
         while True:
             await websocket.receive_text()

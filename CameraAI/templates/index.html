@@ -32,9 +32,15 @@
                 <span class="pulse-dot"></span>
                 <span id="status-text">CHẾ ĐỘ GIẢ LẬP (DEMO)</span>
             </div>
-            <button class="btn btn-primary" onclick="openConfigModal()">
-                🌐 Cấu hình Kết nối Internet NVR
+            <a href="/admin" id="admin-center-nav-btn" class="btn" style="display: none; text-decoration: none; align-items: center; gap: 6px; background: linear-gradient(135deg, #00d2d3 0%, #0abde3 100%); color: #04121e; font-weight: 700; border-radius: 6px; padding: 0.5rem 0.9rem; font-size: 0.85rem;">
+                🛡️ Trung tâm Quản trị
+            </a>
+            <button class="btn btn-primary" id="btn-nvr-config" onclick="openConfigModal()">
+                🌐 Cấu hình NVR
             </button>
+            <a href="/api/logout" class="btn" style="text-decoration: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; border-radius: 6px; padding: 0.5rem 0.8rem; font-size: 0.85rem;">
+                Đăng xuất
+            </a>
         </div>
     </nav>
 

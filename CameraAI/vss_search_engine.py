@@ -212,6 +212,29 @@ def evaluate_critic(event: Dict[str, Any], criteria: Dict[str, Any], base_simila
         "criteria_met": criteria_met
     }
 
+def find_best_clip_for_event(event_id: int, channel: int, clip_filename: Optional[str] = None) -> Optional[str]:
+    """Find a playable clip: existing clip_filename, latest clip for camera channel, or CCTV sample fallback."""
+    if clip_filename:
+        try:
+            p = resolve_clip_path(clip_filename, fetch_remote=False)
+            if p.is_file():
+                return clip_filename
+        except Exception:
+            pass
+    cam_str = f"cam-{channel:03d}"
+    cam_dir = Path(config.CLIPS_DIR) / "cameras" / cam_str
+    if cam_dir.is_dir():
+        mp4s = sorted(cam_dir.rglob("*.mp4"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if mp4s:
+            try:
+                return mp4s[0].relative_to(config.CLIPS_DIR).as_posix()
+            except Exception:
+                pass
+    for sample in ["sample_valid.mp4", "test_real_h264.mp4", "sample_h264.mp4"]:
+        if (Path(config.CLIPS_DIR) / sample).is_file():
+            return sample
+    return None
+
 def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Full Search Pipeline:
@@ -224,6 +247,26 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
     filters = filters or {}
     decomp = decompose_query(query, filters)
     ch = decomp.get("channel")
+    allowed_channels = filters.get("allowed_channels")
+
+    # Channel-level RBAC: check if user is restricted
+    if allowed_channels is not None:
+        if len(allowed_channels) == 0:
+            return {
+                "query": query,
+                "data": [],
+                "total_matches": 0,
+                "channel": ch,
+                "message": "Tài khoản của bạn chưa được phân quyền xem camera nào."
+            }
+        if ch is not None and ch not in allowed_channels:
+            return {
+                "query": query,
+                "data": [],
+                "total_matches": 0,
+                "channel": ch,
+                "message": f"Bạn không có quyền truy cập Camera Kênh {ch:02d}."
+            }
 
     # If caller explicitly provided an empty event_ids list (e.g. Agent RAG found 0 events),
     # return immediately with 0 results instead of pulling random clips!
@@ -243,13 +286,23 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
     event_ids = decomp.get("event_ids") or []
     ch = decomp.get("channel")
 
-    # Query events that have real clips
+    allowed_clause = ""
+    allowed_params = []
+    if allowed_channels is not None:
+        placeholders = ",".join(["?"] * len(allowed_channels))
+        allowed_clause = f" AND channel IN ({placeholders})"
+        allowed_params = list(allowed_channels)
+
+    # Query events
     sql = """
         SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec
         FROM events
-        WHERE clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
+        WHERE 1=1
     """
     params = []
+    if allowed_clause:
+        sql += allowed_clause
+        params.extend(allowed_params)
 
     if target_id:
         sql += " AND id = ?"
@@ -273,32 +326,33 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
                 t_dict = dict(target_ev)
                 t_time = t_dict.get("timestamp")
                 t_ch = t_dict.get("channel")
-                cursor.execute("""
-                    SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec,
-                           ABS(strftime('%s', timestamp) - strftime('%s', ?)) as time_diff
-                    FROM events
-                    WHERE channel = ? AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
-                    ORDER BY time_diff ASC LIMIT 5
-                """, (t_time, t_ch))
-                nearby_rows = [dict(r) for r in cursor.fetchall()]
-                if not nearby_rows:
+                if allowed_channels is None or t_ch in allowed_channels:
                     cursor.execute("""
                         SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec,
                                ABS(strftime('%s', timestamp) - strftime('%s', ?)) as time_diff
                         FROM events
-                        WHERE clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
+                        WHERE channel = ? AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
                         ORDER BY time_diff ASC LIMIT 5
-                    """, (t_time,))
+                    """, (t_time, t_ch))
                     nearby_rows = [dict(r) for r in cursor.fetchall()]
-                for nr in nearby_rows:
-                    try:
-                        if resolve_clip_path(nr["clip_filename"]).is_file():
-                            nr["title"] = f"Event #{target_id} (Clip #{nr['id']})"
-                            nr["description"] = f"[Clip tương ứng lúc {nr.get('timestamp')} trên Cam {nr.get('channel')}] {nr.get('description', '')}"
-                            rows = [nr]
-                            break
-                    except Exception:
-                        pass
+                    if not nearby_rows and (allowed_channels is None or not allowed_params):
+                        cursor.execute("""
+                            SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec,
+                                   ABS(strftime('%s', timestamp) - strftime('%s', ?)) as time_diff
+                            FROM events
+                            WHERE clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
+                            ORDER BY time_diff ASC LIMIT 5
+                        """, (t_time,))
+                        nearby_rows = [dict(r) for r in cursor.fetchall()]
+                    for nr in nearby_rows:
+                        try:
+                            if resolve_clip_path(nr["clip_filename"]).is_file():
+                                nr["title"] = f"Event #{target_id} (Clip #{nr['id']})"
+                                nr["description"] = f"[Clip tương ứng lúc {nr.get('timestamp')} trên Cam {nr.get('channel')}] {nr.get('description', '')}"
+                                rows = [nr]
+                                break
+                        except Exception:
+                            pass
     elif event_ids:
         # Highest precision: prioritize specific event IDs grounded by Agent RAG across any cameras
         placeholders = ",".join(["?"] * len(event_ids))
@@ -355,9 +409,12 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         fallback_sql = """
             SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec
             FROM events
-            WHERE clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
+            WHERE 1=1
         """
         fallback_params = []
+        if allowed_clause:
+            fallback_sql += allowed_clause
+            fallback_params.extend(allowed_params)
         if ch:
             fallback_sql += " AND channel = ?"
             fallback_params.append(ch)
@@ -379,10 +436,11 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
     lowered_q = decomp["raw_query"].lower()
 
     for row in rows:
-        clip_name = row["clip_filename"]
-        clip_path = resolve_clip_path(clip_name)
-        if not clip_path.is_file():
+        clip_name = row.get("clip_filename")
+        best_clip = find_best_clip_for_event(row["id"], row["channel"], clip_name)
+        if not best_clip:
             continue
+        clip_name = best_clip
 
         # Score calculation based on query match and severity
         desc = (row["description"] or "").lower()
@@ -458,7 +516,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         f"messages=\n"
         f"[Message(content='{decomp['raw_query']}',\n"
         f"role=<UserMessageContentRoleType.USER: 'user'>)]\n"
-        f"model='Qwen3.8-27B (Server AI)'\n"
+        f"model='{config.QWEN_MODEL_NAME} (Server AI)'\n"
         f"channel={decomp['channel'] or 11}\n"
         f"attributes={decomp['attributes']}\n"
         f"min_similarity={decomp['min_similarity']}\n"

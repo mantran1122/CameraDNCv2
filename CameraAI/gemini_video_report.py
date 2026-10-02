@@ -23,7 +23,7 @@ _VIETNAMESE_WORDS = {
     "không", "có", "người", "video", "đoạn", "hình", "ảnh", "mức", "rủi",
     "ro", "cần", "kiểm", "tra", "phát", "hiện", "khuyến", "nghị", "thời", "gian",
 }
-_DEFAULT_MODEL = "gemini-2.5-flash"
+_DEFAULT_MODEL = os.getenv("QWEN_MODEL_NAME", "GLM-5.3-Flash")
 _LOCAL_CONFIG_FILE = Path(
     os.getenv(
         "CAMERAAI_GEMINI_CONFIG_FILE",

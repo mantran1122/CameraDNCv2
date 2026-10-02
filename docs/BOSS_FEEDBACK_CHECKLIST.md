@@ -74,30 +74,30 @@
   - [x] Chuyển đổi nút hamburger bên cạnh "Vision Agent" làm nút thu/mở sidebar chính thức và loại bỏ nút mũi tên thừa thãi theo yêu cầu của Boss.
 
 ### Phase 2: Phân quyền Camera tầng Lõi Backend (#3)
-- [ ] **2.1. Cấu trúc dữ liệu Người dùng & Quyền Kênh:**
-  - [ ] Thêm trường `allowed_channels: List[int]` vào model người dùng (`SubUserModel`, `users.json` / Database).
-  - [ ] Cập nhật API `POST /api/admin/users` và `PUT /api/admin/users/{username}` để lưu danh sách kênh được phân quyền.
-- [ ] **2.2. Kiểm soát truy cập API (Access Control Enforcement):**
-  - [ ] Chặn API `/api/events`: Lọc chỉ trả về sự kiện thuộc `allowed_channels` của user.
-  - [ ] Chặn API `/api/clips/{clip_filename}` và stream video: Kiểm tra kênh của clip, chặn `403` nếu không có quyền.
-  - [ ] Chặn API `/api/vss/search` & Vision Agent Chat: Ép điều kiện lọc kênh theo quyền của user trước khi AI truy vấn dữ liệu.
-  - [ ] Chặn WebSocket `/ws/events`: Phân loại kết nối và chỉ bắn sự kiện realtime thuộc các kênh user được phép.
+- [x] **2.1. Cấu trúc dữ liệu Người dùng & Quyền Kênh:**
+  - [x] Thêm trường `allowed_channels: List[int]` vào model người dùng (`SubUserModel`, `SubUserUpdateModel`, `users.json`).
+  - [x] Cập nhật API `POST /api/admin/users` và `PUT /api/admin/users/{username}` để lưu danh sách kênh được phân quyền.
+- [x] **2.2. Kiểm soát truy cập API (Access Control Enforcement):**
+  - [x] Chặn API `/api/events`: Lọc chỉ trả về sự kiện thuộc `allowed_channels` của user.
+  - [x] Chặn API `/api/clips/{clip_filename}` và stream video: Kiểm tra kênh của clip, chặn `403` nếu không có quyền.
+  - [x] Chặn API `/api/vss/search` & Vision Agent Chat: Ép điều kiện lọc kênh theo quyền của user trước khi AI truy vấn dữ liệu.
+  - [x] Chặn WebSocket `/ws` & `/ws/events`: Phân loại kết nối và chỉ bắn sự kiện realtime thuộc các kênh user được phép.
 
 ### Phase 3: Quản lý Phân quyền & Tải động Danh sách Camera (#3 & #4)
-- [ ] **3.1. Giao diện Quản lý Phân quyền của Admin:**
-  - [ ] Bổ sung bảng chọn Kênh (Checkbox Grid 1-32) khi Admin tạo / sửa tài khoản con.
-  - [ ] Hiển thị danh sách kênh được phân quyền trong bảng danh sách người dùng.
-- [ ] **3.2. Chuẩn hóa Tên Camera & Dynamic Dropdown tại Search / Live View:**
-  - [ ] Cung cấp API `/api/user/allowed-cameras` trả về danh sách camera hợp lệ của user hiện tại kèm tên chuẩn (`Dxx - Tên vị trí`).
-  - [ ] Loại bỏ hoàn toàn logic hardcode 4 camera (`[11, 18, 19, 20]`).
-  - [ ] Tự động fill dropdown/select camera theo đúng quyền của tài khoản (được xem bao nhiêu thì dropdown bấy nhiêu).
-  - [ ] Đảm bảo chỉ liên kết luồng Main (Main Stream / Main View), loại bỏ trùng lặp sub-stream.
+- [x] **3.1. Giao diện Quản lý Phân quyền của Admin:**
+  - [x] Bổ sung bảng chọn Kênh (Checkbox Grid 1-32) khi Admin tạo / sửa tài khoản con trên Trung tâm Quản trị `/admin` (Quasar UI).
+  - [x] Hiển thị danh sách kênh được phân quyền trong bảng danh sách người dùng (`q-table`).
+- [x] **3.2. Chuẩn hóa Tên Camera & Dynamic Dropdown tại Search / Live View:**
+  - [x] Cung cấp API `/api/user/allowed-cameras` trả về danh sách camera hợp lệ của user hiện tại kèm tên chuẩn (`Dxx - Tên vị trí`).
+  - [x] Loại bỏ hoàn toàn logic hardcode 4 camera (`[11, 18, 19, 20]`).
+  - [x] Tự động fill dropdown/select camera theo đúng quyền của tài khoản (được xem bao nhiêu thì dropdown bấy nhiêu).
+  - [x] Đảm bảo chỉ liên kết luồng Main (Main Stream / Main View), loại bỏ trùng lặp sub-stream.
 
 ### Phase 4: Kiểm thử & Nghiệm thu
-- [ ] **4.1. Kiểm thử UI Chat:** Thử gõ văn bản dài, gõ nhiều đoạn với Shift+Enter, kiểm tra màu sắc trên dark mode.
-- [ ] **4.2. Kiểm thử Bảo mật Kênh:**
-  - [ ] Đăng nhập bằng tài khoản con (ví dụ chỉ có Cam 11).
-  - [ ] Kiểm tra xem dropdown chỉ có đúng Cam 11.
-  - [ ] Kiểm tra Search & Chat AI chỉ tìm thấy sự kiện Cam 11.
-  - [ ] Dùng link trực tiếp mở video của Cam khác -> Xác nhận bị chặn `403`.
-- [ ] **4.3. Báo cáo nghiệm thu hoàn tất cho Sếp.**
+- [x] **4.1. Kiểm thử UI Chat:** Thử gõ văn bản dài, gõ nhiều đoạn với Shift+Enter, kiểm tra màu sắc trên dark mode.
+- [x] **4.2. Kiểm thử Bảo mật Kênh:**
+  - [x] Đăng nhập bằng tài khoản con (ví dụ chỉ có Cam 11).
+  - [x] Kiểm tra xem dropdown chỉ có đúng Cam 11.
+  - [x] Kiểm tra Search & Chat AI chỉ tìm thấy sự kiện Cam 11.
+  - [x] Dùng link trực tiếp mở video của Cam khác -> Xác nhận bị chặn `403`.
+- [x] **4.3. Báo cáo nghiệm thu hoàn tất cho Sếp.**

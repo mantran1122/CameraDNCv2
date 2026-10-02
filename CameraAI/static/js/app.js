@@ -5,6 +5,7 @@ let activeEventFilter = false;
 let selectedEventId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    checkUserPermissions();
     fetchDailySummary();
     fetchEvents();
     loadNVRConfigUI();
@@ -18,6 +19,26 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.key === 'Escape' && videoModal?.classList.contains('active')) closeClipModal();
     });
 });
+
+async function checkUserPermissions() {
+    try {
+        const res = await fetch('/api/user/allowed-cameras');
+        if (res.ok) {
+            const data = await res.json();
+            const adminBtn = document.getElementById('admin-center-nav-btn');
+            const nvrConfigBtn = document.getElementById('btn-nvr-config');
+            if (data.is_admin) {
+                if (adminBtn) adminBtn.style.display = 'inline-flex';
+                if (nvrConfigBtn) nvrConfigBtn.style.display = 'inline-block';
+            } else {
+                if (adminBtn) adminBtn.style.display = 'none';
+                if (nvrConfigBtn) nvrConfigBtn.style.display = 'none';
+            }
+        }
+    } catch (e) {
+        console.error('Error checking user permissions:', e);
+    }
+}
 
 // Populate 32 Channel Checkboxes Grid
 function renderChannelGrid() {
@@ -697,6 +718,39 @@ function initVssAgentInput() {
     input.addEventListener("keydown", (e) => handleVssAgentKeydown(e, input));
 }
 
+const OFFICIAL_DNC_CAMERAS = {
+    1: "1.T1. ĐÀO TẠO VÀ NCKH CAM1",
+    2: "2.T1. ĐÀO TẠO VÀ NCKH CAM2",
+    3: "3.T1. TTĐT CHUẨN ĐẦU RA CAM1",
+    4: "4.T1. TTĐT CHUẨN ĐẦU RA CAM2",
+    5: "5.T1. TVTS VÀ HƯỚNG NGHIỆP CAM1",
+    6: "6.T1. TVTS VÀ HƯỚNG NGHIỆP CAM2",
+    7: "7.T1. TÀI CHÍNH-KẾ HOẠCH CAM1",
+    8: "8.T1. TÀI CHÍNH-KẾ HOẠCH CAM2",
+    9: "9.T1. TỔ CHỨC - HÀNH CHÍNH CAM1",
+    10: "10.T1. TỔ CHỨC - HÀNH CHÍNH CAM2",
+    11: "11.T1. QUẢN LÝ HSSV",
+    12: "12.T1. QTTB",
+    13: "13.TH. KHOA KINH TẾ",
+    14: "14.HAM. KHOA CƠ BẢN",
+    15: "15.HAM. QTKQ",
+    16: "16.T1. Y TẾ",
+    17: "17.T1. PHÒNG HỌP",
+    18: "18.T1. SẢNH CAM1",
+    19: "19.T1. SẢNH CAM2",
+    20: "20.T1. SẢNH CAM3",
+    21: "21.T1. HÀNH LANG TCHC",
+    22: "22.T1. HL ĐÀO TẠO",
+    23: "23.T1. HÀNH LANG CHỦ TỊCH",
+    24: "24.T1. HÀNH LANG HIỆU TRƯỞNG"
+};
+
+function formatDncCamLabel(i) {
+    const raw = OFFICIAL_DNC_CAMERAS[i] || `Kênh ${String(i).padStart(2, '0')}`;
+    const code = `D${String(i).padStart(2, '0')}`;
+    return raw.startsWith(code) ? raw : `${code} - ${raw}`;
+}
+
 function initVssVisionSearch() {
     initVssAgentInput();
     const channelSelect = document.getElementById("vss-filter-channels");
@@ -707,7 +761,7 @@ function initVssVisionSearch() {
         for (let i = 1; i <= 32; i++) {
             const opt = document.createElement("option");
             opt.value = i;
-            opt.innerText = `Camera Kênh ${String(i).padStart(2, '0')}${i === 11 || i === 18 ? ' (🟢 Online)' : ''}`;
+            opt.innerText = formatDncCamLabel(i) + ([3, 11, 18, 19, 20].includes(i) ? ' (🟢 Online)' : '');
             channelSelect.appendChild(opt);
         }
     }
@@ -717,7 +771,7 @@ function initVssVisionSearch() {
         for (let i = 1; i <= 32; i++) {
             const opt = document.createElement("option");
             opt.value = i;
-            opt.innerText = `Kênh ${String(i).padStart(2, '0')}`;
+            opt.innerText = formatDncCamLabel(i);
             quickSelect.appendChild(opt);
         }
         quickSelect.value = currentVssChannel;

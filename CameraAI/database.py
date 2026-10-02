@@ -140,6 +140,22 @@ def init_db():
     );
     """)
 
+    # Security & Access Audit Log table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS login_audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        ip_address TEXT NOT NULL,
+        username TEXT NOT NULL,
+        status TEXT NOT NULL,
+        user_agent TEXT,
+        detail TEXT
+    );
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_ip ON login_audit_logs(ip_address);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_time ON login_audit_logs(timestamp);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_user ON login_audit_logs(username);")
+
     # Repair legacy rows that were marked completed even though neither STT nor
     # an AI conclusion was produced.
     cursor.execute("""
@@ -210,7 +226,15 @@ def get_events(
     event_codes: Optional[List[str]] = None,
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
+    allowed_channels: Optional[List[int]] = None,
 ) -> List[Dict[str, Any]]:
+    # Channel-level RBAC: If user is restricted to allowed_channels
+    if allowed_channels is not None:
+        if len(allowed_channels) == 0:
+            return []
+        if channel is not None and channel not in allowed_channels:
+            return []
+
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -229,6 +253,10 @@ def get_events(
     if channel:
         query += " AND channel = ?"
         params.append(channel)
+    elif allowed_channels is not None:
+        placeholders = ",".join(["?"] * len(allowed_channels))
+        query += f" AND channel IN ({placeholders})"
+        params.extend(allowed_channels)
 
     if date_str:
         query += " AND timestamp LIKE ?"
@@ -274,11 +302,35 @@ def get_events(
     return result
 
 
-def get_channel_event_stats(channel: Optional[int] = None, date_str: Optional[str] = None) -> Dict[str, Any]:
+def get_channel_event_stats(
+    channel: Optional[int] = None,
+    date_str: Optional[str] = None,
+    allowed_channels: Optional[List[int]] = None,
+) -> Dict[str, Any]:
     """
     Return aggregate summary of real events for a given channel (or all channels if channel is None)
     and date from the SQLite database.
     """
+    if allowed_channels is not None:
+        if len(allowed_channels) == 0:
+            return {
+                "channel": channel,
+                "date": date_str,
+                "total_events": 0,
+                "total_clips": 0,
+                "code_counts": {},
+                "time_range": {"earliest": None, "latest": None}
+            }
+        if channel is not None and channel not in allowed_channels:
+            return {
+                "channel": channel,
+                "date": date_str,
+                "total_events": 0,
+                "total_clips": 0,
+                "code_counts": {},
+                "time_range": {"earliest": None, "latest": None}
+            }
+
     conn = get_db_connection()
     cursor = conn.cursor()
     params = []
@@ -286,6 +338,11 @@ def get_channel_event_stats(channel: Optional[int] = None, date_str: Optional[st
     if channel is not None:
         where_parts.append("channel = ?")
         params.append(channel)
+    elif allowed_channels is not None:
+        placeholders = ",".join(["?"] * len(allowed_channels))
+        where_parts.append(f"channel IN ({placeholders})")
+        params.extend(allowed_channels)
+
     if date_str:
         where_parts.append("timestamp LIKE ?")
         params.append(f"{date_str}%")
@@ -345,11 +402,18 @@ def get_diverse_channel_events(
     limit_per_code: int = 3,
     total_limit: int = 15,
     has_clip: bool = True,
+    allowed_channels: Optional[List[int]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Fetch a diverse mix of real events across distinct event codes and time ranges,
     avoiding returning a burst of 15 identical records in the same minute.
     """
+    if allowed_channels is not None:
+        if len(allowed_channels) == 0:
+            return []
+        if channel is not None and channel not in allowed_channels:
+            return []
+
     conn = get_db_connection()
     cursor = conn.cursor()
     params = []
@@ -357,6 +421,11 @@ def get_diverse_channel_events(
     if channel is not None:
         where_parts.append("channel = ?")
         params.append(channel)
+    elif allowed_channels is not None:
+        placeholders = ",".join(["?"] * len(allowed_channels))
+        where_parts.append(f"channel IN ({placeholders})")
+        params.extend(allowed_channels)
+
     if date_str:
         where_parts.append("timestamp LIKE ?")
         params.append(f"{date_str}%")
@@ -635,19 +704,29 @@ def get_video_analysis(event_id: int) -> Optional[Dict[str, Any]]:
     return item
 
 
-def get_kibana_figure5_stats(filter_mode: str = "all") -> Dict[str, Any]:
+def get_kibana_figure5_stats(filter_mode: str = "all", allowed_channels: Optional[List[int]] = None) -> Dict[str, Any]:
     """Return aggregated metrics, 24-hour hourly time series, and recent events
     from the SQLite database for the Kibana Figure 5 Dashboard."""
     conn = get_db_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT COUNT(*) FROM events")
+    ch_filter = ""
+    ch_params: List[Any] = []
+    if allowed_channels is not None:
+        if len(allowed_channels) == 0:
+            ch_filter = " AND 1=0"
+        else:
+            placeholders = ",".join(["?"] * len(allowed_channels))
+            ch_filter = f" AND channel IN ({placeholders})"
+            ch_params = list(allowed_channels)
+
+    cur.execute(f"SELECT COUNT(*) FROM events WHERE 1=1{ch_filter}", ch_params)
     total_db_records = cur.fetchone()[0]
 
-    cur.execute("SELECT COUNT(*) FROM events WHERE clip_filename IS NOT NULL AND TRIM(clip_filename) != ''")
+    cur.execute(f"SELECT COUNT(*) FROM events WHERE clip_filename IS NOT NULL AND TRIM(clip_filename) != ''{ch_filter}", ch_params)
     total_clips_in_db = cur.fetchone()[0]
 
-    cur.execute("SELECT MAX(timestamp) FROM events")
+    cur.execute(f"SELECT MAX(timestamp) FROM events WHERE 1=1{ch_filter}", ch_params)
     max_ts = cur.fetchone()[0]
     if max_ts:
         try:
@@ -667,7 +746,7 @@ def get_kibana_figure5_stats(filter_mode: str = "all") -> Dict[str, Any]:
     end_str = end_dt.strftime("%Y-%m-%d %H:59:59")
 
     cur.execute(
-        """
+        f"""
         SELECT substr(timestamp, 1, 13) as hour_key,
                COUNT(*) as total,
                SUM(CASE WHEN event_code LIKE '%Human%' THEN 1 ELSE 0 END) as human_cnt,
@@ -680,10 +759,10 @@ def get_kibana_figure5_stats(filter_mode: str = "all") -> Dict[str, Any]:
                SUM(CASE WHEN channel = 19 THEN 1 ELSE 0 END) as ch19_cnt,
                SUM(CASE WHEN channel = 20 THEN 1 ELSE 0 END) as ch20_cnt
         FROM events
-        WHERE timestamp >= ? AND timestamp <= ?
+        WHERE timestamp >= ? AND timestamp <= ?{ch_filter}
         GROUP BY hour_key
         """,
-        (start_str, end_str),
+        [start_str, end_str] + ch_params,
     )
 
     data_by_hour = {r["hour_key"]: dict(r) for r in cur.fetchall()}
@@ -737,7 +816,7 @@ def get_kibana_figure5_stats(filter_mode: str = "all") -> Dict[str, Any]:
             }
 
     today_str = datetime.now().strftime("%Y-%m-%d")
-    cur.execute("SELECT COUNT(*) FROM events WHERE timestamp >= ?", (f"{today_str} 00:00:00",))
+    cur.execute(f"SELECT COUNT(*) FROM events WHERE timestamp >= ?{ch_filter}", [f"{today_str} 00:00:00"] + ch_params)
     total_today = cur.fetchone()[0]
 
     health_pct = 98.5
@@ -746,29 +825,33 @@ def get_kibana_figure5_stats(filter_mode: str = "all") -> Dict[str, Any]:
 
     if filter_mode == "with_clip":
         cur.execute(
-            """
+            f"""
             SELECT id, timestamp, channel, event_code, severity, description, clip_filename
             FROM events
-            WHERE clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
+            WHERE clip_filename IS NOT NULL AND TRIM(clip_filename) != ''{ch_filter}
             ORDER BY id DESC LIMIT 15
-            """
+            """,
+            ch_params
         )
     elif filter_mode == "anomalies":
         cur.execute(
-            """
+            f"""
             SELECT id, timestamp, channel, event_code, severity, description, clip_filename
             FROM events
-            WHERE severity = 'high' OR event_code IN ('Intrusion', 'CrossLine', 'Fight', 'AudioMutation', 'SoundDetection', 'VideoMotion', 'RtspSessionDisconnect')
+            WHERE (severity = 'high' OR event_code IN ('Intrusion', 'CrossLine', 'Fight', 'AudioMutation', 'SoundDetection', 'VideoMotion', 'RtspSessionDisconnect')){ch_filter}
             ORDER BY id DESC LIMIT 15
-            """
+            """,
+            ch_params
         )
     else:
         cur.execute(
-            """
+            f"""
             SELECT id, timestamp, channel, event_code, severity, description, clip_filename
             FROM events
+            WHERE 1=1{ch_filter}
             ORDER BY id DESC LIMIT 15
-            """
+            """,
+            ch_params
         )
     recent_events = [dict(r) for r in cur.fetchall()]
     conn.close()
@@ -799,6 +882,60 @@ def get_kibana_figure5_stats(filter_mode: str = "all") -> Dict[str, Any]:
         },
         "recent_events": recent_events,
     }
+
+
+def log_login_attempt(ip_address: str, username: str, status: str, user_agent: str = "", detail: str = "") -> None:
+    """Record an authentication event in the login_audit_logs table."""
+    try:
+        conn = get_db_connection()
+        now_iso = datetime.now().astimezone().isoformat(timespec="seconds")
+        conn.execute(
+            """
+            INSERT INTO login_audit_logs (timestamp, ip_address, username, status, user_agent, detail)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (now_iso, str(ip_address), str(username), str(status), str(user_agent)[:255], str(detail)[:255])
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"[Audit Log Error] Failed to log login attempt: {exc}")
+
+
+def get_login_audit_logs(limit: int = 50, ip_filter: Optional[str] = None, username_filter: Optional[str] = None) -> list:
+    """Retrieve recent login attempts with optional filters."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        query = "SELECT id, timestamp, ip_address, username, status, user_agent, detail FROM login_audit_logs"
+        params = []
+        conditions = []
+
+        if ip_filter:
+            conditions.append("ip_address LIKE ?")
+            params.append(f"%{ip_filter.strip()}%")
+        if username_filter:
+            conditions.append("username LIKE ?")
+            params.append(f"%{username_filter.strip()}%")
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(max(1, min(int(limit), 200)))
+
+        cur.execute(query, tuple(params))
+        rows = []
+        for r in cur.fetchall():
+            d = dict(r)
+            d["client_ip"] = d.get("ip_address", "")
+            d["details"] = d.get("detail", "")
+            rows.append(d)
+        conn.close()
+        return rows
+    except Exception as exc:
+        print(f"[Audit Log Error] Failed to read audit logs: {exc}")
+        return []
 
 
 # Initialize DB on module import

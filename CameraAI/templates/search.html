@@ -5128,6 +5128,12 @@
 
             <!-- Sidebar User / Actions (Đăng xuất) -->
             <div class="sidebar-user-section" id="sidebar-user-section">
+                <a href="/admin" id="sidebar-admin-link" class="sidebar-tab-item" title="Trung tâm Quản trị Quasar" style="display: none; color: #00d2d3; text-decoration: none; margin-bottom: 4px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                    <span>Quản Trị Hệ Thống</span>
+                </a>
                 <button class="sidebar-tab-item sidebar-logout-btn" onclick="handleLogout()" title="Đăng xuất khỏi hệ thống">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -5499,10 +5505,8 @@
                     <div class="ncc-panel-list" id="ncc-alerts-list"></div>
                 </div>
 
-                <!-- 2. Center Stage: Floorplan (Hidden as requested: ẩn phần Mặt bằng) -->
                 <div class="ncc-stage-container" id="ncc-stage-floorplan" style="display: none !important;">
                     <div class="ncc-blueprint-wrap" id="ncc-blueprint-canvas">
-                        <img src="/static/assets/X-StrpP1_simpleConverted.png" class="ncc-blueprint-img" alt="CAD Blueprint Floorplan">
                         <div class="ncc-blueprint-grid"></div>
                         <!-- Camera Nodes injected dynamically -->
                         <div id="ncc-camera-nodes-layer" style="position: absolute; inset: 0;"></div>
@@ -6605,11 +6609,11 @@
             if (empty) {
                 empty.style.display = 'flex';
                 empty.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width: 52px; height: 52px; max-width: 52px; max-height: 52px; flex-shrink: 0;">
                         <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
                         <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
                     </svg>
-                    <p class="empty-state-text">Chưa có kết quả video. Nhập từ khóa hoặc câu hỏi để tra cứu sự kiện.</p>
+                    <p class="empty-state-text">Kết quả tìm kiếm sẽ hiển thị tại đây</p>
                 `;
             }
             if (grid) {
@@ -6886,7 +6890,7 @@ user=None`;
                             <div style="display: flex; align-items: center; gap: 0.65rem; color: #a1a1aa; font-size: 0.8125rem;">
                                 <div class="camera-spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>
                                 <span id="${timerId}" style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--nv-green); min-width: 58px;">[00:00s]</span>
-                                <span>Đang trích xuất 32 frames & gửi lên Server AI (Qwen3.8-27B)...</span>
+                                <span>Đang trích xuất 32 frames & gửi lên Server AI (GLM-5.3-Flash)...</span>
                                 <span>Đang trích xuất 32 frames & phân tích âm thanh thực tế (DeepFilterNet)...</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.6875rem; color: #71717a; font-family: monospace; padding-left: 1.65rem;">
@@ -6927,10 +6931,10 @@ user=None`;
             syncWorkflowStage('vios', 'BƯỚC 1: VIOS CẮT 8 FRAMES & LỌC NHIỄU ÂM THANH...');
 
             try {
-                // GIAI ĐOẠN 2 THỰC TẾ: Server AI (VLM Qwen 3.8-27B) đang phân tích thị giác & âm thanh đa phương thức
+                // GIAI ĐOẠN 2 THỰC TẾ: Server AI (VLM GLM-5.3-Flash) đang phân tích thị giác & âm thanh đa phương thức
                 setTimeout(() => {
                     if (window.isChatActive) {
-                        syncWorkflowStage('vlm_dense_frames', 'BƯỚC 2: SERVER AI (QWEN 3.8-27B) ĐANG PHÂN TÍCH ĐA PHƯƠNG THỨC...', true);
+                        syncWorkflowStage('vlm_dense_frames', 'BƯỚC 2: SERVER AI (GLM-5.3-FLASH) ĐANG PHÂN TÍCH ĐA PHƯƠNG THỨC...', true);
                     }
                 }, 400);
 
@@ -6955,10 +6959,10 @@ user=None`;
                 const replyText = data.reply || 'Đã phân tích xong video.';
                 const reasoningText = data.reasoning || '';
                 const frameCount = data.frame_count || 8;
-                const serverTag = `${data.model || 'Qwen3.8-27B'} · Server AI (${frameCount} frames + Audio)`;
+                const serverTag = `${data.model || 'GLM-5.3-Flash'} · Server AI (${frameCount} frames + Audio)`;
 
                 // GIAI ĐOẠN 3 THỰC TẾ: Hoàn tất phản hồi VLM xuất ra chat
-                syncWorkflowStage('output', `BƯỚC 3: HOÀN TẤT PHÂN TÍCH (${frameCount} FRAMES + AUDIO QWEN 3.8-27B)`);
+                syncWorkflowStage('output', `BƯỚC 3: HOÀN TẤT PHÂN TÍCH (${frameCount} FRAMES + AUDIO GLM-5.3-FLASH)`);
 
                 // Tạo thẻ hiển thị thông tin âm thanh thực tế nếu có
                 let audioCardHtml = '';
@@ -7181,9 +7185,6 @@ user=None`;
 
                 // Render kết quả video thực tế tìm được (nếu không có thì hiển thị empty state, không giữ video cũ)
                 renderVideoCards(items || []);
-                if (window.cameraViewInstance && typeof window.cameraViewInstance.addRecordedClips === 'function') {
-                    window.cameraViewInstance.addRecordedClips(items || []);
-                }
             } catch (err) {
                 console.error('[Search Error]:', err);
                 if (!isInitial && !window.isChatActive) {
@@ -7497,12 +7498,12 @@ user=None`;
                             <div style="display: flex; align-items: center; gap: 0.65rem; color: #a1a1aa; font-size: 0.8125rem;">
                                 <div class="camera-spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>
                                 <span id="${timerId}" style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--nv-green); min-width: 58px;">[00:00s]</span>
-                                <span>Server AI (Qwen 3.8-27B) đang suy luận dữ liệu...</span>
+                                <span>Server AI (GLM-5.3-Flash) đang suy luận dữ liệu...</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.6875rem; color: #71717a; font-family: monospace; padding-left: 1.65rem;">
                                 <span style="color: #38bdf8;">[1. Tiếp nhận]</span>
                                 <span>➔</span>
-                                <span style="color: #a3e635; font-weight: 600;">[2. Video Agent & Qwen AI]</span>
+                                <span style="color: #a3e635; font-weight: 600;">[2. Video Agent & GLM AI]</span>
                                 <span>➔</span>
                                 <span>[3. Xuất Video & Trả lời]</span>
                             </div>
@@ -7574,11 +7575,11 @@ user=None`;
             }
 
             try {
-                // BƯỚC 2: Video Agent điều phối -> BƯỚC 3: Server AI (Qwen 3.8-27B) suy luận
+                // BƯỚC 2: Video Agent điều phối -> BƯỚC 3: Server AI (GLM-5.3-Flash) suy luận
                 syncWorkflowStage('agent_planning', `BƯỚC 2: VIDEO AGENT ĐIỀU PHỐI SUY LUẬN (${initialChLabel})`);
                 setTimeout(() => {
                     if (window.isChatActive) {
-                        syncWorkflowStage('llm_reasoning', `BƯỚC 3: SERVER AI (QWEN 3.8-27B) SUY LUẬN (${initialChLabel})...`, true);
+                        syncWorkflowStage('llm_reasoning', `BƯỚC 3: SERVER AI (GLM-5.3-FLASH) SUY LUẬN (${initialChLabel})...`, true);
                     }
                 }, 350);
 
@@ -8085,8 +8086,50 @@ user=None`;
                 });
             }
 
-            // Khởi tạo trạng thái sạch (chờ người dùng gõ tìm kiếm hoặc hỏi Vision Agent)
+            // Khởi tạo trạng thái chờ sạch (chỉ tìm kiếm khi người dùng bấm Search hoặc hỏi Vision Agent)
             resetToEmptyState();
+
+            // Tải danh sách Camera được phân quyền động theo tài khoản (Phase 3.2 RBAC)
+            loadUserAllowedCamerasToDropdown();
+        }
+
+        async function loadUserAllowedCamerasToDropdown() {
+            try {
+                const res = await fetch('/api/user/allowed-cameras');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                // Hiển thị nút Trung tâm Quản trị nếu có quyền Admin
+                const adminLink = document.getElementById('sidebar-admin-link');
+                if (adminLink && data.is_admin) {
+                    adminLink.style.display = 'flex';
+                }
+
+                // Cập nhật Dropdown chọn Camera trong Filter Search
+                const selectEl = document.getElementById('filter-video-sources');
+                if (selectEl && Array.isArray(data.cameras)) {
+                    let optionsHtml = `<option value="" selected>Tất cả Camera Được Phép (${data.cameras.length} kênh)</option>`;
+                    data.cameras.forEach(cam => {
+                        optionsHtml += `<option value="${cam.channel}">${cam.name}</option>`;
+                    });
+                    selectEl.innerHTML = optionsHtml;
+                }
+
+                // Cập nhật trạng thái kênh khả dụng cho danh sách NCC_CAMERAS
+                if (Array.isArray(data.cameras) && data.cameras.length > 0) {
+                    const userAllowedIds = data.cameras.map(c => c.channel);
+                    if (typeof NCC_CAMERAS !== 'undefined' && Array.isArray(NCC_CAMERAS)) {
+                        NCC_CAMERAS.forEach(c => {
+                            c.isReal = userAllowedIds.includes(c.id);
+                        });
+                        if (typeof renderVmSidebarCameraList === 'function') {
+                            renderVmSidebarCameraList();
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Lỗi khi nạp danh sách camera được phân quyền:', err);
+            }
         }
 
         if (document.readyState === 'loading') {

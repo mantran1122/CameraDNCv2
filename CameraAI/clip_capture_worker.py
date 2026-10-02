@@ -82,15 +82,7 @@ class ClipCaptureWorker:
             database.update_event_clip(event_id, captured_file)
             mirrored = mirror_clip(captured_file)
             if config.STORAGE_BACKEND == "synology":
-                print(f"[CLIP] alert={event_id} synology_mirrored={mirrored}")
-                if mirrored:
-                    try:
-                        local_path = resolve_clip_path(captured_file, fetch_remote=False)
-                        if local_path.is_file():
-                            local_path.unlink()
-                            print(f"[CLIP] Local file purged immediately after NAS upload: {captured_file}")
-                    except Exception as purge_err:
-                        print(f"[CLIP Warning] Could not purge local file {captured_file}: {purge_err}")
+                print(f"[CLIP] alert={event_id} synology_mirrored={mirrored} (retained in local cache for playback)")
             print(f"[CLIP] alert={event_id} evidence={captured_file}")
         else:
             print(f"[CLIP] alert={event_id} evidence capture failed")
