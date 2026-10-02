@@ -1,0 +1,36 @@
+[
+  {
+    "username": "aicamera",
+    "password": "Nctu#$4321",
+    "role": "admin",
+    "full_name": "Quản trị viên Hệ thống",
+    "can_config_nvr": true,
+    "allowed_channels": [
+      "*"
+    ],
+    "created_at": "2026-09-21T00:00:00"
+  },
+  {
+    "username": "user_cam11",
+    "password": "Password123@",
+    "role": "viewer",
+    "full_name": "Nhân viên Kênh 11",
+    "can_config_nvr": false,
+    "allowed_channels": [
+      11
+    ],
+    "created_at": "2026-09-22T10:00:00"
+  },
+  {
+    "username": "user_cam18_19",
+    "password": "Password123@",
+    "role": "operator",
+    "full_name": "Nhân viên Sảnh 18 19",
+    "can_config_nvr": false,
+    "allowed_channels": [
+      18,
+      19
+    ],
+    "created_at": "2026-09-22T10:00:00"
+  }
+]

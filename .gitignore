@@ -8,6 +8,7 @@
 **/config.json
 CameraAI/storage/*
 !CameraAI/storage/.gitkeep
+!CameraAI/storage/users.example.json
 .omo/
 *.pem
 *.key

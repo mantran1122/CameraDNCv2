@@ -286,6 +286,15 @@ def get_all_system_users() -> list[dict]:
         }
     ]
     if not USERS_STORAGE_FILE.is_file():
+        example_file = config.STORAGE_DIR / "users.example.json"
+        if example_file.is_file():
+            try:
+                shutil.copy2(example_file, USERS_STORAGE_FILE)
+                data = json.loads(USERS_STORAGE_FILE.read_text(encoding="utf-8"))
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+            except Exception:
+                pass
         try:
             USERS_STORAGE_FILE.write_text(json.dumps(default_users, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
