@@ -152,7 +152,10 @@ templates_dir.mkdir(exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-quasar_spa_dir = Path(__file__).resolve().parent.parent / "quasar-admin" / "dist" / "spa"
+quasar_spa_dir = Path(__file__).resolve().parent / "quasar_spa"
+if not (quasar_spa_dir / "index.html").is_file():
+    quasar_spa_dir = Path(__file__).resolve().parent.parent / "quasar-admin" / "dist" / "spa"
+
 if (quasar_spa_dir / "assets").is_dir():
     app.mount("/admin/assets", StaticFiles(directory=str(quasar_spa_dir / "assets")), name="quasar_assets")
 if (quasar_spa_dir / "icons").is_dir():

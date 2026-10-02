@@ -1,0 +1,2 @@
+import{b as e}from"./_plugin-vue_export-helper-tJ1OL1vp.js";import{m as t}from"./render-CCGBpuZn.js";var n=t({name:`QSpace`,setup(){let t=e(`div`,{class:`q-space`});return()=>t}});export{n as t};
+//# sourceMappingURL=QSpace-CsmdCO1t.js.map

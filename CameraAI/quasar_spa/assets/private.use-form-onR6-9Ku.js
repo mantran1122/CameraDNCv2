@@ -1,0 +1,2 @@
+import{b as e}from"./_plugin-vue_export-helper-tJ1OL1vp.js";var t={name:String};function n(e){return()=>({type:`hidden`,name:e.name,value:e.modelValue})}function r(t){return(n,r,i)=>{n[r](e(`input`,{class:`hidden`+(i||``),...t===void 0?void 0:t()}))}}function i(e){return()=>e.name||e.for}export{t as i,r as n,i as r,n as t};
+//# sourceMappingURL=private.use-form-onR6-9Ku.js.map

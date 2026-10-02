@@ -1,0 +1,2 @@
+import{D as e,T as t,v as n}from"./_plugin-vue_export-helper-tJ1OL1vp.js";import{s as r}from"./use-router-link-CN2ooISQ.js";function i(){let i=null,a=n();function o(){i!==null&&(clearTimeout(i),i=null)}return e(o),t(o),{removeTimeout:o,registerTimeout(e,t){o(),r(a)||(i=setTimeout(()=>{i=null,e()},t))}}}export{i as t};
+//# sourceMappingURL=use-timeout-CoaDFsFJ.js.map

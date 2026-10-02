@@ -1,0 +1,2 @@
+var e=!1;function t(t){e=t.isComposing===!0}function n(t){return e||t!==Object(t)||t.isComposing||t.qKeyEvent}function r(e,t){return!n(e)&&(Array.isArray(t)?t.includes(e.keyCode):t===e.keyCode)}export{t as n,n as r,r as t};
+//# sourceMappingURL=key-composition-DPETYhIM.js.map

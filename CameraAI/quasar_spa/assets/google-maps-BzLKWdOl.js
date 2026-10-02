@@ -1,0 +1,2 @@
+var e=null;function t(){return typeof window>`u`?Promise.reject(Error(`Google Maps can only be loaded in the browser`)):window.google&&window.google.maps?Promise.resolve(window.google.maps):(e===null&&(e=new Promise((t,n)=>{let r=document.createElement(`script`);r.src=`https://maps.googleapis.com/maps/api/js?loading=async`,r.async=!0,r.defer=!0,r.onload=()=>t(window.google.maps),r.onerror=()=>{e=null,n(Error(`Failed to load the Google Maps JS API`))},document.head.appendChild(r)})),e)}export{t};
+//# sourceMappingURL=google-maps-BzLKWdOl.js.map

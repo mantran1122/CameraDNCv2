@@ -1,0 +1,2 @@
+var e={dark:{type:Boolean,default:null}};function t(e,t){return()=>e.dark===null?t.dark.isActive:e.dark}export{e as n,t};
+//# sourceMappingURL=use-dark-BHObfh0O.js.map

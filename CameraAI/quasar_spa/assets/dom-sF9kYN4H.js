@@ -1,0 +1,2 @@
+import{et as e}from"./_plugin-vue_export-helper-tJ1OL1vp.js";function t(e,t){let n=e.style;for(let e in t)n[e]=t[e]}function n(t){if(t==null)return;if(typeof t==`string`)try{return document.querySelector(t)||void 0}catch{return}let n=e(t);if(n)return n.$el||n}function r(e,t){if(e==null||e.contains(t))return!0;for(let n=e.nextElementSibling;n!==null;n=n.nextElementSibling)if(n.contains(t))return!0;return!1}export{t as n,n as r,r as t};
+//# sourceMappingURL=dom-sF9kYN4H.js.map

@@ -1,0 +1,2 @@
+function e(e,t=250,n){let r=null;function i(...i){let a=n&&r===null;r!==null&&clearTimeout(r),r=setTimeout(()=>{r=null,n||e.apply(this,i)},t),a&&e.apply(this,i)}return i.cancel=()=>{r!==null&&(clearTimeout(r),r=null)},i}export{e as t};
+//# sourceMappingURL=debounce-_M3mn3OC.js.map

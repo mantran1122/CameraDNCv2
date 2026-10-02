@@ -1,0 +1,2 @@
+import{b as e,c as t}from"./_plugin-vue_export-helper-tJ1OL1vp.js";import{m as n,r}from"./render-CCGBpuZn.js";var i=n({name:`QToolbar`,props:{inset:Boolean},setup(n,{slots:i}){let a=t(()=>`q-toolbar row no-wrap items-center`+(n.inset?` q-toolbar--inset`:``));return()=>e(`div`,{class:a.value,role:`toolbar`},r(i.default))}});export{i as t};
+//# sourceMappingURL=QToolbar-B0cqttpg.js.map
