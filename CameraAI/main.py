@@ -281,16 +281,21 @@ def sanitize_allowed_channels(channels: Any, role: str = "viewer") -> list:
     if not channels:
         return []
     result = []
+    has_star = False
     for c in channels:
         if str(c).strip() == "*":
-            return ["*"]
+            has_star = True
+            continue
         try:
             val = int(c)
             if 1 <= val <= 64:
                 result.append(val)
         except (ValueError, TypeError):
             continue
-    return sorted(list(set(result)))
+    cleaned = sorted(list(set(result)))
+    if not cleaned and has_star:
+        return list(DEFAULT_NEW_USER_CHANNELS)
+    return cleaned
 
 
 def get_all_system_users() -> list[dict]:
@@ -363,19 +368,15 @@ def save_system_users(users: list[dict]):
 
 
 def upsert_google_system_user(email: str, name: str, picture: str, is_admin: bool) -> dict:
-    """Register or update a Google SSO user in users.json to ensure they appear in admin management."""
+    """Register or update a Google SSO user in users.json while preserving Admin-configured role & camera RBAC."""
     users = get_all_system_users()
     existing_user = next((item for item in users if item.get("username") == email), None)
 
     if existing_user:
-        if is_admin:
-            role = "admin"
-            allowed_channels = ["*"]
-        else:
-            role = existing_user.get("role", "viewer")
-            allowed_channels = existing_user.get("allowed_channels", DEFAULT_NEW_USER_CHANNELS)
+        role = existing_user.get("role") or ("admin" if is_admin else "viewer")
+        allowed_channels = existing_user.get("allowed_channels", DEFAULT_NEW_USER_CHANNELS)
 
-        existing_user["full_name"] = name or existing_user.get("full_name", email)
+        existing_user["full_name"] = existing_user.get("full_name") or name or email
         if picture:
             existing_user["avatar_url"] = picture
         existing_user["auth_provider"] = "google"
@@ -418,15 +419,14 @@ def get_user_allowed_channels_by_name(username: str) -> Optional[List[int]]:
     users = get_all_system_users()
     for item in users:
         if item.get("username") == username:
-            if item.get("role") == "admin":
+            role = str(item.get("role", "viewer")).lower()
+            if role == "admin":
                 return None
             channels = item.get("allowed_channels")
             if channels is None:
                 return []
             if isinstance(channels, list):
-                if "*" in channels:
-                    return None
-                return [int(c) for c in channels if str(c).isdigit()]
+                return sanitize_allowed_channels(channels, role)
     return []
 
 
@@ -439,9 +439,6 @@ def get_current_user_allowed_channels(request: Request) -> Optional[List[int]]:
     username = request.session.get("username")
     if not username:
         return []
-    role = request.session.get("role")
-    if role == "admin":
-        return None
     return get_user_allowed_channels_by_name(username)
 
 
@@ -2903,7 +2900,18 @@ async def logout(request: Request):
 @app.get("/api/user/allowed-cameras")
 async def get_user_allowed_cameras_api(request: Request):
     """Return the list of allowed cameras for the current logged-in user with standardized names."""
+    username = request.session.get("username", "")
     allowed = get_current_user_allowed_channels(request)
+    live_role = "admin" if allowed is None else "viewer"
+    if username:
+        for item in get_all_system_users():
+            if item.get("username") == username:
+                live_role = item.get("role", live_role)
+                break
+        request.session["role"] = live_role
+        request.session["can_config_nvr"] = (live_role == "admin")
+        request.session["allowed_channels"] = ["*"] if allowed is None else list(allowed)
+
     if allowed is None:
         channel_ids = sorted(config.ACTIVE_CHANNELS)
     else:
@@ -2920,9 +2928,9 @@ async def get_user_allowed_cameras_api(request: Request):
         })
     return {
         "status": "success",
-        "username": request.session.get("username", ""),
-        "role": request.session.get("role", "viewer"),
-        "is_admin": request.session.get("role") == "admin",
+        "username": username,
+        "role": live_role,
+        "is_admin": live_role == "admin",
         "cameras": cameras,
     }
 
@@ -2978,7 +2986,7 @@ async def list_system_users(_: str = Depends(require_session_admin)):
             "role": u.get("role", "viewer"),
             "full_name": u.get("full_name", ""),
             "can_config_nvr": (u.get("role") == "admin"),
-            "allowed_channels": ["*"] if u.get("role") == "admin" else u.get("allowed_channels", []),
+            "allowed_channels": ["*"] if u.get("role") == "admin" else sanitize_allowed_channels(u.get("allowed_channels", []), u.get("role", "viewer")),
             "created_at": u.get("created_at", ""),
             "auth_provider": u.get("auth_provider", "local"),
             "avatar_url": u.get("avatar_url", ""),
@@ -3059,6 +3067,8 @@ async def update_system_user(username: str, payload: SubUserUpdateModel, _: str 
         user_obj["allowed_channels"] = ["*"]
     elif payload.allowed_channels is not None:
         user_obj["allowed_channels"] = sanitize_allowed_channels(payload.allowed_channels, curr_role)
+    else:
+        user_obj["allowed_channels"] = sanitize_allowed_channels(user_obj.get("allowed_channels", DEFAULT_NEW_USER_CHANNELS), curr_role)
 
     users[target_idx] = user_obj
     save_system_users(users)

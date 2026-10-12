@@ -615,7 +615,7 @@
 
                                     <template v-slot:body-cell-channels="props">
                                         <q-td :props="props">
-                                            <div v-if="props.row.role === 'admin' || props.row.allowed_channels.includes('*')">
+                                            <div v-if="props.row.role === 'admin'">
                                                 <q-chip color="cyan-9" text-color="white" dense icon="star">
                                                     Toàn quyền (Tất cả 32 Kênh)
                                                 </q-chip>
@@ -1057,7 +1057,7 @@
                                                         color="cyan"
                                                         dense
                                                         class="q-mr-xs"
-                                                        @update:model-value="toggleCamera(cam.channel)"
+                                                        style="pointer-events: none;"
                                                     ></q-checkbox>
                                                     <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                                         <div class="text-caption text-weight-bold text-white">{{ cam.name }}</div>

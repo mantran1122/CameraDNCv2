@@ -340,13 +340,15 @@
             };
 
             const openEditUserDialog = (row) => {
+                const rawCh = Array.isArray(row.allowed_channels) ? row.allowed_channels : [];
+                const cleanCh = rawCh.filter(x => x !== '*' && !isNaN(Number(x))).map(Number);
                 userDialog.isEdit = true;
                 userDialog.form = {
                     username: row.username,
                     full_name: row.full_name || '',
                     password: '',
                     role: row.role || 'viewer',
-                    allowed_channels: Array.isArray(row.allowed_channels) ? [...row.allowed_channels] : []
+                    allowed_channels: cleanCh.length > 0 ? cleanCh : (rawCh.includes('*') ? [18, 19] : [])
                 };
                 showDialogPass.value = false;
                 userDialog.show = true;
@@ -354,11 +356,13 @@
 
             const toggleCamera = (channel) => {
                 if (userDialog.form.role === 'admin') return;
-                const idx = userDialog.form.allowed_channels.indexOf(channel);
+                const numCh = Number(channel);
+                userDialog.form.allowed_channels = userDialog.form.allowed_channels.filter(x => x !== '*').map(Number);
+                const idx = userDialog.form.allowed_channels.indexOf(numCh);
                 if (idx > -1) {
                     userDialog.form.allowed_channels.splice(idx, 1);
                 } else {
-                    userDialog.form.allowed_channels.push(channel);
+                    userDialog.form.allowed_channels.push(numCh);
                     userDialog.form.allowed_channels.sort((a, b) => a - b);
                 }
             };
@@ -388,7 +392,10 @@
                 try {
                     let url = '/api/admin/users';
                     let method = 'POST';
-                    let payload = { ...userDialog.form };
+                    const cleanList = userDialog.form.role === 'admin'
+                        ? ['*']
+                        : userDialog.form.allowed_channels.filter(x => x !== '*' && !isNaN(Number(x))).map(Number);
+                    let payload = { ...userDialog.form, allowed_channels: cleanList };
 
                     if (userDialog.isEdit) {
                         url = `/api/admin/users/${encodeURIComponent(userDialog.form.username)}`;
