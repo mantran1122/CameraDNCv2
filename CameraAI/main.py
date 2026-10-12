@@ -497,22 +497,16 @@ class ConnectionManager:
             event_ch_int = None
 
         for connection, user_info in list(self.active_connections.items()):
-            role = user_info.get("role")
             username = user_info.get("username", "")
             sub_ch = user_info.get("subscribed_channel")
 
-            # 1. Strict Account-Level RBAC: Only send if camera channel is permitted for this user
-            if role != "admin":
-                allowed = get_user_allowed_channels_by_name(username)
-                if allowed is None:
-                    pass
-                elif event_ch_int is not None and event_ch_int in allowed:
-                    pass
-                else:
-                    # Strictly block events from unauthorized cameras or without a valid camera channel
+            # 1. Strict Account-Level RBAC: Deliver alerts for ALL cameras managed by this user (e.g. [1,2,3]), block all others
+            allowed = get_user_allowed_channels_by_name(username)
+            if allowed is not None:
+                if event_ch_int is None or event_ch_int not in allowed:
                     continue
 
-            # 2. Strict Per-Camera Isolation: If client subscribed to a specific camera, only send that camera's alerts
+            # 2. Optional channel filter if user explicitly chose to filter a single camera in the dropdown
             if sub_ch is not None and event_ch_int is not None:
                 try:
                     if int(sub_ch) != event_ch_int:
@@ -1034,16 +1028,22 @@ def _fetch_enriched_events_sync(
     only_anomalies: bool,
     limit: int,
     allowed_channels: Optional[List[int]],
+    hours: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
+    start_time_str: Optional[str] = None
+    if hours is not None and hours > 0:
+        start_time_str = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+
     events = database.get_events(
         event_type=event_type,
         channel=channel,
         limit=limit,
         only_anomalies=only_anomalies,
+        start_time=start_time_str,
         allowed_channels=allowed_channels,
     )
-    # If only_anomalies returned empty, fallback to recent events so notifications never vanish
-    if only_anomalies and not events:
+    # Only fallback to general recent events when NOT querying a strict recent time window (e.g. hours=24)
+    if only_anomalies and not events and not start_time_str:
         events = database.get_events(
             event_type=event_type,
             channel=channel,
@@ -1117,6 +1117,7 @@ async def get_events_api(
     event_type: Optional[str] = None,
     channel: Optional[int] = None,
     only_anomalies: bool = False,
+    hours: Optional[int] = None,
     limit: int = 50
 ):
     allowed_channels = get_current_user_allowed_channels(request)
@@ -1133,6 +1134,7 @@ async def get_events_api(
         only_anomalies,
         limit,
         allowed_channels,
+        hours,
     )
     return {"events": events, "count": len(events)}
 
