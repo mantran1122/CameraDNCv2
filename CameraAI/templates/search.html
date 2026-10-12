@@ -1084,14 +1084,14 @@
         /* Results Grid View Modes */
         .results-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 0.75rem;
             align-content: flex-start;
         }
 
-        /* 1. Extra Large Icons Mode: Always 1 big video showcase card */
+        /* 1. Extra Large Icons Mode: Strictly 1 column at any zoom/resolution */
         .results-grid.view-extra-large {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
             max-width: 820px;
             margin: 0 auto;
             width: 100%;
@@ -1130,9 +1130,9 @@
             padding: 0.2rem 0.6rem;
         }
 
-        /* 2. Large Icons Mode: Strictly 2 videos per row (Never collapses to 1) */
+        /* 2. Large Icons Mode: Strictly 2 columns at any zoom/resolution */
         .results-grid.view-large {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 1rem;
         }
 
@@ -1158,9 +1158,9 @@
             padding: 0.5rem 0.85rem 0.75rem;
         }
 
-        /* 3. Medium Icons Mode: Standard 3-4 videos per row */
+        /* 3. Medium Icons Mode: Strictly 3 columns at any zoom/resolution */
         .results-grid.view-medium {
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
             gap: 0.65rem;
         }
 
@@ -1201,9 +1201,9 @@
             padding: 0.1rem 0.35rem;
         }
 
-        /* 4. Small Icons Mode (Compact high-density grid: 4-6 columns) */
+        /* 4. Small Icons Mode: Strictly 4 columns at any zoom/resolution */
         .results-grid.view-small {
-            grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
             gap: 0.5rem;
         }
 
@@ -1414,6 +1414,7 @@
             border: 1px solid #27272a;
             display: flex;
             flex-direction: column;
+            min-width: 0;
             transition: transform 0.15s, border-color 0.15s;
         }
 
