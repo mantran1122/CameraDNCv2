@@ -129,6 +129,10 @@
                     if (!hasPlayer || this.source.url !== prevUrl) {
                         this.setSource(this.source);
                     }
+                    window.currentActiveChannel = this.getCurrentChannel();
+                    if (typeof window.onActiveCameraChannelChanged === 'function') {
+                        window.onActiveCameraChannelChanged(window.currentActiveChannel);
+                    }
                 }
             } catch (e) {
                 console.warn('[CameraView] Error loading NVR config:', e);
@@ -160,19 +164,24 @@
             this.container.innerHTML = `
                 <div class="camera-view-card">
                     <div class="camera-view-top-bar">
-                        <div class="camera-view-controls-wrap" style="width: 100%; display: flex; align-items: center; justify-content: space-between;">
+                        <div class="camera-view-controls-wrap" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                             <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-sub); flex-shrink: 0;">
                                     <path d="M23 7l-7 5 7 5V7z"></path>
                                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                                 </svg>
-                                <select class="camera-source-select" id="camera-source-picker" style="max-width: 320px; font-weight: 600;">
+                                <select class="camera-source-select" id="camera-source-picker" style="max-width: 280px; font-weight: 600;">
                                     ${this.buildPickerOptionsHtml()}
                                 </select>
                             </div>
-                            <span class="camera-badge-live">
-                                <span class="camera-live-dot"></span> LIVE
-                            </span>
+                            <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                                <button type="button" id="camera-view-notif-pill" onclick="if(typeof openNotificationForCamera==='function') openNotificationForCamera(window.currentActiveChannel, event)" style="height: 22px; padding: 0 7px; font-size: 0.68rem; font-weight: 600; border-radius: 4px; border: 1px solid rgba(118,185,0,0.45); background: rgba(118,185,0,0.12); color: #9be62b; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Xem thông báo riêng của Camera đang chọn">
+                                    <span>🔔 Kênh ${this.getCurrentChannel() < 10 ? '0' + this.getCurrentChannel() : this.getCurrentChannel()}</span>
+                                </button>
+                                <span class="camera-badge-live">
+                                    <span class="camera-live-dot"></span> LIVE
+                                </span>
+                            </div>
                         </div>
                     </div>
 
@@ -222,6 +231,9 @@
                     if (selected) {
                         this.setSource(selected);
                         window.currentActiveChannel = this.getCurrentChannel();
+                        if (typeof window.onActiveCameraChannelChanged === 'function') {
+                            window.onActiveCameraChannelChanged(window.currentActiveChannel);
+                        }
                         console.log(`[CameraView] Switched to Channel ${window.currentActiveChannel}: ${selected.label}`);
                     }
                 });

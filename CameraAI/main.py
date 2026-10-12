@@ -484,32 +484,42 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         self.active_connections.pop(websocket, None)
 
+    def set_subscribed_channel(self, websocket: WebSocket, channel: Optional[int]):
+        if websocket in self.active_connections:
+            self.active_connections[websocket]["subscribed_channel"] = channel
+
     async def broadcast(self, message: dict):
         event_ch = message.get("channel")
+        if event_ch is None and isinstance(message.get("data"), dict):
+            event_ch = message["data"].get("channel")
+        try:
+            event_ch_int = int(event_ch) if event_ch is not None else None
+        except (ValueError, TypeError):
+            event_ch_int = None
+
         for connection, user_info in list(self.active_connections.items()):
             role = user_info.get("role")
             username = user_info.get("username", "")
+            sub_ch = user_info.get("subscribed_channel")
 
-            # Admin receives all broadcasts
-            if role == "admin":
+            # 1. Strict Account-Level RBAC: Only send if camera channel is permitted for this user
+            if role != "admin":
+                allowed = get_user_allowed_channels_by_name(username)
+                if allowed is None:
+                    pass
+                elif event_ch_int is not None and event_ch_int in allowed:
+                    pass
+                else:
+                    # Strictly block events from unauthorized cameras or without a valid camera channel
+                    continue
+
+            # 2. Strict Per-Camera Isolation: If client subscribed to a specific camera, only send that camera's alerts
+            if sub_ch is not None and event_ch_int is not None:
                 try:
-                    await connection.send_json(message)
-                except Exception:
-                    self.disconnect(connection)
-                continue
-
-            # Check user's permitted channels
-            allowed = get_user_allowed_channels_by_name(username)
-            if allowed is None or "*" in allowed:
-                pass
-            elif event_ch is not None and event_ch in allowed:
-                pass
-            elif event_ch is None:
-                # General notification without specific channel
-                pass
-            else:
-                # Disallowed camera channel
-                continue
+                    if int(sub_ch) != event_ch_int:
+                        continue
+                except (ValueError, TypeError):
+                    pass
 
             try:
                 await connection.send_json(message)
@@ -539,7 +549,15 @@ def broadcast_event_sync(event_obj: dict):
         return
 
     try:
-        asyncio.run_coroutine_threadsafe(manager.broadcast(event_obj), loop)
+        payload = dict(event_obj)
+        if payload.get("clip_filename") and not payload.get("clip_url"):
+            payload["clip_url"] = f"/clips/{str(payload['clip_filename']).replace(chr(92), '/')}"
+        ws_msg = {
+            **payload,
+            "type": "new_event",
+            "data": payload,
+        }
+        asyncio.run_coroutine_threadsafe(manager.broadcast(ws_msg), loop)
     except Exception as e:
         print(f"[WebSocket Broadcast Error] {e}")
 
@@ -921,44 +939,59 @@ async def upload_test_video(video: UploadFile = File(...), _: str = Depends(requ
     remote_mirrored = await asyncio.to_thread(mirror_clip, reference)
     return {"event": database.get_event_by_id(event_id), "remote_mirrored": remote_mirrored}
 
-def _find_local_fallback_clip(channel: int = 1) -> Optional[str]:
-    """Find a valid local MP4 file in config.CLIPS_DIR without blocking on remote NAS."""
+def _find_local_fallback_clip(channel: int = 1, event: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """Find or generate a valid local MP4 file strictly belonging to the specified camera channel."""
+    ch = int(channel or 1)
     try:
-        cam_dir = config.CLIPS_DIR / "cameras" / f"cam-{int(channel):03d}"
+        cam_dir = config.CLIPS_DIR / "cameras" / f"cam-{ch:03d}"
         if cam_dir.is_dir():
             for mp4 in sorted(cam_dir.rglob("*.mp4"), reverse=True):
                 if mp4.is_file() and mp4.stat().st_size > 1024:
                     return mp4.relative_to(config.CLIPS_DIR).as_posix()
 
-        preferred = ["test_real_h264.mp4", "sample_h264.mp4", "sample_valid.mp4", "test_compressed_h264.mp4"]
-        for name in preferred:
-            cand = config.CLIPS_DIR / name
-            if cand.is_file() and cand.stat().st_size > 1024:
-                return name
+        # Generate a dedicated H.264 clip specifically for this camera channel so channels never share clips
+        ev_id = (event or {}).get("id") or f"ch{ch:02d}"
+        ev_type = (event or {}).get("event_type") or "video_anomaly"
+        ev_code = (event or {}).get("event_code") or "Intrusion"
+        ev_ts = (event or {}).get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        rel_path = f"cameras/cam-{ch:03d}/evt_cam-{ch:03d}_{ev_id}.mp4"
+        target_path = config.CLIPS_DIR / rel_path
+        if target_path.is_file() and target_path.stat().st_size > 1024:
+            return rel_path
 
-        for mp4 in config.CLIPS_DIR.rglob("*.mp4"):
-            if mp4.is_file() and mp4.stat().st_size > 1024:
-                return mp4.relative_to(config.CLIPS_DIR).as_posix()
-    except Exception:
-        pass
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        ok = video_clipper.generate_synthetic_anomaly_clip(
+            str(target_path),
+            ch,
+            ev_type,
+            ev_code,
+            ev_ts,
+            duration_sec=max(4, min(6, int(getattr(config, "CLIP_DURATION_SEC", 5)))),
+        )
+        if ok and target_path.is_file() and target_path.stat().st_size > 1024:
+            return rel_path
+    except Exception as exc:
+        print(f"[PerCameraClipFallback Error ch={ch}]: {exc}")
     return None
 
 
 def _resolve_playable_clip_for_event(conn, event: Dict[str, Any]) -> Optional[str]:
-    """Ensure every event/notification has a playable local MP4 clip_filename in < 5ms (no remote NAS timeout)."""
+    """Ensure every event/notification has a playable local MP4 clip strictly belonging to its own camera channel."""
+    ch = int(event.get("channel") or 1)
     raw_clip = (event.get("clip_filename") or "").strip().replace("\\", "/")
     if raw_clip:
-        try:
-            if resolve_clip_path(raw_clip, fetch_remote=False).is_file():
-                return raw_clip
-        except Exception:
-            pass
+        raw_ch = get_clip_channel(raw_clip)
+        if raw_ch is None or raw_ch == ch:
+            try:
+                if resolve_clip_path(raw_clip, fetch_remote=False).is_file():
+                    return raw_clip
+            except Exception:
+                pass
 
-    ch = event.get("channel") or 1
     ts = event.get("timestamp") or ""
     cursor = conn.cursor()
 
-    # 1. Nearest clip on the same channel that exists on local disk
+    # 1. Nearest clip on the EXACT SAME camera channel that exists on local disk
     try:
         cursor.execute(
             """
@@ -973,32 +1006,21 @@ def _resolve_playable_clip_for_event(conn, event: Dict[str, Any]) -> Optional[st
         )
         for row in cursor.fetchall():
             cand = (row[0] or "").strip().replace("\\", "/")
-            if cand and resolve_clip_path(cand, fetch_remote=False).is_file():
+            cand_ch = get_clip_channel(cand)
+            if cand and (cand_ch is None or cand_ch == ch) and resolve_clip_path(cand, fetch_remote=False).is_file():
                 return cand
     except Exception:
         pass
 
-    # 2. Any recent clip across channels that exists on local disk
-    try:
-        cursor.execute(
-            """
-            SELECT clip_filename FROM events
-            WHERE clip_filename IS NOT NULL
-              AND TRIM(clip_filename) != ''
-            ORDER BY id DESC
-            LIMIT 20
-            """
-        )
-        for row in cursor.fetchall():
-            cand = (row[0] or "").strip().replace("\\", "/")
-            if cand and resolve_clip_path(cand, fetch_remote=False).is_file():
-                return cand
-    except Exception:
-        pass
-
-    # 3. Direct local filesystem fallback in CLIPS_DIR
-    local_fb = _find_local_fallback_clip(ch)
+    # 2. Dedicated local clip for this specific camera channel (generates one for channel `ch` if needed)
+    local_fb = _find_local_fallback_clip(ch, event=event)
     if local_fb:
+        try:
+            if event.get("id"):
+                cursor.execute("UPDATE events SET clip_filename = ? WHERE id = ?", (local_fb, event["id"]))
+                conn.commit()
+        except Exception:
+            pass
         return local_fb
 
     return raw_clip or None
@@ -2147,19 +2169,30 @@ def _cosmos_prompt_file(profile: str) -> Path:
     return COSMOS_PROMPT_PROFILES_DIR / f"{profile}.txt"
 
 @app.get("/api/config/nvr")
-async def get_nvr_config():
+async def get_nvr_config(request: Request):
+    allowed = get_current_user_allowed_channels(request)
+    if allowed is not None:
+        allowed_set = set(allowed)
+        active_chs = [ch for ch in config.ACTIVE_CHANNELS if ch in allowed_set]
+        cam_names = {k: v for k, v in (config.CAMERA_NAMES or {}).items() if str(k).isdigit() and int(k) in allowed_set}
+        alert_rules = {k: v for k, v in (config.CAMERA_ALERT_RULES or {}).items() if str(k).isdigit() and int(k) in allowed_set}
+    else:
+        active_chs = config.ACTIVE_CHANNELS
+        cam_names = config.CAMERA_NAMES
+        alert_rules = config.CAMERA_ALERT_RULES
+
     return {
         "nvr_host": config.NVR_HOST,
         "use_https": config.USE_HTTPS,
         "nvr_port": config.NVR_PORT,
         "rtsp_port": config.RTSP_PORT,
         "nvr_user": config.NVR_USER,
-        "active_channels": config.ACTIVE_CHANNELS,
+        "active_channels": active_chs,
         "demo_mode": config.DEMO_MODE,
         "abnormal_event_codes": config.ABNORMAL_EVENT_CODES,
         "abnormal_behavior_options": config.ABNORMAL_BEHAVIOR_OPTIONS,
-        "camera_names": config.CAMERA_NAMES,
-        "camera_alert_rules": config.CAMERA_ALERT_RULES,
+        "camera_names": cam_names,
+        "camera_alert_rules": alert_rules,
         "critical_anomaly_codes": config.CRITICAL_ANOMALY_CODES,
         "routine_event_codes": config.ROUTINE_EVENT_CODES,
         "ffmpeg_available": True
@@ -3247,7 +3280,7 @@ async def api_purge_storage_retention(days: Optional[int] = Query(default=None),
 
 @app.websocket("/ws")
 @app.websocket("/ws/events")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, channel: Optional[int] = Query(default=None)):
     # Enforce authentication: only users with a valid session can listen to real-time events
     session = websocket.scope.get("session") or {}
     username = session.get("username")
@@ -3255,14 +3288,33 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required")
         return
 
+    role = session.get("role", "viewer")
+    allowed = None if role == "admin" else get_user_allowed_channels_by_name(username)
+    if channel is not None and allowed is not None and channel not in allowed:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Channel not permitted")
+        return
+
     user_info = {
         "username": username,
-        "role": session.get("role", "viewer"),
+        "role": role,
+        "subscribed_channel": channel,
     }
     await manager.connect(websocket, user_info)
     try:
         while True:
-            await websocket.receive_text()
+            raw_text = await websocket.receive_text()
+            try:
+                msg = json.loads(raw_text)
+                if isinstance(msg, dict) and msg.get("action") == "subscribe_channel":
+                    req_ch = msg.get("channel")
+                    if req_ch is None or req_ch == "" or req_ch == "all":
+                        manager.set_subscribed_channel(websocket, None)
+                    else:
+                        ch_int = int(req_ch)
+                        if allowed is None or ch_int in allowed:
+                            manager.set_subscribed_channel(websocket, ch_int)
+            except Exception:
+                pass
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 

@@ -5776,12 +5776,12 @@
                     <span class="notif-badge" id="notif-badge" style="display: none;">0</span>
                 </button>
 
-                <!-- Popover Bảng Thông Báo Cảnh Báo Realtime -->
-                <div class="notif-popover" id="notif-popover" style="display: none;">
+                <!-- Popover Bảng Thông Báo Cảnh Báo Realtime (Phân quyền & Tách riêng theo từng Camera) -->
+                <div class="notif-popover" id="notif-popover" style="display: none; width: 390px;">
                     <div class="notif-popover-header">
                         <div class="notif-popover-title-row">
                             <span class="notif-pulse-dot"></span>
-                            <span class="notif-popover-title">Cảnh Báo &amp; Sự Kiện Mới</span>
+                            <span class="notif-popover-title" id="notif-popover-title-text">Thông Báo Theo Camera</span>
                             <span class="notif-count-tag" id="notif-count-tag">0</span>
                         </div>
                         <div class="notif-header-actions">
@@ -5790,15 +5790,27 @@
                             <button class="notif-close-btn" onclick="closeNotificationPopover()">&times;</button>
                         </div>
                     </div>
+                    <!-- Thanh Phân Quyền & Chọn Riêng Từng Camera Nhận Thông Báo -->
+                    <div style="padding: 8px 12px; background: rgba(15, 23, 42, 0.92); border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                            <span id="notif-rbac-badge" style="font-size: 0.68rem; color: #8ae300; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                🔒 Phân quyền riêng từng Camera
+                            </span>
+                            <select id="notif-camera-select" onchange="setNotificationCameraChannel(this.value)" style="background: #18181b; color: #f4f4f5; border: 1px solid rgba(118, 185, 0, 0.45); border-radius: 4px; padding: 3px 6px; font-size: 0.72rem; font-weight: 600; max-width: 205px; outline: none; cursor: pointer;">
+                                <option value="">Đang nạp quyền camera...</option>
+                            </select>
+                        </div>
+                        <div id="notif-camera-pills" style="display: flex; align-items: center; gap: 5px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin;"></div>
+                    </div>
                     <div class="notif-popover-body" id="notif-popover-body">
                         <div class="notif-empty-state">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
-                            <span>Đang tải thông báo cảnh báo thời gian thực...</span>
+                            <span>Đang tải thông báo của camera...</span>
                         </div>
                     </div>
                     <div class="notif-popover-footer">
-                        <span class="notif-footer-info">Kết nối thời gian thực Dahua NVR</span>
-                        <a href="/admin" class="notif-footer-link" target="_blank">Trung tâm Quản trị &rarr;</a>
+                        <span class="notif-footer-info" id="notif-footer-cam-label">Chỉ nhận thông báo của đúng Camera đang chọn</span>
+                        <a href="/admin" class="notif-footer-link" target="_blank">Phân quyền &rarr;</a>
                     </div>
                 </div>
             </div>
@@ -9036,15 +9048,21 @@ user=None`;
         function render32CameraGrid() {
             const gridEl = document.getElementById('cam-grid-container');
             if (!gridEl) return;
+            const allowedList = (Array.isArray(window.userAllowedChannels) && window.userAllowedChannels.length > 0)
+                ? window.userAllowedChannels
+                : Array.from({ length: 32 }, (_, idx) => idx + 1);
             let html = '';
-            for (let i = 1; i <= 32; i++) {
+            allowedList.forEach(i => {
                 const isActive = selectedPlaybackChannels.has(i);
                 html += `<div class="cam-grid-chip ${isActive ? 'active' : ''}" onclick="toggleCamGridChip(${i}, this)" title="Camera Kênh ${i}">C${i < 10 ? '0' + i : i}</div>`;
-            }
+            });
             gridEl.innerHTML = html;
         }
 
         function toggleCamGridChip(channel, chipEl) {
+            if (Array.isArray(window.userAllowedChannels) && !window.userAllowedChannels.includes(Number(channel))) {
+                return;
+            }
             if (selectedPlaybackChannels.has(channel)) {
                 selectedPlaybackChannels.delete(channel);
                 chipEl.classList.remove('active');
@@ -9058,7 +9076,10 @@ user=None`;
         function selectAllCamGrid(select) {
             selectedPlaybackChannels.clear();
             if (select) {
-                for (let i = 1; i <= 32; i++) selectedPlaybackChannels.add(i);
+                const allowedList = (Array.isArray(window.userAllowedChannels) && window.userAllowedChannels.length > 0)
+                    ? window.userAllowedChannels
+                    : Array.from({ length: 32 }, (_, idx) => idx + 1);
+                allowedList.forEach(i => selectedPlaybackChannels.add(i));
             }
             render32CameraGrid();
             syncCamGridToDropdown();
@@ -9067,8 +9088,13 @@ user=None`;
         function syncDropdownToCamGrid(val) {
             selectedPlaybackChannels.clear();
             if (val) {
-                const ch = parseInt(val);
-                if (!isNaN(ch)) selectedPlaybackChannels.add(ch);
+                const ch = parseInt(val, 10);
+                if (!isNaN(ch)) {
+                    selectedPlaybackChannels.add(ch);
+                    if (typeof setNotificationCameraChannel === 'function') {
+                        setNotificationCameraChannel(ch);
+                    }
+                }
             }
             render32CameraGrid();
         }
@@ -9079,6 +9105,9 @@ user=None`;
             if (selectedPlaybackChannels.size === 1) {
                 const singleCh = Array.from(selectedPlaybackChannels)[0];
                 selectEl.value = String(singleCh);
+                if (typeof setNotificationCameraChannel === 'function') {
+                    setNotificationCameraChannel(singleCh);
+                }
             } else {
                 selectEl.value = '';
             }
@@ -9276,44 +9305,188 @@ user=None`;
         }
 
         // ==========================================================================
-        // HẠNG MỤC 1: REALTIME NOTIFICATION SYSTEM (CHUÔNG THÔNG BÁO)
+        // HẠNG MỤC 1: REALTIME NOTIFICATION SYSTEM (PHÂN QUYỀN & TÁCH RIÊNG TỪNG CAMERA)
         // ==========================================================================
         let notifPopoverOpen = false;
         let recentNotificationsList = [];
         let readNotifIds = new Set();
         let notifPollTimer = null;
         let notifWs = null;
+        let selectedNotifCameraChannel = 11;
+        let notifCountsByChannel = {};
+        window.userAllowedChannels = null;
+        window.userAllowedCamerasList = [];
+        window.currentAuthUsername = 'default';
+        window.isCurrentUserAdmin = false;
 
         try {
             const savedRead = localStorage.getItem('vss_read_notif_ids');
             if (savedRead) readNotifIds = new Set(JSON.parse(savedRead));
         } catch(e) {}
 
-        try {
-            const cachedNotifs = localStorage.getItem('vss_cached_notifications_v2');
-            if (cachedNotifs) {
-                const parsed = JSON.parse(cachedNotifs);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    recentNotificationsList = parsed;
+        function getNotifCacheKey(ch) {
+            const u = window.currentAuthUsername || 'default';
+            return `vss_notif_v3_${u}_cam_${ch}`;
+        }
+
+        function loadNotificationsCacheForChannel(ch) {
+            try {
+                const raw = localStorage.getItem(getNotifCacheKey(ch));
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) {
+                        return parsed.filter(ev => Number(ev.channel) === Number(ch));
+                    }
+                }
+            } catch (e) {}
+            return [];
+        }
+
+        function saveNotificationsCacheForChannel(ch, list) {
+            try {
+                if (Array.isArray(list)) {
+                    const filtered = list.filter(ev => Number(ev.channel) === Number(ch)).slice(0, 20);
+                    localStorage.setItem(getNotifCacheKey(ch), JSON.stringify(filtered));
+                }
+            } catch (e) {}
+        }
+
+        function isChannelPermittedForCurrentUser(ch) {
+            const chNum = Number(ch);
+            if (!chNum) return false;
+            if (!Array.isArray(window.userAllowedChannels)) return true;
+            return window.userAllowedChannels.includes(chNum);
+        }
+
+        function updateCameraViewNotifPill() {
+            const pill = document.getElementById('camera-view-notif-pill');
+            if (!pill) return;
+            const ch = Number(window.currentActiveChannel || selectedNotifCameraChannel || 11);
+            const chStr = ch < 10 ? '0' + ch : String(ch);
+            const unreadForCam = (Number(ch) === Number(selectedNotifCameraChannel))
+                ? recentNotificationsList.filter(ev => Number(ev.channel) === ch && !readNotifIds.has(String(ev.id))).length
+                : (notifCountsByChannel[ch] || 0);
+            pill.innerHTML = unreadForCam > 0
+                ? `<span>🔔 Kênh ${chStr} (${unreadForCam})</span>`
+                : `<span>🔔 Kênh ${chStr}</span>`;
+        }
+
+        window.onActiveCameraChannelChanged = function(newChannel) {
+            const ch = Number(newChannel);
+            if (!ch || !isChannelPermittedForCurrentUser(ch)) return;
+            setNotificationCameraChannel(ch);
+        };
+
+        function openNotificationForCamera(channel, e) {
+            if (e) e.stopPropagation();
+            const ch = Number(channel || window.currentActiveChannel || selectedNotifCameraChannel || 11);
+            if (isChannelPermittedForCurrentUser(ch)) {
+                setNotificationCameraChannel(ch);
+            }
+            const popover = document.getElementById('notif-popover');
+            if (popover) {
+                notifPopoverOpen = true;
+                popover.style.display = 'flex';
+            }
+        }
+
+        function setNotificationCameraChannel(channel) {
+            const ch = Number(channel);
+            if (!ch || !isChannelPermittedForCurrentUser(ch)) return;
+            selectedNotifCameraChannel = ch;
+
+            // Sync dropdown & pills inside notification popover
+            const selectEl = document.getElementById('notif-camera-select');
+            if (selectEl && String(selectEl.value) !== String(ch)) {
+                selectEl.value = String(ch);
+            }
+            renderNotificationCameraSelectorUI();
+
+            // Subscribe WebSocket strictly to this camera channel
+            if (notifWs && notifWs.readyState === WebSocket.OPEN) {
+                try {
+                    notifWs.send(JSON.stringify({ action: 'subscribe_channel', channel: ch }));
+                } catch (e) {}
+            }
+
+            // Load cached notifications for this specific camera immediately, then fetch fresh
+            const cached = loadNotificationsCacheForChannel(ch);
+            recentNotificationsList = cached;
+            renderNotificationsList(recentNotificationsList);
+            fetchRecentNotifications();
+        }
+
+        function renderNotificationCameraSelectorUI() {
+            const rbacBadge = document.getElementById('notif-rbac-badge');
+            const selectEl = document.getElementById('notif-camera-select');
+            const pillsEl = document.getElementById('notif-camera-pills');
+            const titleText = document.getElementById('notif-popover-title-text');
+            const footerLabel = document.getElementById('notif-footer-cam-label');
+
+            const cams = (Array.isArray(window.userAllowedCamerasList) && window.userAllowedCamerasList.length > 0)
+                ? window.userAllowedCamerasList
+                : [{ channel: selectedNotifCameraChannel, name: `D${selectedNotifCameraChannel < 10 ? '0' + selectedNotifCameraChannel : selectedNotifCameraChannel} - Camera Kênh ${selectedNotifCameraChannel}` }];
+
+            if (!cams.some(c => Number(c.channel) === Number(selectedNotifCameraChannel)) && cams.length > 0) {
+                selectedNotifCameraChannel = Number(cams[0].channel);
+            }
+
+            const chStr = selectedNotifCameraChannel < 10 ? '0' + selectedNotifCameraChannel : String(selectedNotifCameraChannel);
+            if (titleText) {
+                titleText.innerText = `Thông Báo Camera Kênh ${chStr}`;
+            }
+            if (footerLabel) {
+                footerLabel.innerText = `🔒 Chỉ nhận thông báo riêng của Camera Kênh ${chStr}`;
+            }
+            if (rbacBadge) {
+                if (window.isCurrentUserAdmin) {
+                    rbacBadge.innerHTML = `🔒 Quản trị viên (${cams.length} camera)`;
+                } else {
+                    rbacBadge.innerHTML = `🔒 Được phân quyền: ${cams.length} camera`;
                 }
             }
-        } catch(e) {}
 
-        function initNotificationSystem() {
-            // 1. Render cached notifications immediately so UI is never stuck on "Đang tải..."
-            if (recentNotificationsList.length > 0) {
-                renderNotificationsList(recentNotificationsList);
+            if (selectEl) {
+                selectEl.innerHTML = cams.map(c => {
+                    const cnt = notifCountsByChannel[c.channel] || 0;
+                    const suffix = cnt > 0 ? ` (${cnt} cảnh báo)` : '';
+                    return `<option value="${c.channel}" ${Number(c.channel) === Number(selectedNotifCameraChannel) ? 'selected' : ''}>📹 ${c.name}${suffix}</option>`;
+                }).join('');
             }
 
-            // 2. Fetch fresh notifications immediately and every 20 seconds
+            if (pillsEl) {
+                pillsEl.innerHTML = cams.slice(0, 12).map(c => {
+                    const isAct = Number(c.channel) === Number(selectedNotifCameraChannel);
+                    const cnt = notifCountsByChannel[c.channel] || 0;
+                    const cStr = c.channel < 10 ? '0' + c.channel : c.channel;
+                    return `
+                        <button type="button" onclick="event.stopPropagation(); setNotificationCameraChannel(${c.channel})" style="flex-shrink: 0; padding: 2px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 600; cursor: pointer; border: 1px solid ${isAct ? '#76b900' : 'rgba(255,255,255,0.14)'}; background: ${isAct ? 'rgba(118,185,0,0.22)' : 'rgba(255,255,255,0.04)'}; color: ${isAct ? '#9be62b' : '#a1a1aa'};">
+                            Kênh ${cStr}${cnt > 0 ? ` <span style="color:#f87171;">(${cnt})</span>` : ''}
+                        </button>
+                    `;
+                }).join('');
+            }
+            updateCameraViewNotifPill();
+        }
+
+        function initNotificationSystem() {
+            const initialCh = Number(window.currentActiveChannel || selectedNotifCameraChannel || 11);
+            if (isChannelPermittedForCurrentUser(initialCh)) {
+                selectedNotifCameraChannel = initialCh;
+            } else if (Array.isArray(window.userAllowedChannels) && window.userAllowedChannels.length > 0) {
+                selectedNotifCameraChannel = Number(window.userAllowedChannels[0]);
+            }
+
+            renderNotificationCameraSelectorUI();
+            recentNotificationsList = loadNotificationsCacheForChannel(selectedNotifCameraChannel);
+            renderNotificationsList(recentNotificationsList);
+
             fetchRecentNotifications();
             if (notifPollTimer) clearInterval(notifPollTimer);
             notifPollTimer = setInterval(fetchRecentNotifications, 20000);
 
-            // 3. Connect realtime WebSocket so new alerts appear without disappearing
             connectNotificationWebSocket();
 
-            // 4. Close on click outside
             document.addEventListener('click', (e) => {
                 const wrap = document.getElementById('header-notif-wrap');
                 if (notifPopoverOpen && wrap && !wrap.contains(e.target)) {
@@ -9324,36 +9497,53 @@ user=None`;
 
         function connectNotificationWebSocket() {
             try {
+                if (notifWs) {
+                    try { notifWs.onclose = null; notifWs.close(); } catch (e) {}
+                }
                 const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                notifWs = new WebSocket(`${proto}//${window.location.host}/ws/events`);
+                notifWs = new WebSocket(`${proto}//${window.location.host}/ws/events?channel=${selectedNotifCameraChannel}`);
+                notifWs.onopen = () => {
+                    try {
+                        notifWs.send(JSON.stringify({ action: 'subscribe_channel', channel: selectedNotifCameraChannel }));
+                    } catch (e) {}
+                };
                 notifWs.onmessage = (event) => {
                     try {
                         const msg = JSON.parse(event.data);
-                        if (msg && msg.type === 'new_event' && msg.data) {
-                            const ev = msg.data;
-                            if (!ev.clip_url && ev.clip_filename) {
-                                ev.clip_url = `/clips/${String(ev.clip_filename).replace(/\\/g, '/')}`;
-                            }
+                        const ev = (msg && msg.type === 'new_event' && msg.data) ? msg.data : (msg && msg.id ? msg : null);
+                        if (!ev || !ev.id) return;
+
+                        const evCh = Number(ev.channel || 0);
+                        // 1. Strict Account RBAC check
+                        if (!isChannelPermittedForCurrentUser(evCh)) return;
+
+                        if (!ev.clip_url && ev.clip_filename) {
+                            ev.clip_url = `/clips/${String(ev.clip_filename).replace(/\\/g, '/')}`;
+                        }
+
+                        // Update per-camera cache & counter for that camera
+                        const camCache = loadNotificationsCacheForChannel(evCh);
+                        if (!camCache.some(x => Number(x.id) === Number(ev.id))) {
+                            const updatedCamCache = [ev, ...camCache].slice(0, 20);
+                            saveNotificationsCacheForChannel(evCh, updatedCamCache);
+                            notifCountsByChannel[evCh] = updatedCamCache.filter(x => !readNotifIds.has(String(x.id))).length;
+                        }
+
+                        // 2. Strict Per-Camera Display: Only push to active notification list if it belongs to selectedNotifCameraChannel
+                        if (evCh === Number(selectedNotifCameraChannel)) {
                             const exists = recentNotificationsList.some(x => Number(x.id) === Number(ev.id));
                             if (!exists) {
                                 recentNotificationsList = [ev, ...recentNotificationsList].slice(0, 20);
-                                saveNotificationsCache(recentNotificationsList);
                                 renderNotificationsList(recentNotificationsList);
                             }
+                        } else {
+                            renderNotificationCameraSelectorUI();
                         }
                     } catch (err) {}
                 };
                 notifWs.onclose = () => {
                     setTimeout(connectNotificationWebSocket, 8000);
                 };
-            } catch (e) {}
-        }
-
-        function saveNotificationsCache(list) {
-            try {
-                if (Array.isArray(list) && list.length > 0) {
-                    localStorage.setItem('vss_cached_notifications_v2', JSON.stringify(list.slice(0, 20)));
-                }
             } catch (e) {}
         }
 
@@ -9364,9 +9554,8 @@ user=None`;
             notifPopoverOpen = !notifPopoverOpen;
             popover.style.display = notifPopoverOpen ? 'flex' : 'none';
             if (notifPopoverOpen) {
-                if (recentNotificationsList.length > 0) {
-                    renderNotificationsList(recentNotificationsList);
-                }
+                renderNotificationCameraSelectorUI();
+                renderNotificationsList(recentNotificationsList);
                 fetchRecentNotifications();
             }
         }
@@ -9378,10 +9567,18 @@ user=None`;
         }
 
         async function fetchRecentNotifications() {
+            const targetCh = Number(selectedNotifCameraChannel || window.currentActiveChannel || 11);
+            if (!isChannelPermittedForCurrentUser(targetCh)) {
+                recentNotificationsList = [];
+                renderNotificationsList([]);
+                return;
+            }
+
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5500);
             try {
-                const res = await fetch('/api/events?only_anomalies=true&limit=15', {
+                // Strictly fetch notifications ONLY for targetCh ("camera nào nhận thông báo của camera đó")
+                const res = await fetch(`/api/events?only_anomalies=true&channel=${encodeURIComponent(targetCh)}&limit=15`, {
                     signal: controller.signal,
                     cache: 'no-store'
                 });
@@ -9391,15 +9588,18 @@ user=None`;
                     return;
                 }
                 const data = await res.json();
-                const events = Array.isArray(data.events) ? data.events : [];
-                if (events.length > 0) {
-                    recentNotificationsList = events;
-                    saveNotificationsCache(events);
-                }
+                const events = (Array.isArray(data.events) ? data.events : []).filter(
+                    ev => Number(ev.channel) === targetCh && isChannelPermittedForCurrentUser(ev.channel)
+                );
+
+                recentNotificationsList = events;
+                saveNotificationsCacheForChannel(targetCh, events);
+                notifCountsByChannel[targetCh] = events.filter(ev => !readNotifIds.has(String(ev.id))).length;
+                renderNotificationCameraSelectorUI();
                 renderNotificationsList(recentNotificationsList);
             } catch (err) {
                 clearTimeout(timeoutId);
-                console.warn('[Notification] fetch warning (using cached notifications):', err);
+                console.warn('[Notification] fetch warning (using per-camera cache):', err);
                 renderNotificationsList(recentNotificationsList);
             }
         }
@@ -9420,9 +9620,16 @@ user=None`;
             const countTag = document.getElementById('notif-count-tag');
             if (!body) return;
 
-            const safeEvents = Array.isArray(events) ? events : [];
+            const targetCh = Number(selectedNotifCameraChannel || 11);
+            const chStr = targetCh < 10 ? '0' + targetCh : String(targetCh);
+
+            // Strictly filter to ONLY the selected camera and permitted channels
+            const safeEvents = (Array.isArray(events) ? events : []).filter(
+                ev => Number(ev.channel) === targetCh && isChannelPermittedForCurrentUser(ev.channel)
+            );
             const unreadEvents = safeEvents.filter(ev => !readNotifIds.has(String(ev.id)));
             const unreadCount = unreadEvents.length;
+            notifCountsByChannel[targetCh] = unreadCount;
 
             if (badge) {
                 if (unreadCount > 0) {
@@ -9435,13 +9642,14 @@ user=None`;
             if (countTag) {
                 countTag.innerText = unreadCount;
             }
+            updateCameraViewNotifPill();
 
             if (safeEvents.length === 0) {
                 body.innerHTML = `
                     <div class="notif-empty-state">
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#76b900" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                        <span style="color: #76b900; font-weight: 600;">Hệ thống an toàn!</span>
-                        <span style="font-size: 0.72rem;">Không ghi nhận cảnh báo nguy hiểm nào gần đây.</span>
+                        <span style="color: #76b900; font-weight: 600;">Camera Kênh ${chStr} an toàn!</span>
+                        <span style="font-size: 0.72rem;">Không có cảnh báo bất thường nào trên Camera Kênh ${chStr}.</span>
                     </div>
                 `;
                 return;
@@ -9455,7 +9663,7 @@ user=None`;
                 const tagClass = isDanger ? 'notif-tag-danger' : (isWarning ? 'notif-tag-warning' : 'notif-tag-info');
                 const label = getFriendlyNotifLabel(ev);
 
-                const ch = ev.channel || 1;
+                const ch = ev.channel || targetCh;
                 const camName = (window.NCC_CAMERAS && NCC_CAMERAS.find(c => c.id === ch)?.name) || `Camera Kênh ${ch}`;
                 const descSafe = (ev.description || 'Phát hiện sự kiện an ninh từ đầu ghi NVR').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -9467,9 +9675,9 @@ user=None`;
                         </div>
                         <div class="notif-item-desc">${descSafe}</div>
                         <div class="notif-item-meta" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px;">
-                            <span class="notif-item-cam">📹 Kênh ${ch < 10 ? '0' + ch : ch} &bull; ${camName}</span>
+                            <span class="notif-item-cam">📹 Riêng Kênh ${ch < 10 ? '0' + ch : ch} &bull; ${camName}</span>
                             <div style="display: inline-flex; align-items: center; gap: 5px;">
-                                <button type="button" class="notif-item-clip-btn" onclick="event.stopPropagation(); handleNotifItemClick(${ev.id}, false)" title="Xem đoạn video liên quan tới thông báo này">▶ Xem Clip</button>
+                                <button type="button" class="notif-item-clip-btn" onclick="event.stopPropagation(); handleNotifItemClick(${ev.id}, false)" title="Xem đoạn video của Camera Kênh ${ch}">▶ Xem Clip</button>
                                 <button type="button" class="notif-item-clip-btn" style="background: rgba(118, 185, 0, 0.2); border-color: rgba(118, 185, 0, 0.55); color: #9be62b;" onclick="event.stopPropagation(); handleNotifItemClick(${ev.id}, true)" title="Xem video &amp; gửi AI phân tích nhanh trong 3 giây">⚡ AI 3s</button>
                             </div>
                         </div>
@@ -9484,6 +9692,7 @@ user=None`;
                 localStorage.setItem('vss_read_notif_ids', JSON.stringify(Array.from(readNotifIds).slice(-200)));
             } catch(e) {}
             renderNotificationsList(recentNotificationsList);
+            renderNotificationCameraSelectorUI();
 
             let ev = recentNotificationsList.find(x => Number(x.id) === Number(eventId));
             if (!ev) {
@@ -9492,14 +9701,13 @@ user=None`;
                     if (res.ok) ev = await res.json();
                 } catch (e) {}
             }
-            if (!ev) return;
+            if (!ev || !isChannelPermittedForCurrentUser(ev.channel)) return;
 
-            const ch = ev.channel || 1;
+            const ch = ev.channel || selectedNotifCameraChannel || 1;
             const label = getFriendlyNotifLabel(ev);
             const titleStr = `${label} - CAM ${ch < 10 ? '0' + ch : ch} (${ev.timestamp || ''})`;
             let clipUrl = ev.clip_url || (ev.clip_filename ? `/clips/${String(ev.clip_filename).replace(/\\/g, '/')}` : '');
 
-            // If clipUrl was not yet populated on cached item, fetch event detail to resolve nearest clip
             if (!clipUrl) {
                 try {
                     const detailRes = await fetch(`/api/events/${eventId}`);
@@ -9528,6 +9736,7 @@ user=None`;
                 localStorage.setItem('vss_read_notif_ids', JSON.stringify(Array.from(readNotifIds).slice(-200)));
             } catch(e) {}
             renderNotificationsList(recentNotificationsList);
+            renderNotificationCameraSelectorUI();
         }
 
         function formatTimeAgo(ts) {
@@ -9779,7 +9988,12 @@ user=None`;
                 const res = await fetch('/api/user/allowed-cameras');
                 if (!res.ok) return;
                 const data = await res.json();
-                
+
+                window.currentAuthUsername = data.username || 'default';
+                window.isCurrentUserAdmin = Boolean(data.is_admin);
+                window.userAllowedCamerasList = Array.isArray(data.cameras) ? data.cameras : [];
+                window.userAllowedChannels = window.userAllowedCamerasList.map(c => Number(c.channel));
+
                 // Hiển thị nút Trung tâm Quản trị nếu có quyền Admin
                 const adminLink = document.getElementById('sidebar-admin-link');
                 if (adminLink && data.is_admin) {
@@ -9796,9 +10010,33 @@ user=None`;
                     selectEl.innerHTML = optionsHtml;
                 }
 
-                // Cập nhật trạng thái kênh khả dụng cho danh sách NCC_CAMERAS
+                // Đồng bộ phân quyền với Hệ thống Thông báo Tách riêng theo từng Camera
+                if (window.userAllowedChannels.length > 0) {
+                    const activeCh = Number(window.currentActiveChannel || selectedNotifCameraChannel);
+                    if (window.userAllowedChannels.includes(activeCh)) {
+                        selectedNotifCameraChannel = activeCh;
+                    } else {
+                        selectedNotifCameraChannel = window.userAllowedChannels[0];
+                        window.currentActiveChannel = selectedNotifCameraChannel;
+                    }
+                    setNotificationCameraChannel(selectedNotifCameraChannel);
+                }
+
+                // Cập nhật lưới chọn Camera 32 kênh theo đúng quyền
+                if (typeof render32CameraGrid === 'function') {
+                    render32CameraGrid();
+                }
+
+                // Cập nhật trạng thái kênh khả dụng cho danh sách NCC_CAMERAS & 4-Camera Matrix
                 if (Array.isArray(data.cameras) && data.cameras.length > 0) {
-                    const userAllowedIds = data.cameras.map(c => c.channel);
+                    const userAllowedIds = data.cameras.map(c => Number(c.channel));
+                    if (typeof nccActiveSlots !== 'undefined' && Array.isArray(nccActiveSlots)) {
+                        for (let idx = 0; idx < nccActiveSlots.length; idx++) {
+                            if (!userAllowedIds.includes(Number(nccActiveSlots[idx]))) {
+                                nccActiveSlots[idx] = userAllowedIds[idx % userAllowedIds.length];
+                            }
+                        }
+                    }
                     if (typeof NCC_CAMERAS !== 'undefined' && Array.isArray(NCC_CAMERAS)) {
                         NCC_CAMERAS.forEach(c => {
                             c.isReal = userAllowedIds.includes(c.id);
@@ -11139,6 +11377,12 @@ user=None`;
         // Assign Camera to Target Slot
         function assignCameraToTargetSlot(camId) {
             const numId = Number(camId);
+            if (Array.isArray(window.userAllowedChannels) && !window.userAllowedChannels.includes(numId)) {
+                return;
+            }
+            if (typeof window.setNotificationCameraChannel === 'function') {
+                window.setNotificationCameraChannel(numId);
+            }
             const existingSlot = nccActiveSlots.indexOf(numId);
             
             // If already in grid, just focus that slot!
@@ -11260,13 +11504,16 @@ user=None`;
             if (label) label.textContent = `Ô ${nccTargetSlotIndex + 1}`;
         }
 
-        // Render Sidebar Camera List (32 Channels)
+        // Render Sidebar Camera List (RBAC-filtered)
         function renderVmSidebarCameraList() {
             const listEl = document.getElementById('vm-sb-list');
             if (!listEl) return;
 
             const q = (vmSidebarSearchQuery || '').toLowerCase().trim();
             const filtered = NCC_CAMERAS.filter(c => {
+                if (Array.isArray(window.userAllowedChannels) && !window.userAllowedChannels.includes(c.id)) {
+                    return false;
+                }
                 if (vmSidebarFilterMode === 'online' && !c.isReal) return false;
                 if (!q) return true;
                 return (
