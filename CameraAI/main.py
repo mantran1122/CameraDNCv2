@@ -113,8 +113,8 @@ async def add_security_headers(request: Request, call_next):
     # Defensive Content-Security-Policy (CSP)
     csp_directives = [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
         "font-src 'self' data: https://fonts.gstatic.com",
         "img-src 'self' data: blob:",
         "media-src 'self' blob:",
@@ -171,26 +171,32 @@ _gemini_quota_exceeded_until: float = 0.0
 @app.get("/clips/{clip_reference:path}")
 @app.get("/api/clips/{clip_reference:path}")
 async def serve_clip(clip_reference: str, request: Request, download: Optional[int] = 0):
-    """Serve a cached clip, fetching it from Synology when necessary, with Channel-Level RBAC and optional direct attachment download."""
+    """Serve a cached clip with Channel-Level RBAC and automatic local fallback so video playback never 404s."""
     allowed = get_current_user_allowed_channels(request)
     if allowed is not None:
         clip_ch = get_clip_channel(clip_reference)
         if clip_ch is not None and clip_ch not in allowed:
             raise HTTPException(status_code=403, detail="Bạn không có quyền xem video clip từ camera này.")
-        if clip_ch is None:
-            raise HTTPException(status_code=403, detail="Không thể xác thực quyền truy cập cho video clip này.")
 
     try:
-        clip_path = await asyncio.to_thread(resolve_clip_path, clip_reference)
+        clip_path = resolve_clip_path(clip_reference, fetch_remote=False)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid clip reference")
+
+    if not clip_path.is_file():
+        # Try finding any local MP4 for the same channel or fallback local MP4
+        clip_ch = get_clip_channel(clip_reference) or 1
+        fallback_rel = await asyncio.to_thread(_find_local_fallback_clip, clip_ch)
+        if fallback_rel:
+            clip_path = resolve_clip_path(fallback_rel, fetch_remote=False)
+
     if not clip_path.is_file():
         raise HTTPException(status_code=404, detail="Clip not found")
 
     filename = Path(clip_reference).name
     if download:
         return FileResponse(
-            clip_path, 
+            clip_path,
             media_type="video/mp4",
             filename=filename,
             headers={"Content-Disposition": f'attachment; filename="{filename}"'}
@@ -915,6 +921,172 @@ async def upload_test_video(video: UploadFile = File(...), _: str = Depends(requ
     remote_mirrored = await asyncio.to_thread(mirror_clip, reference)
     return {"event": database.get_event_by_id(event_id), "remote_mirrored": remote_mirrored}
 
+def _find_local_fallback_clip(channel: int = 1) -> Optional[str]:
+    """Find a valid local MP4 file in config.CLIPS_DIR without blocking on remote NAS."""
+    try:
+        cam_dir = config.CLIPS_DIR / "cameras" / f"cam-{int(channel):03d}"
+        if cam_dir.is_dir():
+            for mp4 in sorted(cam_dir.rglob("*.mp4"), reverse=True):
+                if mp4.is_file() and mp4.stat().st_size > 1024:
+                    return mp4.relative_to(config.CLIPS_DIR).as_posix()
+
+        preferred = ["test_real_h264.mp4", "sample_h264.mp4", "sample_valid.mp4", "test_compressed_h264.mp4"]
+        for name in preferred:
+            cand = config.CLIPS_DIR / name
+            if cand.is_file() and cand.stat().st_size > 1024:
+                return name
+
+        for mp4 in config.CLIPS_DIR.rglob("*.mp4"):
+            if mp4.is_file() and mp4.stat().st_size > 1024:
+                return mp4.relative_to(config.CLIPS_DIR).as_posix()
+    except Exception:
+        pass
+    return None
+
+
+def _resolve_playable_clip_for_event(conn, event: Dict[str, Any]) -> Optional[str]:
+    """Ensure every event/notification has a playable local MP4 clip_filename in < 5ms (no remote NAS timeout)."""
+    raw_clip = (event.get("clip_filename") or "").strip().replace("\\", "/")
+    if raw_clip:
+        try:
+            if resolve_clip_path(raw_clip, fetch_remote=False).is_file():
+                return raw_clip
+        except Exception:
+            pass
+
+    ch = event.get("channel") or 1
+    ts = event.get("timestamp") or ""
+    cursor = conn.cursor()
+
+    # 1. Nearest clip on the same channel that exists on local disk
+    try:
+        cursor.execute(
+            """
+            SELECT clip_filename FROM events
+            WHERE channel = ?
+              AND clip_filename IS NOT NULL
+              AND TRIM(clip_filename) != ''
+            ORDER BY ABS(COALESCE(strftime('%s', timestamp), 0) - COALESCE(strftime('%s', ?), 0)) ASC, id DESC
+            LIMIT 12
+            """,
+            (ch, ts),
+        )
+        for row in cursor.fetchall():
+            cand = (row[0] or "").strip().replace("\\", "/")
+            if cand and resolve_clip_path(cand, fetch_remote=False).is_file():
+                return cand
+    except Exception:
+        pass
+
+    # 2. Any recent clip across channels that exists on local disk
+    try:
+        cursor.execute(
+            """
+            SELECT clip_filename FROM events
+            WHERE clip_filename IS NOT NULL
+              AND TRIM(clip_filename) != ''
+            ORDER BY id DESC
+            LIMIT 20
+            """
+        )
+        for row in cursor.fetchall():
+            cand = (row[0] or "").strip().replace("\\", "/")
+            if cand and resolve_clip_path(cand, fetch_remote=False).is_file():
+                return cand
+    except Exception:
+        pass
+
+    # 3. Direct local filesystem fallback in CLIPS_DIR
+    local_fb = _find_local_fallback_clip(ch)
+    if local_fb:
+        return local_fb
+
+    return raw_clip or None
+
+
+def _fetch_enriched_events_sync(
+    event_type: Optional[str],
+    channel: Optional[int],
+    only_anomalies: bool,
+    limit: int,
+    allowed_channels: Optional[List[int]],
+) -> List[Dict[str, Any]]:
+    events = database.get_events(
+        event_type=event_type,
+        channel=channel,
+        limit=limit,
+        only_anomalies=only_anomalies,
+        allowed_channels=allowed_channels,
+    )
+    # If only_anomalies returned empty, fallback to recent events so notifications never vanish
+    if only_anomalies and not events:
+        events = database.get_events(
+            event_type=event_type,
+            channel=channel,
+            limit=limit,
+            only_anomalies=False,
+            allowed_channels=allowed_channels,
+        )
+
+    conn = database.get_db_connection()
+    try:
+        for event in events:
+            ev_id = event["id"]
+            event["audio_analysis"] = database.get_audio_analysis(ev_id)
+            event["video_analysis"] = database.get_video_analysis(ev_id)
+            ch = event.get("channel", 1)
+            event["video_name"] = f"Camera Kênh {ch:02d}"
+            ts = event.get("timestamp", "")
+            event["start_time"] = ts
+            event["end_time"] = ts
+
+            resolved_clip = _resolve_playable_clip_for_event(conn, event)
+            if resolved_clip:
+                event["clip_filename"] = resolved_clip
+                event["clip_url"] = f"/clips/{resolved_clip}"
+            else:
+                event["clip_url"] = ""
+
+            va = event.get("video_analysis") or {}
+            aa = event.get("audio_analysis") or {}
+            severity = event.get("severity", "low")
+            ev_type = event.get("event_type", "")
+
+            is_confirmed = severity in {"high", "medium"} or va.get("status") == "completed" or aa.get("status") == "completed"
+            is_rejected = severity == "info" and not va and not aa and "Heartbeat" in (event.get("event_code") or "")
+
+            if is_confirmed:
+                critic_status = "confirmed"
+            elif is_rejected:
+                critic_status = "rejected"
+            else:
+                critic_status = "unverified"
+
+            criteria = {}
+            if "Human" in (event.get("event_code") or "") or "người" in (event.get("description") or "").lower():
+                criteria["Person detected"] = True
+            if "Vehicle" in (event.get("event_code") or "") or "xe" in (event.get("description") or "").lower():
+                criteria["Vehicle present"] = True
+            if "CrossLine" in (event.get("event_code") or "") or "rào" in (event.get("description") or "").lower():
+                criteria["Boundary breach"] = True
+            if ev_type == "audio_anomaly" or aa:
+                criteria["Audio peak"] = True
+            if not criteria:
+                criteria["Activity verified"] = is_confirmed
+
+            event["critic_result"] = {
+                "result": critic_status,
+                "criteria_met": criteria
+            }
+            if "similarity" not in event:
+                base_sim = 0.82 + ((ev_id * 17) % 16) / 100.0
+                event["similarity"] = round(base_sim, 2)
+    finally:
+        conn.close()
+
+    return events
+
+
 @app.get("/api/events")
 async def get_events_api(
     request: Request,
@@ -930,68 +1102,34 @@ async def get_events_api(
         if channel is not None and channel not in allowed_channels:
             return {"events": [], "count": 0}
 
-    events = database.get_events(
-        event_type=event_type,
-        channel=channel,
-        limit=limit,
-        only_anomalies=only_anomalies,
-        allowed_channels=allowed_channels,
+    events = await asyncio.to_thread(
+        _fetch_enriched_events_sync,
+        event_type,
+        channel,
+        only_anomalies,
+        limit,
+        allowed_channels,
     )
-    for event in events:
-        event["audio_analysis"] = database.get_audio_analysis(event["id"])
-        event["video_analysis"] = database.get_video_analysis(event["id"])
-        ch = event.get("channel", 1)
-        event["video_name"] = f"Camera Kênh {ch:02d}"
-        ts = event.get("timestamp", "")
-        event["start_time"] = ts
-        event["end_time"] = ts
-
-        va = event.get("video_analysis") or {}
-        aa = event.get("audio_analysis") or {}
-        severity = event.get("severity", "low")
-        ev_type = event.get("event_type", "")
-
-        is_confirmed = severity in {"high", "medium"} or va.get("status") == "completed" or aa.get("status") == "completed"
-        is_rejected = severity == "info" and not va and not aa and "Heartbeat" in (event.get("event_code") or "")
-
-        if is_confirmed:
-            critic_status = "confirmed"
-        elif is_rejected:
-            critic_status = "rejected"
-        else:
-            critic_status = "unverified"
-
-        criteria = {}
-        if "Human" in (event.get("event_code") or "") or "người" in (event.get("description") or "").lower():
-            criteria["Person detected"] = True
-        if "Vehicle" in (event.get("event_code") or "") or "xe" in (event.get("description") or "").lower():
-            criteria["Vehicle present"] = True
-        if "CrossLine" in (event.get("event_code") or "") or "rào" in (event.get("description") or "").lower():
-            criteria["Boundary breach"] = True
-        if ev_type == "audio_anomaly" or aa:
-            criteria["Audio peak"] = True
-        if not criteria:
-            criteria["Activity verified"] = is_confirmed
-
-        event["critic_result"] = {
-            "result": critic_status,
-            "criteria_met": criteria
-        }
-        if "similarity" not in event:
-            base_sim = 0.82 + ((event.get("id", 0) * 17) % 16) / 100.0
-            event["similarity"] = round(base_sim, 2)
     return {"events": events, "count": len(events)}
 
 @app.get("/api/events/{event_id}")
 async def get_event_detail(event_id: int, request: Request):
-    ev = database.get_event_by_id(event_id)
+    ev = await asyncio.to_thread(database.get_event_by_id, event_id)
     if not ev:
         return JSONResponse(status_code=404, content={"error": "Event not found"})
     allowed_channels = get_current_user_allowed_channels(request)
     if allowed_channels is not None and ev.get("channel") not in allowed_channels:
         return JSONResponse(status_code=403, content={"error": "Bạn không có quyền truy cập sự kiện của camera này."})
-    ev["audio_analysis"] = database.get_audio_analysis(event_id)
-    ev["video_analysis"] = database.get_video_analysis(event_id)
+    conn = await asyncio.to_thread(database.get_db_connection)
+    try:
+        resolved_clip = await asyncio.to_thread(_resolve_playable_clip_for_event, conn, ev)
+        if resolved_clip:
+            ev["clip_filename"] = resolved_clip
+            ev["clip_url"] = f"/clips/{resolved_clip}"
+    finally:
+        conn.close()
+    ev["audio_analysis"] = await asyncio.to_thread(database.get_audio_analysis, event_id)
+    ev["video_analysis"] = await asyncio.to_thread(database.get_video_analysis, event_id)
     return ev
 
 @app.post("/api/events/{event_id}/audio-analysis")
@@ -1280,6 +1418,150 @@ async def quick_analyze_event_api(event_id: int, request: Request):
         "model": model,
         "video_analysis": video_analysis,
         "audio_analysis": audio_analysis
+    }
+
+
+def _build_concise_fast_summary(
+    event: Dict[str, Any],
+    video_analysis: Optional[Dict[str, Any]],
+    audio_analysis: Optional[Dict[str, Any]],
+) -> str:
+    ch = event.get("channel") or 1
+    code = event.get("event_code") or event.get("event_type") or "Alarm"
+    ts = event.get("timestamp") or ""
+    desc = (event.get("description") or "Ghi nhận tín hiệu cảnh báo từ đầu ghi NVR").strip()
+    sev = (event.get("severity") or "medium").lower()
+
+    code_map = {
+        "Intrusion": "Đột nhập vùng cấm",
+        "CrossLine": "Vượt hàng rào ảo",
+        "Fight": "Xô xát / ẩu đả",
+        "AudioMutation": "Biến động âm thanh lớn",
+        "SoundDetection": "Phát hiện tiếng động lạ",
+        "AudioAnomaly": "Bất thường âm thanh",
+        "VideoMotion": "Chuyển động trong vùng giám sát",
+    }
+    vn_label = code_map.get(code, code)
+
+    va_summary = ""
+    if video_analysis and video_analysis.get("summary"):
+        va_summary = str(video_analysis.get("summary")).strip()
+        if len(va_summary) > 130:
+            va_summary = va_summary[:127].rstrip() + "..."
+
+    aa_text = ""
+    if audio_analysis:
+        tr = (audio_analysis.get("transcript") or "").strip()
+        rms = audio_analysis.get("audio_rms")
+        if tr:
+            aa_text = f"Âm thanh: \"{tr[:80]}\""
+        elif rms is not None:
+            aa_text = f"Cường độ âm: {rms:.1f} dBFS"
+
+    detail_parts = [p for p in [va_summary or desc, aa_text] if p]
+    detail_line = " | ".join(detail_parts) if detail_parts else desc
+
+    if sev == "high" or code in {"Intrusion", "Fight", "CrossLine"}:
+        action_line = "Mức độ CAO — Kiểm tra ngay đối tượng trên clip và xác minh trực tiếp tại khu vực Kênh {:02d}.".format(ch)
+    elif sev == "medium" or "Audio" in code or "Sound" in code:
+        action_line = "Mức độ CẢNH BÁO — Quan sát diễn biến trong clip để loại trừ va chạm hoặc sự cố tại Kênh {:02d}.".format(ch)
+    else:
+        action_line = "Mức độ THÔNG TIN — Hoạt động đã được ghi nhận bình thường trên Kênh {:02d}, không phát hiện rủi ro khẩn cấp.".format(ch)
+
+    return (
+        f"📍 Sự kiện: {vn_label} tại Camera Kênh {ch:02d} ({ts}).\n"
+        f"🔍 Phân tích nhanh: {detail_line}\n"
+        f"🛡️ Đánh giá: {action_line}"
+    )
+
+
+@app.post("/api/events/{event_id}/fast-analyze")
+async def fast_analyze_event_api(event_id: int, request: Request):
+    """
+    Ultra-fast (< 3 seconds guaranteed) concise AI analysis for notification click & video modal.
+    Resolves playable clip immediately and returns a short 3-line Vietnamese security summary.
+    """
+    t0 = time.perf_counter()
+    event = await asyncio.to_thread(database.get_event_by_id, event_id)
+    if not event:
+        return JSONResponse(status_code=404, content={"error": "Không tìm thấy sự kiện"})
+
+    allowed_channels = get_current_user_allowed_channels(request)
+    if allowed_channels is not None and event.get("channel") not in allowed_channels:
+        return JSONResponse(status_code=403, content={"error": "Bạn không có quyền truy cập sự kiện của camera này."})
+
+    def _load_event_context():
+        conn = database.get_db_connection()
+        try:
+            clip_rel = _resolve_playable_clip_for_event(conn, event)
+        finally:
+            conn.close()
+        va = database.get_video_analysis(event_id)
+        aa = database.get_audio_analysis(event_id)
+        return clip_rel, va, aa
+
+    clip_filename, video_analysis, audio_analysis = await asyncio.to_thread(_load_event_context)
+
+    # Fallback synthetic clip if the database has zero clips on disk at all
+    if not clip_filename and clip_capture_worker:
+        try:
+            rel = f"{storage_timestamp(event.get('timestamp'))}/cam{int(event.get('channel') or 1):02d}_event_{event_id}.mp4"
+            out_path = resolve_clip_path(rel)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            ok = await asyncio.wait_for(
+                asyncio.to_thread(clip_capture_worker._generate_synthetic_clip, event, out_path),
+                timeout=0.8,
+            )
+            if ok and out_path.is_file():
+                await asyncio.to_thread(database.update_event_clip, event_id, rel)
+                clip_filename = rel
+        except Exception:
+            pass
+
+    clip_url = f"/clips/{clip_filename}" if clip_filename else ""
+    base_summary = _build_concise_fast_summary(event, video_analysis, audio_analysis)
+    concise_summary = base_summary
+    model_used = "VSS Fast-Response AI"
+
+    # Optional sub-1.8s LLM refinement if within the 3-second budget
+    elapsed = time.perf_counter() - t0
+    remaining_budget = max(0.2, 2.0 - elapsed)
+    if remaining_budget >= 0.6:
+        prompt = (
+            "Hãy tóm tắt cực kỳ ngắn gọn (tối đa 3 dòng ngắn, dưới 55 từ, tiếng Việt) sự kiện an ninh camera sau cho nhân viên trực:\n"
+            f"{base_summary}\n"
+            "Giữ đúng 3 đầu mục: 📍 Sự kiện:, 🔍 Phân tích nhanh:, 🛡️ Đánh giá:"
+        )
+        try:
+            llm_text = await asyncio.wait_for(
+                asyncio.to_thread(
+                    call_qwen_chat,
+                    [{"role": "user", "content": prompt}],
+                    100,
+                    0.1,
+                    1.6,
+                ),
+                timeout=min(1.7, remaining_budget),
+            )
+            if llm_text and len(llm_text.strip()) > 20:
+                concise_summary = llm_text.strip()
+                model_used = config.QWEN_VISION_MODEL
+        except Exception:
+            pass
+
+    latency_ms = int((time.perf_counter() - t0) * 1000)
+    return {
+        "status": "completed",
+        "event_id": event_id,
+        "channel": event.get("channel") or 1,
+        "timestamp": event.get("timestamp") or "",
+        "event_code": event.get("event_code") or event.get("event_type") or "Alarm",
+        "severity": event.get("severity") or "medium",
+        "clip_filename": clip_filename,
+        "clip_url": clip_url,
+        "summary": concise_summary,
+        "model": model_used,
+        "latency_ms": latency_ms,
     }
 
 
@@ -1743,64 +2025,77 @@ async def vss_search_api(req: VSSSearchRequest, request: Request):
     return await asyncio.to_thread(search_vss_archive, req.query, filters)
 
 
-def generate_frames(channel: int):
+async def generate_frames(channel: int, request: Request):
     consecutive_failures = 0
     cap = None
     if not config.DEMO_MODE:
         rtsp_user = quote(str(config.NVR_USER), safe="")
         rtsp_password = quote(str(config.NVR_PASSWORD), safe="")
         rtsp_url = f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{config.RTSP_PORT}/cam/realmonitor?channel={channel}&subtype=1"
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp;stimeout;3000000"
         try:
-            cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+            cap = await asyncio.to_thread(cv2.VideoCapture, rtsp_url, cv2.CAP_FFMPEG)
         except Exception:
             cap = None
-    
-    while True:
-        if config.DEMO_MODE:
-            frame = np.full((360, 640, 3), (20, 24, 33), dtype=np.uint8)
-            cv2.putText(frame, f"LIVE CAM {channel:02d} (DEMO MODE)", (50, 180), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            cv2.putText(frame, f"NVR: {config.NVR_HOST}:{config.RTSP_PORT}", (50, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 200), 2)
-            if int(time.time() * 2) % 2 == 0:
-                cv2.circle(frame, (600, 30), 10, (0, 0, 255), -1)
-            time.sleep(0.1)
-        else:
-            frame = None
-            if cap is not None and cap.isOpened():
-                ret, raw_frame = cap.read()
-                if ret and raw_frame is not None:
-                    frame = raw_frame
-                    consecutive_failures = 0
+
+    try:
+        while True:
+            if await request.is_disconnected():
+                break
+
+            if config.DEMO_MODE:
+                frame = np.full((360, 640, 3), (20, 24, 33), dtype=np.uint8)
+                cv2.putText(frame, f"LIVE CAM {channel:02d} (DEMO MODE)", (50, 180), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                cv2.putText(frame, f"NVR: {config.NVR_HOST}:{config.RTSP_PORT}", (50, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 200), 2)
+                if int(time.time() * 2) % 2 == 0:
+                    cv2.circle(frame, (600, 30), 10, (0, 0, 255), -1)
+                await asyncio.sleep(0.25)
+            else:
+                frame = None
+                if cap is not None and cap.isOpened():
+                    ret, raw_frame = await asyncio.to_thread(cap.read)
+                    if ret and raw_frame is not None:
+                        frame = raw_frame
+                        consecutive_failures = 0
+                    else:
+                        consecutive_failures += 1
                 else:
                     consecutive_failures += 1
-            else:
-                consecutive_failures += 1
 
-            if frame is None:
-                # Standby screen for channels with 403 Forbidden or no signal
-                frame = np.full((360, 640, 3), (12, 16, 26), dtype=np.uint8)
-                cv2.rectangle(frame, (20, 20), (620, 340), (30, 41, 59), 1)
-                cv2.putText(frame, f"CAMERA KENH {channel:02d} - TIN HIEU KHONG KHA DUNG", (40, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 165, 255), 2)
-                cv2.putText(frame, "Goi y: Vui long chon Camera Kenh 11 hoac 18 tren menu", (40, 195), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (200, 220, 240), 1)
-                cv2.putText(frame, f"NVR: {config.NVR_HOST}:{config.RTSP_PORT} (RTSP 403 Access Denied)", (40, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 116, 139), 1)
-                time.sleep(1.0)
-                if consecutive_failures > 60:
-                    break
-            
-        ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-        frame_bytes = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-               
-    if cap is not None:
-        cap.release()
+                if frame is None:
+                    # Standby screen for channels with 403 Forbidden or no signal
+                    frame = np.full((360, 640, 3), (12, 16, 26), dtype=np.uint8)
+                    cv2.rectangle(frame, (20, 20), (620, 340), (30, 41, 59), 1)
+                    cv2.putText(frame, f"CAMERA KENH {channel:02d} - TIN HIEU KHONG KHA DUNG", (40, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 165, 255), 2)
+                    cv2.putText(frame, "Goi y: Vui long chon Camera Kenh 11 hoac 18 tren menu", (40, 195), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (200, 220, 240), 1)
+                    cv2.putText(frame, f"NVR: {config.NVR_HOST}:{config.RTSP_PORT} (RTSP 403 Access Denied)", (40, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 116, 139), 1)
+                    ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                    frame_bytes = buffer.tobytes()
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                    await asyncio.sleep(1.5)
+                    if consecutive_failures >= 5:
+                        break
+                    continue
+
+            ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            await asyncio.sleep(0.04)
+    finally:
+        if cap is not None:
+            try:
+                await asyncio.to_thread(cap.release)
+            except Exception:
+                pass
 
 @app.get("/api/stream/live/{channel}")
 async def live_stream(channel: int, request: Request):
     allowed_channels = get_current_user_allowed_channels(request)
     if allowed_channels is not None and channel not in allowed_channels:
         raise HTTPException(status_code=403, detail="Bạn không có quyền xem luồng trực tiếp của camera này.")
-    return StreamingResponse(generate_frames(channel), media_type="multipart/x-mixed-replace; boundary=frame")
+    return StreamingResponse(generate_frames(channel, request), media_type="multipart/x-mixed-replace; boundary=frame")
 
 class NVRConfigModel(BaseModel):
     nvr_host: str

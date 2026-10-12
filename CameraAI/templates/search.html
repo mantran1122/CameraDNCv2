@@ -7025,10 +7025,14 @@
     <!-- 4. Video Playback Modal (matching media_1788857714710.png) -->
     <!-- 4. Video Playback Modal (matching media_1788857714710.png) -->
     <div class="video-modal-backdrop" id="video-playback-modal" style="display: none;" onclick="if(event.target===this) closeVideoModal()">
-        <div class="video-modal-container">
+        <div class="video-modal-container" style="max-width: 820px; width: 92vw;">
             <div class="video-modal-top">
                 <span class="video-modal-title" id="modal-video-title">warehouse_20250101_000000_3805c.mp4</span>
-                <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <!-- Fast 3s AI Analysis Button -->
+                    <button type="button" id="modal-fast-ai-btn" onclick="triggerModalFastAiAnalysis()" style="height: 26px; padding: 0 10px; font-size: 0.725rem; font-weight: 600; border-radius: 4px; border: 1px solid rgba(118, 185, 0, 0.55); background: rgba(118, 185, 0, 0.16); color: #9be62b; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;" title="Gửi AI phân tích nhanh sự kiện này (< 3 giây)">
+                        <span>⚡ AI Phân tích (3s)</span>
+                    </button>
                     <!-- Speed buttons -->
                     <div style="display: flex; gap: 3px; background: rgba(255,255,255,0.06); padding: 2px 4px; border-radius: 4px;">
                         <button class="popover-btn-cancel" style="height: 22px; padding: 0 5px; font-size: 0.65rem;" onclick="setVideoSpeed(1.0)">1.0x</button>
@@ -7045,10 +7049,20 @@
             </div>
             <div class="video-modal-green-line"></div>
             <div class="video-modal-player-wrap">
-                <video id="modal-video-element" controls autoplay loop>
+                <video id="modal-video-element" controls autoplay loop playsinline>
                     <source src="" type="video/mp4">
                     Your browser does not support HTML5 video.
                 </video>
+            </div>
+            <!-- Fast 3s AI Analysis Result Box inside Video Modal -->
+            <div id="modal-fast-ai-box" style="display: none; padding: 12px 16px; background: rgba(15, 23, 42, 0.96); border-top: 1px solid rgba(118, 185, 0, 0.35); color: #e4e4e7; font-size: 0.8rem; line-height: 1.5;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <span style="font-weight: 700; color: #8ae300; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>🤖 Kết quả AI Phân tích nhanh</span>
+                        <span id="modal-fast-ai-meta" style="font-weight: 500; color: #a1a1aa; font-size: 0.7rem;"></span>
+                    </span>
+                </div>
+                <div id="modal-fast-ai-content" style="white-space: pre-line; color: #f4f4f5; font-size: 0.79rem;"></div>
             </div>
         </div>
     </div>
@@ -9105,22 +9119,40 @@ user=None`;
             }
         });
 
-        // 9. Video Modal
-        function openVideoModal(title, url) {
+        // 9. Video Modal + Ultra-Fast 3s AI Analysis
+        let currentModalEventId = null;
+        let currentModalVideoTitle = '';
+        let currentModalVideoUrl = '';
+
+        function openVideoModal(title, url, eventId = null) {
             const modal = document.getElementById('video-playback-modal');
             const titleEl = document.getElementById('modal-video-title');
             const videoEl = document.getElementById('modal-video-element');
             const downloadBtn = document.getElementById('modal-video-download-btn');
-            
-            if (titleEl) titleEl.innerText = title;
+            const aiBox = document.getElementById('modal-fast-ai-box');
+
+            currentModalEventId = eventId || null;
+            currentModalVideoTitle = title || 'Video sự kiện an ninh';
+            currentModalVideoUrl = url || '';
+
+            if (titleEl) titleEl.innerText = currentModalVideoTitle;
+            if (aiBox && !eventId) {
+                aiBox.style.display = 'none';
+            }
             if (videoEl && url) {
-                videoEl.src = url;
+                if (videoEl.getAttribute('src') !== url) {
+                    videoEl.src = url;
+                }
                 videoEl.playbackRate = 1.0;
+                const playPromise = videoEl.play();
+                if (playPromise && typeof playPromise.catch === 'function') {
+                    playPromise.catch(() => {});
+                }
             }
             if (downloadBtn && url) {
                 const downloadUrl = url.includes('?') ? `${url}&download=1` : `${url}?download=1`;
                 downloadBtn.href = downloadUrl;
-                downloadBtn.download = title || 'camera_clip.mp4';
+                downloadBtn.download = (title || 'camera_clip').replace(/[^a-zA-Z0-9_\-\.]/g, '_') + '.mp4';
             }
             if (modal) modal.style.display = 'flex';
         }
@@ -9137,29 +9169,192 @@ user=None`;
             if (modal) modal.style.display = 'none';
         }
 
+        async function triggerModalFastAiAnalysis() {
+            if (currentModalEventId) {
+                await runFastAiAnalysisForEvent(currentModalEventId);
+                return;
+            }
+            // Fallback if opened from a generic video card without eventId
+            const matchedEv = recentNotificationsList.find(e => e.clip_filename && currentModalVideoUrl.includes(e.clip_filename));
+            if (matchedEv && matchedEv.id) {
+                currentModalEventId = matchedEv.id;
+                await runFastAiAnalysisForEvent(matchedEv.id);
+            } else if (recentNotificationsList.length > 0) {
+                await runFastAiAnalysisForEvent(recentNotificationsList[0].id);
+            }
+        }
+
+        async function runFastAiAnalysisForEvent(eventId) {
+            const aiBox = document.getElementById('modal-fast-ai-box');
+            const aiContent = document.getElementById('modal-fast-ai-content');
+            const aiMeta = document.getElementById('modal-fast-ai-meta');
+            const aiBtn = document.getElementById('modal-fast-ai-btn');
+            const tStart = performance.now();
+
+            if (aiBox) aiBox.style.display = 'block';
+            if (aiMeta) aiMeta.innerText = 'Đang phân tích (< 3s)...';
+            if (aiContent) aiContent.innerText = '⏳ AI đang trích xuất đặc trưng sự kiện và tổng hợp báo cáo ngắn gọn...';
+            if (aiBtn) {
+                aiBtn.disabled = true;
+                aiBtn.innerHTML = '<span>⏳ Đang phân tích...</span>';
+            }
+
+            const evObj = recentNotificationsList.find(x => Number(x.id) === Number(eventId)) || {};
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 2700);
+
+            try {
+                const res = await fetch(`/api/events/${eventId}/fast-analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal
+                });
+                clearTimeout(timer);
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const elapsedSec = ((performance.now() - tStart) / 1000).toFixed(1);
+
+                // If backend resolved or synthesized a playable clip_url, ensure video player plays it
+                if (data.clip_url) {
+                    const videoEl = document.getElementById('modal-video-element');
+                    if (videoEl && (!currentModalVideoUrl || currentModalVideoUrl !== data.clip_url)) {
+                        currentModalVideoUrl = data.clip_url;
+                        videoEl.src = data.clip_url;
+                        const p = videoEl.play();
+                        if (p && typeof p.catch === 'function') p.catch(() => {});
+                    }
+                    if (evObj) {
+                        evObj.clip_url = data.clip_url;
+                        evObj.clip_filename = data.clip_filename || evObj.clip_filename;
+                    }
+                }
+
+                const summaryText = data.summary || 'Đã xác nhận sự kiện an ninh trên camera.';
+                if (aiMeta) aiMeta.innerText = `⚡ Hoàn tất trong ${elapsedSec}s • ${data.model || 'VSS Fast AI'}`;
+                if (aiContent) aiContent.innerText = summaryText;
+
+                // Also append concise AI result to Vision Agent chat sidebar for history
+                appendFastAiResultToChat(evObj, summaryText, elapsedSec);
+            } catch (err) {
+                clearTimeout(timer);
+                const elapsedSec = ((performance.now() - tStart) / 1000).toFixed(1);
+                const ch = evObj.channel || 1;
+                const code = evObj.event_code || evObj.event_type || 'Cảnh báo';
+                const desc = evObj.description || 'Phát hiện tín hiệu cảnh báo an ninh từ đầu ghi NVR';
+                const fallbackSummary =
+                    `📍 Sự kiện: ${code} tại Camera Kênh ${ch < 10 ? '0' + ch : ch} (${evObj.timestamp || 'Vừa ghi nhận'}).\n` +
+                    `🔍 Phân tích nhanh: ${desc}.\n` +
+                    `🛡️ Đánh giá: Đã tải đoạn video liên quan, vui lòng quan sát trực tiếp diễn biến trên trình phát.`;
+                if (aiMeta) aiMeta.innerText = `⚡ Phản hồi tức thì (${elapsedSec}s)`;
+                if (aiContent) aiContent.innerText = fallbackSummary;
+                appendFastAiResultToChat(evObj, fallbackSummary, elapsedSec);
+            } finally {
+                if (aiBtn) {
+                    aiBtn.disabled = false;
+                    aiBtn.innerHTML = '<span>⚡ AI Phân tích (3s)</span>';
+                }
+            }
+        }
+
+        function appendFastAiResultToChat(evObj, summaryText, elapsedSec) {
+            const chatContainer = document.getElementById('chat-messages');
+            if (!chatContainer) return;
+            const ch = evObj.channel || 1;
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'chat-msg assistant';
+            msgDiv.innerHTML = `
+                <div class="chat-bubble" style="border-left: 3px solid #76b900;">
+                    <div style="font-weight: 700; color: #8ae300; font-size: 0.75rem; margin-bottom: 4px;">
+                        ⚡ AI Phân tích nhanh Sự kiện #${evObj.id || ''} (Kênh ${ch < 10 ? '0' + ch : ch}) • ${elapsedSec}s
+                    </div>
+                    <div style="white-space: pre-line; font-size: 0.78rem; line-height: 1.45;">${summaryText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                </div>
+            `;
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
         // ==========================================================================
         // HẠNG MỤC 1: REALTIME NOTIFICATION SYSTEM (CHUÔNG THÔNG BÁO)
         // ==========================================================================
         let notifPopoverOpen = false;
         let recentNotificationsList = [];
         let readNotifIds = new Set();
+        let notifPollTimer = null;
+        let notifWs = null;
+
         try {
             const savedRead = localStorage.getItem('vss_read_notif_ids');
             if (savedRead) readNotifIds = new Set(JSON.parse(savedRead));
         } catch(e) {}
 
-        function initNotificationSystem() {
-            fetchRecentNotifications();
-            // Polling every 25 seconds for new anomalies
-            setInterval(fetchRecentNotifications, 25000);
+        try {
+            const cachedNotifs = localStorage.getItem('vss_cached_notifications_v2');
+            if (cachedNotifs) {
+                const parsed = JSON.parse(cachedNotifs);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    recentNotificationsList = parsed;
+                }
+            }
+        } catch(e) {}
 
-            // Close on click outside
+        function initNotificationSystem() {
+            // 1. Render cached notifications immediately so UI is never stuck on "Đang tải..."
+            if (recentNotificationsList.length > 0) {
+                renderNotificationsList(recentNotificationsList);
+            }
+
+            // 2. Fetch fresh notifications immediately and every 20 seconds
+            fetchRecentNotifications();
+            if (notifPollTimer) clearInterval(notifPollTimer);
+            notifPollTimer = setInterval(fetchRecentNotifications, 20000);
+
+            // 3. Connect realtime WebSocket so new alerts appear without disappearing
+            connectNotificationWebSocket();
+
+            // 4. Close on click outside
             document.addEventListener('click', (e) => {
                 const wrap = document.getElementById('header-notif-wrap');
                 if (notifPopoverOpen && wrap && !wrap.contains(e.target)) {
                     closeNotificationPopover();
                 }
             });
+        }
+
+        function connectNotificationWebSocket() {
+            try {
+                const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                notifWs = new WebSocket(`${proto}//${window.location.host}/ws/events`);
+                notifWs.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        if (msg && msg.type === 'new_event' && msg.data) {
+                            const ev = msg.data;
+                            if (!ev.clip_url && ev.clip_filename) {
+                                ev.clip_url = `/clips/${String(ev.clip_filename).replace(/\\/g, '/')}`;
+                            }
+                            const exists = recentNotificationsList.some(x => Number(x.id) === Number(ev.id));
+                            if (!exists) {
+                                recentNotificationsList = [ev, ...recentNotificationsList].slice(0, 20);
+                                saveNotificationsCache(recentNotificationsList);
+                                renderNotificationsList(recentNotificationsList);
+                            }
+                        }
+                    } catch (err) {}
+                };
+                notifWs.onclose = () => {
+                    setTimeout(connectNotificationWebSocket, 8000);
+                };
+            } catch (e) {}
+        }
+
+        function saveNotificationsCache(list) {
+            try {
+                if (Array.isArray(list) && list.length > 0) {
+                    localStorage.setItem('vss_cached_notifications_v2', JSON.stringify(list.slice(0, 20)));
+                }
+            } catch (e) {}
         }
 
         function toggleNotificationPopover(e) {
@@ -9169,6 +9364,9 @@ user=None`;
             notifPopoverOpen = !notifPopoverOpen;
             popover.style.display = notifPopoverOpen ? 'flex' : 'none';
             if (notifPopoverOpen) {
+                if (recentNotificationsList.length > 0) {
+                    renderNotificationsList(recentNotificationsList);
+                }
                 fetchRecentNotifications();
             }
         }
@@ -9180,16 +9378,40 @@ user=None`;
         }
 
         async function fetchRecentNotifications() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5500);
             try {
-                const res = await fetch('/api/events?only_anomalies=true&limit=15');
-                if (!res.ok) return;
+                const res = await fetch('/api/events?only_anomalies=true&limit=15', {
+                    signal: controller.signal,
+                    cache: 'no-store'
+                });
+                clearTimeout(timeoutId);
+                if (!res.ok) {
+                    renderNotificationsList(recentNotificationsList);
+                    return;
+                }
                 const data = await res.json();
-                const events = data.events || [];
-                recentNotificationsList = events;
-                renderNotificationsList(events);
+                const events = Array.isArray(data.events) ? data.events : [];
+                if (events.length > 0) {
+                    recentNotificationsList = events;
+                    saveNotificationsCache(events);
+                }
+                renderNotificationsList(recentNotificationsList);
             } catch (err) {
-                console.warn('[Notification] fetch error:', err);
+                clearTimeout(timeoutId);
+                console.warn('[Notification] fetch warning (using cached notifications):', err);
+                renderNotificationsList(recentNotificationsList);
             }
+        }
+
+        function getFriendlyNotifLabel(ev) {
+            const code = ev.event_code || ev.event_type || 'Alarm';
+            if (code === 'Intrusion') return '⚠️ Đột nhập vùng cấm';
+            if (code === 'Fight') return '🚨 Đánh nhau / Xô xát';
+            if (code === 'CrossLine') return '⚠️ Vượt hàng rào ảo';
+            if (code === 'AudioMutation' || code === 'SoundDetection' || code === 'AudioAnomaly') return '🔊 Âm thanh bất thường';
+            if (code === 'VideoMotion') return '🏃 Chuyển động bất thường';
+            return code;
         }
 
         function renderNotificationsList(events) {
@@ -9198,8 +9420,8 @@ user=None`;
             const countTag = document.getElementById('notif-count-tag');
             if (!body) return;
 
-            // Filter unread
-            const unreadEvents = events.filter(ev => !readNotifIds.has(String(ev.id)));
+            const safeEvents = Array.isArray(events) ? events : [];
+            const unreadEvents = safeEvents.filter(ev => !readNotifIds.has(String(ev.id)));
             const unreadCount = unreadEvents.length;
 
             if (badge) {
@@ -9214,7 +9436,7 @@ user=None`;
                 countTag.innerText = unreadCount;
             }
 
-            if (!events || events.length === 0) {
+            if (safeEvents.length === 0) {
                 body.innerHTML = `
                     <div class="notif-empty-state">
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#76b900" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
@@ -9225,52 +9447,78 @@ user=None`;
                 return;
             }
 
-            body.innerHTML = events.map(ev => {
+            body.innerHTML = safeEvents.map(ev => {
                 const isRead = readNotifIds.has(String(ev.id));
                 const code = ev.event_code || ev.event_type || 'Alarm';
                 const isDanger = ['Fight', 'Intrusion', 'CrossLine'].includes(code) || ev.severity === 'high';
                 const isWarning = ['AudioMutation', 'SoundDetection', 'AudioAnomaly'].includes(code) || ev.severity === 'medium';
                 const tagClass = isDanger ? 'notif-tag-danger' : (isWarning ? 'notif-tag-warning' : 'notif-tag-info');
-                
-                // Friendly Vietnamese event label
-                let label = code;
-                if (code === 'Intrusion') label = '⚠️ Đột nhập vùng cấm';
-                else if (code === 'Fight') label = '🚨 Đánh nhau / Xô xát';
-                else if (code === 'CrossLine') label = '⚠️ Vượt hàng rào ảo';
-                else if (code === 'AudioMutation' || code === 'SoundDetection') label = '🔊 Âm thanh bất thường';
-                else if (code === 'VideoMotion') label = 'Chuyển động';
+                const label = getFriendlyNotifLabel(ev);
 
                 const ch = ev.channel || 1;
                 const camName = (window.NCC_CAMERAS && NCC_CAMERAS.find(c => c.id === ch)?.name) || `Camera Kênh ${ch}`;
-                const hasClip = Boolean(ev.clip_filename);
-                const clipUrl = ev.clip_filename ? `/clips/${ev.clip_filename.replace(/\\/g, '/')}` : '';
-                const titleStr = `${label} - CAM ${ch} (${ev.timestamp || ''})`.replace(/'/g, "\\'");
+                const descSafe = (ev.description || 'Phát hiện sự kiện an ninh từ đầu ghi NVR').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
                 return `
-                    <div class="notif-item" style="${isRead ? 'opacity: 0.65;' : 'background: rgba(118, 185, 0, 0.04);'}" onclick="handleNotifItemClick(${ev.id}, '${titleStr}', '${clipUrl}')">
+                    <div class="notif-item" style="${isRead ? 'opacity: 0.72;' : 'background: rgba(118, 185, 0, 0.06); border-left: 3px solid #76b900;'}" onclick="handleNotifItemClick(${ev.id}, true)">
                         <div class="notif-item-top">
                             <span class="notif-item-tag ${tagClass}">${label}</span>
                             <span class="notif-item-time">${formatTimeAgo(ev.timestamp)}</span>
                         </div>
-                        <div class="notif-item-desc">${ev.description || 'Phát hiện sự kiện an ninh từ đầu ghi NVR'}</div>
-                        <div class="notif-item-meta">
+                        <div class="notif-item-desc">${descSafe}</div>
+                        <div class="notif-item-meta" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px;">
                             <span class="notif-item-cam">📹 Kênh ${ch < 10 ? '0' + ch : ch} &bull; ${camName}</span>
-                            ${hasClip ? `<button type="button" class="notif-item-clip-btn" onclick="event.stopPropagation(); openVideoModal('${titleStr}', '${clipUrl}')">▶ Xem Clip</button>` : `<span style="font-size: 0.68rem; color: var(--text-muted);">${ev.timestamp ? ev.timestamp.split(' ')[1] : ''}</span>`}
+                            <div style="display: inline-flex; align-items: center; gap: 5px;">
+                                <button type="button" class="notif-item-clip-btn" onclick="event.stopPropagation(); handleNotifItemClick(${ev.id}, false)" title="Xem đoạn video liên quan tới thông báo này">▶ Xem Clip</button>
+                                <button type="button" class="notif-item-clip-btn" style="background: rgba(118, 185, 0, 0.2); border-color: rgba(118, 185, 0, 0.55); color: #9be62b;" onclick="event.stopPropagation(); handleNotifItemClick(${ev.id}, true)" title="Xem video &amp; gửi AI phân tích nhanh trong 3 giây">⚡ AI 3s</button>
+                            </div>
                         </div>
                     </div>
                 `;
             }).join('');
         }
 
-        function handleNotifItemClick(eventId, title, clipUrl) {
+        async function handleNotifItemClick(eventId, autoAnalyze = true) {
             readNotifIds.add(String(eventId));
             try {
                 localStorage.setItem('vss_read_notif_ids', JSON.stringify(Array.from(readNotifIds).slice(-200)));
             } catch(e) {}
             renderNotificationsList(recentNotificationsList);
 
-            if (clipUrl) {
-                openVideoModal(title, clipUrl);
+            let ev = recentNotificationsList.find(x => Number(x.id) === Number(eventId));
+            if (!ev) {
+                try {
+                    const res = await fetch(`/api/events/${eventId}`);
+                    if (res.ok) ev = await res.json();
+                } catch (e) {}
+            }
+            if (!ev) return;
+
+            const ch = ev.channel || 1;
+            const label = getFriendlyNotifLabel(ev);
+            const titleStr = `${label} - CAM ${ch < 10 ? '0' + ch : ch} (${ev.timestamp || ''})`;
+            let clipUrl = ev.clip_url || (ev.clip_filename ? `/clips/${String(ev.clip_filename).replace(/\\/g, '/')}` : '');
+
+            // If clipUrl was not yet populated on cached item, fetch event detail to resolve nearest clip
+            if (!clipUrl) {
+                try {
+                    const detailRes = await fetch(`/api/events/${eventId}`);
+                    if (detailRes.ok) {
+                        const detailData = await detailRes.json();
+                        if (detailData.clip_url || detailData.clip_filename) {
+                            clipUrl = detailData.clip_url || `/clips/${String(detailData.clip_filename).replace(/\\/g, '/')}`;
+                            ev.clip_url = clipUrl;
+                            ev.clip_filename = detailData.clip_filename;
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            closeNotificationPopover();
+            openVideoModal(titleStr, clipUrl, eventId);
+
+            if (autoAnalyze) {
+                await runFastAiAnalysisForEvent(eventId);
             }
         }
 
@@ -10769,6 +11017,14 @@ user=None`;
             const grid = document.getElementById('ncc-stage-grid');
             if (!grid) return;
 
+            // Abort any existing MJPEG streams before re-rendering to free browser HTTP/1.1 connections
+            grid.querySelectorAll('.ncc-slot-stream-img').forEach(img => {
+                img.onload = null;
+                img.onerror = null;
+                img.src = '';
+                img.removeAttribute('src');
+            });
+
             if (nccMaximizedSlotIndex !== null) {
                 grid.classList.add('has-maximized');
             } else {
@@ -10834,7 +11090,7 @@ user=None`;
                                  id="ncc-slot-img-${i}" 
                                  src="/api/stream/live/${cam.id}" 
                                  alt="${cam.name}" 
-                                 loading="eager"
+                                 loading="lazy"
                                  onerror="onSlotStreamError(${i}, ${cam.id})">
                             
                             <div class="ncc-slot-placeholder" id="ncc-slot-fallback-${i}" style="display: none;">

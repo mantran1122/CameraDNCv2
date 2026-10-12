@@ -119,12 +119,16 @@
                     this.availableSources = [...liveSources];
 
                     // Keep selected source if still in available sources
+                    const prevUrl = this.source ? this.source.url : '';
                     const currentChannel = this.getCurrentChannel();
-                    const matched = this.availableSources.find(s => s.channel === currentChannel || s.url === this.source.url);
+                    const matched = this.availableSources.find(s => s.channel === currentChannel || s.url === prevUrl);
                     this.source = matched || this.availableSources[0];
 
                     this.updatePickerOptions();
-                    this.setSource(this.source);
+                    const hasPlayer = this.container && this.container.querySelector('#camera-mjpeg-player, #camera-video-player');
+                    if (!hasPlayer || this.source.url !== prevUrl) {
+                        this.setSource(this.source);
+                    }
                 }
             } catch (e) {
                 console.warn('[CameraView] Error loading NVR config:', e);
@@ -273,6 +277,22 @@
             }
 
             if (frame) {
+                const oldImg = frame.querySelector('#camera-mjpeg-player');
+                if (oldImg) {
+                    oldImg.onload = null;
+                    oldImg.onerror = null;
+                    oldImg.src = '';
+                    oldImg.removeAttribute('src');
+                }
+                const oldVideo = frame.querySelector('#camera-video-player');
+                if (oldVideo) {
+                    try {
+                        oldVideo.pause();
+                        oldVideo.removeAttribute('src');
+                        oldVideo.load();
+                    } catch (e) {}
+                }
+
                 const overlay = frame.querySelector('#camera-status-overlay');
                 const overlayHtml = overlay ? overlay.outerHTML : '';
                 const badgeHtml = badge ? badge.outerHTML : '';
