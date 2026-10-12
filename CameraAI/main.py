@@ -2055,12 +2055,27 @@ async def generate_frames(channel: int, request: Request):
     if not config.DEMO_MODE:
         rtsp_user = quote(str(config.NVR_USER), safe="")
         rtsp_password = quote(str(config.NVR_PASSWORD), safe="")
-        rtsp_url = f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{config.RTSP_PORT}/cam/realmonitor?channel={channel}&subtype=1"
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp;stimeout;3000000"
-        try:
-            cap = await asyncio.to_thread(cv2.VideoCapture, rtsp_url, cv2.CAP_FFMPEG)
-        except Exception:
-            cap = None
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
+        candidate_ports = []
+        for p in (config.RTSP_PORT, 33554, 554):
+            if p and int(p) not in (36677, 37777, 8080, 4443) and int(p) not in candidate_ports:
+                candidate_ports.append(int(p))
+        if not candidate_ports:
+            candidate_ports = [33554, 554]
+
+        for port in candidate_ports:
+            rtsp_url = f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{port}/cam/realmonitor?channel={channel}&subtype=1"
+            try:
+                test_cap = await asyncio.to_thread(cv2.VideoCapture, rtsp_url, cv2.CAP_FFMPEG)
+                if test_cap is not None and test_cap.isOpened():
+                    cap = test_cap
+                    if port != config.RTSP_PORT:
+                        config.RTSP_PORT = port
+                    break
+                elif test_cap is not None:
+                    await asyncio.to_thread(test_cap.release)
+            except Exception:
+                pass
 
     try:
         while True:

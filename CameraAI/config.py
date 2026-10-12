@@ -169,7 +169,8 @@ _current_cfg = load_config()
 NVR_HOST = _current_cfg.get("nvr_host", os.getenv("NVR_HOST", ""))
 USE_HTTPS = _current_cfg.get("use_https", False)
 NVR_PORT = _current_cfg.get("nvr_port", 80)
-RTSP_PORT = _current_cfg.get("rtsp_port", 554)
+_raw_rtsp_port = int(_current_cfg.get("rtsp_port", 33554) or 33554)
+RTSP_PORT = 33554 if _raw_rtsp_port in (36677, 37777, 8080, 4443) else _raw_rtsp_port
 NVR_USER = _current_cfg.get("nvr_user", os.getenv("NVR_USER", ""))
 NVR_PASSWORD = _current_cfg.get("nvr_password", os.getenv("NVR_PASSWORD", ""))
 ACTIVE_CHANNELS = _current_cfg.get("active_channels", list(range(1, 33)))
@@ -303,6 +304,9 @@ AUDIO_EVENT_CODES = {"AudioAnomaly", "SoundDetection", "FightSound"}
 
 def update_global_config(new_cfg: dict):
     global NVR_HOST, USE_HTTPS, NVR_PORT, RTSP_PORT, NVR_USER, NVR_PASSWORD, ACTIVE_CHANNELS, DEMO_MODE, ABNORMAL_EVENT_CODES, CAMERA_NAMES, CAMERA_ALERT_RULES
+    raw_rtsp = int(new_cfg.get("rtsp_port", RTSP_PORT) or 33554)
+    if raw_rtsp in (36677, 37777, 8080, 4443):
+        new_cfg["rtsp_port"] = 33554
     save_config(new_cfg)
     NVR_HOST = new_cfg.get("nvr_host", NVR_HOST)
     USE_HTTPS = new_cfg.get("use_https", USE_HTTPS)
