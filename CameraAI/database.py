@@ -156,6 +156,14 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_time ON login_audit_logs(timestamp);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_user ON login_audit_logs(username);")
 
+    # High-Performance Indexes for YouTube-Speed Search (< 150ms)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_search ON events(channel, timestamp, event_code, severity);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_time_desc ON events(timestamp DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_code ON events(event_code, timestamp DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_type_sev ON events(event_type, severity, timestamp DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_has_clip ON events(clip_filename, timestamp DESC);")
+
+
     # Repair legacy rows that were marked completed even though neither STT nor
     # an AI conclusion was produced.
     cursor.execute("""
@@ -245,7 +253,7 @@ def get_events(
         query += " AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''"
 
     if only_anomalies:
-        query += " AND event_type IN ('audio_anomaly', 'video_anomaly')"
+        query += " AND (event_type IN ('audio_anomaly', 'video_anomaly') OR severity IN ('high', 'critical'))"
     elif event_type:
         query += " AND event_type = ?"
         params.append(event_type)

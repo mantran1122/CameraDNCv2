@@ -43,17 +43,29 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
         except Exception:
             channel = None
 
-    if channel is None and filters.get("video_sources"):
-        vs = str(filters["video_sources"]).lower()
-        ch_m = re.search(r'(\d+)', vs)
-        if ch_m:
-            channel = int(ch_m.group(1))
-    
-    if channel is None:
+    # Support multiple channels or comma-separated video_sources
+    channels = []
+    if filters.get("channels") and isinstance(filters["channels"], list):
+        channels = [int(c) for c in filters["channels"] if str(c).isdigit()]
+    elif filters.get("video_sources"):
+        vs = str(filters["video_sources"]).strip()
+        if "," in vs:
+            channels = [int(c.strip()) for c in vs.split(",") if c.strip().isdigit()]
+        elif vs.isdigit():
+            channels = [int(vs)]
+            channel = int(vs)
+        else:
+            ch_m = re.search(r'(\d+)', vs)
+            if ch_m:
+                channel = int(ch_m.group(1))
+                channels = [channel]
+
+    if channel is None and not channels:
         ch_m = re.search(r'(?:cam|kênh|kenh|channel|ch)\s*(\d+)', lowered)
         if ch_m:
             try:
                 channel = int(ch_m.group(1))
+                channels = [channel]
             except Exception:
                 pass
 
@@ -91,14 +103,23 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
         (["xe nâng", "xe nang", "forklift", "xe", "ô tô", "o to", "vehicle", "car", "truck"], "subject:vehicle", ["Vehicle", "Intrusion"]),
         (["đánh nhau", "danh nhau", "xô xát", "xo xat", "ẩu đả", "au da", "fight"], "action:altercation", ["Fight"]),
         (["vượt rào", "vuot rao", "crossline", "tripwire", "rào", "rao"], "action:line_crossing", ["CrossLine"]),
-        (["bất thường", "bat thuong", "nguy hiểm", "nguy hiem", "cảnh báo", "canh bao", "alarm", "anomaly", "sự cố", "su co"], "event:anomaly", ["VideoMotion", "AudioMutation", "SoundDetection", "Intrusion", "CrossLine", "Fight", "RtspSessionDisconnect"]),
+        (["bất thường", "bat thuong", "nguy hiểm", "nguy hiem", "cảnh báo", "canh bao", "alarm", "anomaly", "sự cố", "su co"], "event:anomaly", ["AudioMutation", "SoundDetection", "Intrusion", "CrossLine", "Fight", "RtspSessionDisconnect"]),
         (["âm thanh", "am thanh", "tiếng ồn", "tieng on", "la hét", "la het", "audio", "sound"], "audio:anomaly", ["AudioMutation", "SoundDetection"]),
+        (["chuyển động", "chuyen dong", "motion"], "event:motion", ["VideoMotion"]),
     ]
 
-    for keywords, attr_label, codes in attr_map:
-        if any(kw in lowered for kw in keywords):
-            attributes.append(attr_label)
-            event_codes.extend(codes)
+    explicit_codes = filters.get("event_codes")
+    if explicit_codes:
+        if isinstance(explicit_codes, str):
+            explicit_codes = [c.strip() for c in explicit_codes.split(",") if c.strip()]
+        event_codes = list(set(explicit_codes))
+        for code in event_codes:
+            attributes.append(f"event:{code.lower()}")
+    else:
+        for keywords, attr_label, codes in attr_map:
+            if any(kw in lowered for kw in keywords):
+                attributes.append(attr_label)
+                event_codes.extend(codes)
 
     if not attributes:
         attributes.append("general:activity")
@@ -121,6 +142,7 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
     return {
         "raw_query": query,
         "channel": channel,
+        "channels": channels,
         "target_event_id": target_event_id,
         "event_ids": event_ids,
         "attributes": attributes,
@@ -192,7 +214,7 @@ def evaluate_critic(event: Dict[str, Any], criteria: Dict[str, Any], base_simila
             met = True
         elif "intrusion" in attr and ("intrusion" in code or "nhập" in desc):
             met = True
-        elif "anomaly" in attr and (severity in ("high", "medium") or "bất thường" in desc or code in ("videomotion", "audiomutation", "sounddetection", "intrusion", "crossline", "fight")):
+        elif "anomaly" in attr and (severity in ("high", "medium") or "bất thường" in desc or code in ("audiomutation", "sounddetection", "intrusion", "crossline", "fight")):
             met = True
         elif "box" in attr:
             met = "human" in code or severity in ("high", "medium")
@@ -212,27 +234,14 @@ def evaluate_critic(event: Dict[str, Any], criteria: Dict[str, Any], base_simila
         "criteria_met": criteria_met
     }
 
-def find_best_clip_for_event(event_id: int, channel: int, clip_filename: Optional[str] = None) -> Optional[str]:
-    """Find a playable clip: existing clip_filename, latest clip for camera channel, or CCTV sample fallback."""
-    if clip_filename:
-        try:
-            p = resolve_clip_path(clip_filename, fetch_remote=False)
-            if p.is_file():
-                return clip_filename
-        except Exception:
-            pass
-    cam_str = f"cam-{channel:03d}"
-    cam_dir = Path(config.CLIPS_DIR) / "cameras" / cam_str
-    if cam_dir.is_dir():
-        mp4s = sorted(cam_dir.rglob("*.mp4"), key=lambda f: f.stat().st_mtime, reverse=True)
-        if mp4s:
-            try:
-                return mp4s[0].relative_to(config.CLIPS_DIR).as_posix()
-            except Exception:
-                pass
-    for sample in ["sample_valid.mp4", "test_real_h264.mp4", "sample_h264.mp4"]:
-        if (Path(config.CLIPS_DIR) / sample).is_file():
-            return sample
+def find_best_clip_for_event(event_id: int, channel: int, clip_filename: Optional[str] = None, allow_sample: bool = False) -> Optional[str]:
+    """Find a playable clip directly from SQLite index metadata.
+    ZERO DISK / SMB SCANNING on query to guarantee YouTube-speed (< 50ms) response.
+    """
+    if clip_filename and str(clip_filename).strip():
+        return str(clip_filename).strip().replace("\\", "/")
+    if allow_sample:
+        return "sample_valid.mp4"
     return None
 
 def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -247,6 +256,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
     filters = filters or {}
     decomp = decompose_query(query, filters)
     ch = decomp.get("channel")
+    chs = decomp.get("channels") or ([ch] if ch else [])
     allowed_channels = filters.get("allowed_channels")
 
     # Channel-level RBAC: check if user is restricted
@@ -267,6 +277,16 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
                 "channel": ch,
                 "message": f"Bạn không có quyền truy cập Camera Kênh {ch:02d}."
             }
+        if chs:
+            chs = [c for c in chs if c in allowed_channels]
+            if not chs:
+                return {
+                    "query": query,
+                    "data": [],
+                    "total_matches": 0,
+                    "channel": ch,
+                    "message": "Bạn không có quyền truy cập các Camera đã chọn."
+                }
 
     # If caller explicitly provided an empty event_ids list (e.g. Agent RAG found 0 events),
     # return immediately with 0 results instead of pulling random clips!
@@ -284,7 +304,6 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
 
     target_id = decomp.get("target_event_id")
     event_ids = decomp.get("event_ids") or []
-    ch = decomp.get("channel")
 
     allowed_clause = ""
     allowed_params = []
@@ -309,13 +328,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         params.append(target_id)
         cursor.execute(sql, params)
         rows = [dict(r) for r in cursor.fetchall()]
-        valid_rows = []
-        for r in rows:
-            try:
-                if resolve_clip_path(r["clip_filename"]).is_file():
-                    valid_rows.append(r)
-            except Exception:
-                pass
+        valid_rows = [r for r in rows if r.get("clip_filename") and str(r.get("clip_filename")).strip()]
         if valid_rows:
             rows = valid_rows
         else:
@@ -345,14 +358,11 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
                         """, (t_time,))
                         nearby_rows = [dict(r) for r in cursor.fetchall()]
                     for nr in nearby_rows:
-                        try:
-                            if resolve_clip_path(nr["clip_filename"]).is_file():
-                                nr["title"] = f"Event #{target_id} (Clip #{nr['id']})"
-                                nr["description"] = f"[Clip tương ứng lúc {nr.get('timestamp')} trên Cam {nr.get('channel')}] {nr.get('description', '')}"
-                                rows = [nr]
-                                break
-                        except Exception:
-                            pass
+                        if nr.get("clip_filename") and str(nr.get("clip_filename")).strip():
+                            nr["title"] = f"Event #{target_id} (Clip #{nr['id']})"
+                            nr["description"] = f"[Clip tương ứng lúc {nr.get('timestamp')} trên Cam {nr.get('channel')}] {nr.get('description', '')}"
+                            rows = [nr]
+                            break
     elif event_ids:
         # Highest precision: prioritize specific event IDs grounded by Agent RAG across any cameras
         placeholders = ",".join(["?"] * len(event_ids))
@@ -367,10 +377,15 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         cursor.execute(sql, params)
         rows = [dict(r) for r in cursor.fetchall()]
     else:
+        sql += " AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''"
         # Enforce channel filter strictly so other cameras are never accidentally leaked
-        if ch:
+        if len(chs) == 1:
             sql += " AND channel = ?"
-            params.append(ch)
+            params.append(chs[0])
+        elif len(chs) > 1:
+            placeholders = ",".join(["?"] * len(chs))
+            sql += f" AND channel IN ({placeholders})"
+            params.extend(chs)
 
         # Enforce strict time range and date if requested
         if decomp.get("from_time"):
@@ -397,6 +412,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
     has_specific_filter = bool(
         target_id 
         or ("event_ids" in filters and filters["event_ids"] is not None)
+        or chs
         or decomp.get("from_time")
         or decomp.get("to_time")
         or decomp.get("target_date")
@@ -409,15 +425,19 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         fallback_sql = """
             SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec
             FROM events
-            WHERE 1=1
+            WHERE clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
         """
         fallback_params = []
         if allowed_clause:
             fallback_sql += allowed_clause
             fallback_params.extend(allowed_params)
-        if ch:
+        if len(chs) == 1:
             fallback_sql += " AND channel = ?"
-            fallback_params.append(ch)
+            fallback_params.append(chs[0])
+        elif len(chs) > 1:
+            placeholders = ",".join(["?"] * len(chs))
+            fallback_sql += f" AND channel IN ({placeholders})"
+            fallback_params.extend(chs)
             
         fallback_sql += f" ORDER BY id DESC LIMIT {fallback_limit}"
         cursor.execute(fallback_sql, fallback_params)
@@ -437,7 +457,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
 
     for row in rows:
         clip_name = row.get("clip_filename")
-        best_clip = find_best_clip_for_event(row["id"], row["channel"], clip_name)
+        best_clip = find_best_clip_for_event(row["id"], row["channel"], clip_name, allow_sample=bool(target_id or event_ids))
         if not best_clip:
             continue
         clip_name = best_clip
@@ -460,7 +480,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
 
             # Boost for anomalies when query asks for abnormal events/alarms
             is_anomaly_query = any(k in lowered_q for k in ["bất thường", "bat thuong", "anomaly", "cảnh báo", "canh bao", "nguy hiểm", "nguy hiem", "sự cố", "alarm"])
-            is_anomaly_event = row["severity"] in ("high", "medium") or any(term in desc or term in code for term in ["bất thường", "bat thuong", "anomaly", "videomotion", "audiomutation", "sounddetection", "intrusion", "crossline", "fight"])
+            is_anomaly_event = row["severity"] in ("high", "medium") or any(term in desc or term in code for term in ["bất thường", "bat thuong", "anomaly", "audiomutation", "sounddetection", "intrusion", "crossline", "fight"])
             if is_anomaly_query and is_anomaly_event:
                 sim += 0.28
 

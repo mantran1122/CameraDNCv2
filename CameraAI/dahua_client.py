@@ -176,10 +176,7 @@ class DahuaNVRListener(threading.Thread):
         description = f"Phát hiện sự kiện {code} tại Camera Ch {channel:02d}"
         audio_db = None
 
-        is_selected_abnormal = (
-            code in config.ABNORMAL_EVENT_CODES
-            or (code == "SmartMotionHuman" and "HumanTrait" in config.ABNORMAL_EVENT_CODES)
-        )
+        is_selected_abnormal = config.is_channel_anomaly(channel, code)
         if is_selected_abnormal and code in config.AUDIO_EVENT_CODES:
             event_type = "audio_anomaly"
             severity = "high"

@@ -20,6 +20,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Flatpickr (Interactive Calendar & Datetime Picker) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <style>
         /* Base Design Tokens matching NVIDIA VSS BLUEPRINT & NeMo Agent Toolkit */
         :root {
@@ -318,28 +322,65 @@
         }
 
         .sidebar-user-section {
-            padding: 0.625rem 0.75rem;
+            padding: 0.6rem 0.75rem;
             border-top: 1px solid var(--border-main);
             margin-top: auto;
             flex-shrink: 0;
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 0.65rem;
+        }
+
+        .sidebar-admin-avatar-btn {
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 210, 211, 0.12);
+            border: 1.5px solid rgba(0, 210, 211, 0.45);
+            color: #00d2d3;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .sidebar-admin-avatar-btn:hover {
+            transform: scale(1.06);
+            border-color: #00d2d3;
+            background: rgba(0, 210, 211, 0.22);
+            box-shadow: 0 0 10px rgba(0, 210, 211, 0.35);
+        }
+
+        .sidebar-admin-avatar-btn img {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            border-radius: 50%;
         }
 
         .sidebar-logout-btn {
-            width: 100%;
-            display: flex;
+            width: auto !important;
+            height: 34px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
+            gap: 0.4rem;
             color: #ef4444 !important;
-            background-color: rgba(239, 68, 68, 0.08) !important;
-            border: 1px solid rgba(239, 68, 68, 0.25) !important;
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            font-size: 0.8125rem;
-            font-weight: 500;
+            background-color: rgba(239, 68, 68, 0.1) !important;
+            border: 1px solid rgba(239, 68, 68, 0.3) !important;
+            border-radius: 999px;
+            padding: 0 0.9rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            white-space: nowrap;
             cursor: pointer;
             transition: all 0.15s ease-in-out;
             text-align: center;
@@ -677,20 +718,22 @@
             top: calc(100% + 6px);
             right: 0;
             left: auto;
-            width: 340px;
-            min-width: 320px;
-            max-width: min(360px, calc(100vw - 32px));
+            width: 440px;
+            min-width: 380px;
+            max-width: min(480px, calc(100vw - 24px));
             background-color: var(--popover-bg);
             border: 1px solid var(--border-main);
-            border-radius: 8px;
-            box-shadow: 0 20px 35px -5px var(--shadow-color), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            box-shadow: 0 20px 35px -5px var(--shadow-color), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(20px);
-            padding: 1rem;
+            padding: 1.1rem;
             z-index: 9999;
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 0.85rem;
             box-sizing: border-box;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
         }
 
         .filter-popover.align-left,
@@ -703,23 +746,26 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding-bottom: 0.25rem;
+            padding-bottom: 0.35rem;
             border-bottom: 1px solid var(--border-main);
         }
 
         .filter-popover-title {
-            font-size: 0.8125rem;
-            font-weight: 600;
+            font-size: 0.875rem;
+            font-weight: 700;
             color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .filter-popover-close {
             background: none;
             border: none;
             color: var(--text-muted);
-            font-size: 16px;
+            font-size: 18px;
             cursor: pointer;
-            padding: 0 4px;
+            padding: 0 6px;
             line-height: 1;
             border-radius: 4px;
         }
@@ -727,6 +773,163 @@
         .filter-popover-close:hover {
             background: rgba(128, 128, 128, 0.12);
             color: var(--text-main);
+        }
+
+        /* Quick Time Presets Bar */
+        .time-presets-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            padding: 6px 8px;
+            background: rgba(128, 128, 128, 0.06);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+        }
+
+        .preset-chip {
+            padding: 3px 9px;
+            font-size: 0.725rem;
+            font-weight: 600;
+            border-radius: 4px;
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-sub);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .preset-chip:hover {
+            background: var(--nv-green-glow);
+            color: var(--nv-green);
+            border-color: var(--nv-green);
+        }
+
+        .preset-chip.active {
+            background: var(--nv-green);
+            color: #000000;
+            border-color: var(--nv-green);
+            font-weight: 700;
+        }
+
+        /* Calendar Datetime Inputs */
+        .datetime-picker-input {
+            width: 100%;
+            height: 32px;
+            padding: 0 0.65rem 0 2rem;
+            background: var(--input-bg);
+            color: var(--input-text);
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            font-size: 0.8125rem;
+            outline: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .datetime-icon {
+            position: absolute;
+            left: 8px;
+            pointer-events: none;
+            color: var(--text-muted);
+        }
+
+        /* Event Tag Filter Chips */
+        .event-tags-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            width: 100%;
+        }
+
+        .event-tag-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.725rem;
+            font-weight: 500;
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-sub);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .event-tag-chip:hover {
+            border-color: var(--text-sub);
+            color: var(--text-main);
+        }
+
+        .event-tag-chip.active {
+            background: rgba(118, 185, 0, 0.15);
+            border-color: var(--nv-green);
+            color: var(--nv-green);
+            font-weight: 700;
+        }
+
+        .event-tag-chip.danger.active {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        /* Camera Selection Mode: Dropdown vs Grid */
+        .cam-selector-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .cam-quick-link {
+            font-size: 0.725rem;
+            color: var(--nv-green);
+            background: none;
+            border: none;
+            cursor: pointer;
+            text-decoration: underline;
+            padding: 0;
+        }
+
+        .cam-grid-container {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+            max-height: 125px;
+            overflow-y: auto;
+            padding: 6px;
+            background: rgba(128, 128, 128, 0.05);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+        }
+
+        .cam-grid-chip {
+            padding: 4px 2px;
+            text-align: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border-radius: 3px;
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-sub);
+            cursor: pointer;
+            transition: all 0.12s ease;
+            user-select: none;
+        }
+
+        .cam-grid-chip:hover {
+            border-color: var(--nv-green);
+            color: var(--text-main);
+        }
+
+        .cam-grid-chip.active {
+            background: var(--nv-green);
+            color: #000000;
+            border-color: var(--nv-green);
+            font-weight: 700;
         }
 
         .filter-row {
@@ -738,7 +941,7 @@
         }
 
         .filter-label {
-            width: 110px;
+            width: 95px;
             font-size: 0.8125rem;
             color: var(--text-main);
             text-align: right;
@@ -5007,6 +5210,541 @@
                 grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
             }
         }
+
+        /* ==========================================================================
+           HẠNG MỤC 1 & 2: NOTIFICATION BELL & CAMERA EVENTS DRAWER
+           ========================================================================== */
+        /* 1. Header Notification Bell */
+        .notif-bell-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .notif-bell-btn {
+            background: none;
+            border: 1px solid transparent;
+            color: var(--text-sub);
+            cursor: pointer;
+            padding: 0.45rem;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+        }
+
+        .notif-bell-btn:hover {
+            color: var(--text-main);
+            background-color: rgba(128, 128, 128, 0.12);
+            border-color: var(--border-subtle);
+        }
+
+        .notif-badge {
+            position: absolute;
+            top: -2px;
+            right: -3px;
+            background: #ef4444;
+            color: #ffffff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            line-height: 1;
+            padding: 2px 5px;
+            border-radius: 9999px;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+            animation: notif-pulse 2s infinite ease-in-out;
+        }
+
+        @keyframes notif-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.15); opacity: 0.9; }
+        }
+
+        /* Notification Dropdown Popover */
+        .notif-popover {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 390px;
+            max-width: 90vw;
+            background: var(--bg-card);
+            border: 1px solid var(--border-main);
+            border-radius: 10px;
+            box-shadow: 0 16px 40px var(--shadow-color);
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: notif-fade-in 0.18s ease-out;
+        }
+
+        @keyframes notif-fade-in {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .notif-popover-header {
+            padding: 10px 14px;
+            background: var(--modal-header-bg);
+            border-bottom: 1px solid var(--border-main);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .notif-popover-title-row {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .notif-pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 6px #ef4444;
+            animation: notif-pulse 1.6s infinite ease-in-out;
+        }
+
+        .notif-popover-title {
+            font-size: 0.825rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .notif-count-tag {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 9999px;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .notif-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .notif-action-btn {
+            background: rgba(128, 128, 128, 0.1);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-sub);
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .notif-action-btn:hover {
+            color: var(--text-main);
+            background: rgba(128, 128, 128, 0.2);
+            border-color: var(--border-main);
+        }
+
+        .notif-close-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            line-height: 1;
+            cursor: pointer;
+            padding: 2px 4px;
+        }
+
+        .notif-close-btn:hover {
+            color: var(--text-main);
+        }
+
+        .notif-popover-body {
+            max-height: 380px;
+            overflow-y: auto;
+            padding: 4px 0;
+        }
+
+        .notif-item {
+            padding: 9px 14px;
+            border-bottom: 1px solid var(--border-main);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .notif-item:last-child {
+            border-bottom: none;
+        }
+
+        .notif-item:hover {
+            background: rgba(128, 128, 128, 0.08);
+        }
+
+        .notif-item-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .notif-item-tag {
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 0.02em;
+        }
+
+        .notif-tag-danger {
+            background: rgba(239, 68, 68, 0.18);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.35);
+        }
+
+        .notif-tag-warning {
+            background: rgba(245, 158, 11, 0.18);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+        }
+
+        .notif-tag-info {
+            background: rgba(56, 189, 248, 0.18);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+        }
+
+        .notif-item-time {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .notif-item-desc {
+            font-size: 0.75rem;
+            color: var(--text-main);
+            line-height: 1.35;
+        }
+
+        .notif-item-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 2px;
+        }
+
+        .notif-item-cam {
+            font-size: 0.7rem;
+            color: var(--nv-green);
+            font-weight: 600;
+        }
+
+        .notif-item-clip-btn {
+            background: rgba(118, 185, 0, 0.15);
+            color: var(--nv-green);
+            border: 1px solid var(--nv-green);
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .notif-item-clip-btn:hover {
+            background: var(--nv-green);
+            color: #000;
+        }
+
+        .notif-empty-state {
+            padding: 24px 14px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .notif-popover-footer {
+            padding: 8px 14px;
+            background: var(--modal-header-bg);
+            border-top: 1px solid var(--border-main);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.7rem;
+        }
+
+        .notif-footer-info {
+            color: var(--text-muted);
+        }
+
+        .notif-footer-link {
+            color: var(--nv-green);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .notif-footer-link:hover {
+            text-decoration: underline;
+        }
+
+        /* 2. Video Manager Camera Events Drawer */
+        .ncc-slot-btn-events {
+            color: #38bdf8 !important;
+            border-color: rgba(56, 189, 248, 0.3) !important;
+            background: rgba(56, 189, 248, 0.08) !important;
+        }
+
+        .ncc-slot-btn-events:hover {
+            background: rgba(56, 189, 248, 0.22) !important;
+            border-color: #38bdf8 !important;
+            color: #ffffff !important;
+        }
+
+        .ncc-cam-events-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(8px);
+            z-index: 10001;
+            justify-content: flex-end;
+            animation: ncc-drawer-fade 0.2s ease-out;
+        }
+
+        .ncc-cam-events-backdrop.open {
+            display: flex;
+        }
+
+        @keyframes ncc-drawer-fade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .ncc-cam-events-drawer {
+            width: 500px;
+            max-width: 95vw;
+            height: 100%;
+            background: var(--bg-card);
+            border-left: 1px solid var(--border-main);
+            box-shadow: -10px 0 35px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            animation: ncc-drawer-slide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes ncc-drawer-slide {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        .ncc-ced-header {
+            padding: 14px 18px;
+            background: var(--modal-header-bg);
+            border-bottom: 1px solid var(--border-main);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .ncc-ced-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ncc-ced-badge {
+            background: rgba(118, 185, 0, 0.2);
+            color: var(--nv-green);
+            font-weight: 800;
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--nv-green);
+        }
+
+        .ncc-ced-cam-name {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .ncc-ced-sub {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .ncc-ced-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.4rem;
+            line-height: 1;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .ncc-ced-close:hover {
+            color: var(--text-main);
+        }
+
+        .ncc-ced-filter-bar {
+            padding: 8px 16px;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-main);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .ncc-ced-filter-tabs {
+            display: flex;
+            gap: 6px;
+        }
+
+        .ncc-ced-filter-tab {
+            background: none;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-sub);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .ncc-ced-filter-tab.active {
+            background: var(--nv-green);
+            color: #000000;
+            border-color: var(--nv-green);
+        }
+
+        .ncc-ced-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .ncc-ced-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-main);
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .ncc-ced-card:hover {
+            border-color: var(--nv-green);
+            box-shadow: 0 4px 14px var(--shadow-color);
+        }
+
+        .ncc-ced-card.has-clip {
+            border-left: 3px solid var(--nv-green);
+        }
+
+        .ncc-ced-card.danger {
+            border-left: 3px solid #ef4444;
+        }
+
+        .ncc-ced-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .ncc-ced-event-tag {
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+
+        .ncc-ced-time {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .ncc-ced-desc {
+            font-size: 0.76rem;
+            color: var(--text-main);
+            line-height: 1.4;
+        }
+
+        .ncc-ced-card-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 4px;
+        }
+
+        .ncc-ced-play-btn {
+            background: rgba(118, 185, 0, 0.15);
+            color: var(--nv-green);
+            border: 1px solid var(--nv-green);
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s;
+        }
+
+        .ncc-ced-play-btn:hover {
+            background: var(--nv-green);
+            color: #000;
+        }
+
+        .ncc-ced-no-clip-tag {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+        }
+
+        .ncc-ced-footer {
+            padding: 10px 16px;
+            background: var(--modal-header-bg);
+            border-top: 1px solid var(--border-main);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.72rem;
+        }
+
+        .ncc-ced-search-btn {
+            background: #76b900;
+            color: #000;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.72rem;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+
+        .ncc-ced-search-btn:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -5028,19 +5766,42 @@
         </div>
 
         <div class="header-right">
-            <button class="theme-toggle-btn" onclick="toggleTheme()" title="Switch Theme">
-                <svg id="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="5"></circle>
-                    <line x1="12" y1="1" x2="12" y2="3"></line>
-                    <line x1="12" y1="21" x2="12" y2="23"></line>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                    <line x1="1" y1="12" x2="3" y2="12"></line>
-                    <line x1="21" y1="12" x2="23" y2="12"></line>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                </svg>
-            </button>
+            <!-- Hạng mục 1: Thay nút Sáng/Tối thành Icon Chuông Thông báo Cảnh báo Realtime -->
+            <div class="notif-bell-wrap" id="header-notif-wrap">
+                <button class="notif-bell-btn" id="notif-bell-btn" onclick="toggleNotificationPopover(event)" title="Thông báo Cảnh báo An ninh (Realtime)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span class="notif-badge" id="notif-badge" style="display: none;">0</span>
+                </button>
+
+                <!-- Popover Bảng Thông Báo Cảnh Báo Realtime -->
+                <div class="notif-popover" id="notif-popover" style="display: none;">
+                    <div class="notif-popover-header">
+                        <div class="notif-popover-title-row">
+                            <span class="notif-pulse-dot"></span>
+                            <span class="notif-popover-title">Cảnh Báo &amp; Sự Kiện Mới</span>
+                            <span class="notif-count-tag" id="notif-count-tag">0</span>
+                        </div>
+                        <div class="notif-header-actions">
+                            <button class="notif-action-btn" onclick="markAllNotificationsAsRead()" title="Đánh dấu tất cả đã đọc">✓ Đã xem</button>
+                            <button class="notif-action-btn" onclick="fetchRecentNotifications()" title="Làm mới">🔄</button>
+                            <button class="notif-close-btn" onclick="closeNotificationPopover()">&times;</button>
+                        </div>
+                    </div>
+                    <div class="notif-popover-body" id="notif-popover-body">
+                        <div class="notif-empty-state">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+                            <span>Đang tải thông báo cảnh báo thời gian thực...</span>
+                        </div>
+                    </div>
+                    <div class="notif-popover-footer">
+                        <span class="notif-footer-info">Kết nối thời gian thực Dahua NVR</span>
+                        <a href="/admin" class="notif-footer-link" target="_blank">Trung tâm Quản trị &rarr;</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -5126,16 +5887,16 @@
                 </div>
             </div>
 
-            <!-- Sidebar User / Actions (Đăng xuất) -->
+            <!-- Sidebar User / Actions (Icon tròn kiểu Facebook + Nút Đăng xuất nhỏ gọn) -->
             <div class="sidebar-user-section" id="sidebar-user-section">
-                <a href="/admin" id="sidebar-admin-link" class="sidebar-tab-item" title="Trung tâm Quản trị Quasar" style="display: none; color: #00d2d3; text-decoration: none; margin-bottom: 4px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <a href="/admin" id="sidebar-admin-link" class="sidebar-admin-avatar-btn" title="Trung tâm Quản trị Hệ thống" style="display: none;">
+                    <img src="/admin/logo_don.png" alt="Admin" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <svg style="display: none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                     </svg>
-                    <span>Quản Trị Hệ Thống</span>
                 </a>
-                <button class="sidebar-tab-item sidebar-logout-btn" onclick="handleLogout()" title="Đăng xuất khỏi hệ thống">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <button class="sidebar-logout-btn" onclick="handleLogout()" title="Đăng xuất khỏi hệ thống">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                         <polyline points="16 17 21 12 16 7"></polyline>
                         <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -5194,49 +5955,100 @@
 
                         <div class="filter-popover win11-dropdown" id="filter-popover" style="display: none;">
                             <div class="filter-popover-header">
-                                <span class="filter-popover-title">Filter Search Options</span>
+                                <span class="filter-popover-title">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                    Bộ Lọc &amp; Playback Video
+                                </span>
                                 <button class="filter-popover-close" onclick="closeAllToolbarMenus()">&times;</button>
                             </div>
+
+                            <!-- Phím tắt thời gian nhanh -->
+                            <div>
+                                <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">PHÍM TẮT MỐC THỜI GIAN:</div>
+                                <div class="time-presets-bar">
+                                    <span class="preset-chip" onclick="applyTimePreset('1h', this)">1 giờ qua</span>
+                                    <span class="preset-chip" onclick="applyTimePreset('today', this)">Hôm nay</span>
+                                    <span class="preset-chip" onclick="applyTimePreset('yesterday', this)">Hôm qua</span>
+                                    <span class="preset-chip" onclick="applyTimePreset('3days', this)">3 ngày qua</span>
+                                    <span class="preset-chip" onclick="applyTimePreset('this_week', this)">Tuần này</span>
+                                    <span class="preset-chip" onclick="applyTimePreset('all', this)">Tất cả</span>
+                                </div>
+                            </div>
+
+                            <!-- Lịch chọn Từ ngày/giờ -> Đến ngày/giờ -->
                             <div class="filter-row">
-                                <span class="filter-label">From:</span>
+                                <span class="filter-label">Từ ngày:</span>
                                 <div class="filter-input-wrap">
-                                    <input type="text" id="filter-from" placeholder="From (YYYY-MM-DD)">
+                                    <svg class="datetime-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                    <input type="text" id="filter-from" class="datetime-picker-input" placeholder="Chọn ngày &amp; giờ bắt đầu...">
                                 </div>
                             </div>
                             <div class="filter-row">
-                                <span class="filter-label">To:</span>
+                                <span class="filter-label">Đến ngày:</span>
                                 <div class="filter-input-wrap">
-                                    <input type="text" id="filter-to" placeholder="To (YYYY-MM-DD)">
+                                    <svg class="datetime-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                    <input type="text" id="filter-to" class="datetime-picker-input" placeholder="Chọn ngày &amp; giờ kết thúc...">
                                 </div>
                             </div>
-                            <div class="filter-row">
-                                <span class="filter-label">Video sources:</span>
-                                <div class="filter-input-wrap">
-                                    <select id="filter-video-sources">
-                                        <option value="" selected>Tất cả Camera (Toàn bộ)</option>
-                                        <option value="11">Camera 11 (T1. Quản lý HSSV)</option>
-                                        <option value="18">Camera 18 (Hành lang/Kho)</option>
-                                        <option value="19">Camera 19</option>
-                                        <option value="20">Camera 20</option>
+
+                            <!-- Nhãn cảnh báo (Event Tag Chips) -->
+                            <div>
+                                <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">LỌC THEO NHÃN SỰ KIỆN:</div>
+                                <div class="event-tags-wrap" id="event-tags-filter-wrap">
+                                    <span class="event-tag-chip danger" data-code="Fight" onclick="toggleEventTagChip(this)">🥊 Ẩu đả (Fight)</span>
+                                    <span class="event-tag-chip danger" data-code="Intrusion" onclick="toggleEventTagChip(this)">🚷 Đột nhập (Intrusion)</span>
+                                    <span class="event-tag-chip danger" data-code="CrossLine" onclick="toggleEventTagChip(this)">🚧 Vượt rào (CrossLine)</span>
+                                    <span class="event-tag-chip" data-code="AudioMutation" onclick="toggleEventTagChip(this)">🔊 La hét (Audio)</span>
+                                    <span class="event-tag-chip" data-code="HumanTrait" onclick="toggleEventTagChip(this)">👤 Có người (Human)</span>
+                                    <span class="event-tag-chip" data-code="VideoMotion" onclick="toggleEventTagChip(this)">🏃 Chuyển động (Motion)</span>
+                                </div>
+                            </div>
+
+                            <!-- Bộ chọn Camera (Dropdown + Lưới 32 Cam nhanh) -->
+                            <div>
+                                <div class="cam-selector-actions">
+                                    <span style="font-size: 0.725rem; font-weight: 600; color: var(--text-muted);">CHỌN CAMERA GIÁM SÁT:</span>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button type="button" class="cam-quick-link" onclick="selectAllCamGrid(true)">Tất cả (32)</button>
+                                        <button type="button" class="cam-quick-link" onclick="selectAllCamGrid(false)" style="color: var(--text-muted);">Bỏ chọn</button>
+                                        <button type="button" class="cam-quick-link" onclick="toggleCamGridMode()" id="toggle-cam-grid-btn">Xem Lưới</button>
+                                    </div>
+                                </div>
+
+                                <!-- Dropdown truyền thống -->
+                                <div class="filter-input-wrap" id="cam-dropdown-wrap">
+                                    <select id="filter-video-sources" onchange="syncDropdownToCamGrid(this.value)">
+                                        <option value="" selected>Tất cả Camera Được Phép</option>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="filter-row">
-                                <span class="filter-label">Min Cosine Sim:</span>
-                                <div class="filter-input-wrap">
-                                    <input type="number" id="filter-min-sim" value="0.00" step="0.05" min="0" max="1">
+
+                                <!-- Lưới nút 32 Camera (ẩn/hiện linh hoạt) -->
+                                <div class="cam-grid-container" id="cam-grid-container" style="display: none;">
+                                    <!-- Rendered dynamically by render32CameraGrid() -->
                                 </div>
                             </div>
+
+                            <!-- Min Similarity & Top K -->
                             <div class="filter-row">
-                                <span class="filter-label"><span class="req">*</span> Top K Results:</span>
+                                <span class="filter-label">Độ tương đồng:</span>
                                 <div class="filter-input-wrap">
-                                    <input type="number" id="filter-topk" value="10" min="1" max="100">
+                                    <input type="number" id="filter-min-sim" value="0.00" step="0.05" min="0" max="1" style="height: 28px;">
+                                </div>
+                                <span class="filter-label" style="width: 60px;">Top K:</span>
+                                <div class="filter-input-wrap">
+                                    <input type="number" id="filter-topk" value="12" min="1" max="100" style="height: 28px;">
                                 </div>
                             </div>
+
                             <div class="filter-popover-divider"></div>
                             <div class="filter-popover-actions">
-                                <button class="popover-btn-cancel" onclick="closeAllToolbarMenus()">Cancel</button>
-                                <button class="popover-btn-apply" onclick="applyFilters()">Apply</button>
+                                <button class="popover-btn-cancel" onclick="resetAllPlaybackFilters()">Đặt Lại</button>
+                                <button class="popover-btn-apply" onclick="applyFilters()">Áp Dụng Lọc</button>
                             </div>
                         </div>
                     </div>
@@ -6034,6 +6846,45 @@
             </div>
         </div>
 
+        <!-- Hạng mục 2: Drawer xem lại toàn bộ sự kiện của đúng Camera đó trong Video Manager -->
+        <div class="ncc-cam-events-backdrop" id="ncc-cam-events-backdrop" onclick="if(event.target===this) closeCameraEventsDrawer()">
+            <div class="ncc-cam-events-drawer" id="ncc-cam-events-drawer">
+                <div class="ncc-ced-header">
+                    <div class="ncc-ced-title-wrap">
+                        <div class="ncc-ced-badge" id="ncc-ced-cam-badge">CAM 01</div>
+                        <div>
+                            <div class="ncc-ced-cam-name" id="ncc-ced-cam-name">Camera 01</div>
+                            <div class="ncc-ced-sub" id="ncc-ced-sub">Toàn bộ sự kiện &amp; clip ghi nhận từ camera này</div>
+                        </div>
+                    </div>
+                    <button class="ncc-ced-close" onclick="closeCameraEventsDrawer()" title="Đóng">&times;</button>
+                </div>
+
+                <!-- Thanh lọc nhanh trong Drawer -->
+                <div class="ncc-ced-filter-bar">
+                    <div class="ncc-ced-filter-tabs">
+                        <button class="ncc-ced-filter-tab active" id="ced-filter-all" onclick="filterCedEvents('all')">Tất cả (<span id="ced-count-all">0</span>)</button>
+                        <button class="ncc-ced-filter-tab" id="ced-filter-anomalies" onclick="filterCedEvents('anomalies')">⚠️ Cảnh báo (<span id="ced-count-anomalies">0</span>)</button>
+                        <button class="ncc-ced-filter-tab" id="ced-filter-clips" onclick="filterCedEvents('clips')">🎬 Có Clip (<span id="ced-count-clips">0</span>)</button>
+                    </div>
+                    <button class="popover-btn-cancel" onclick="reloadCurrentCameraEvents()" style="height: 26px; padding: 0 8px; font-size: 0.72rem; cursor: pointer;">🔄 Tải lại</button>
+                </div>
+
+                <!-- Danh sách sự kiện của Camera -->
+                <div class="ncc-ced-body" id="ncc-ced-body">
+                    <div class="ncc-ced-loading" style="padding: 30px 10px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">
+                        <div>Đang tải dữ liệu sự kiện của camera...</div>
+                    </div>
+                </div>
+
+                <!-- Footer Drawer -->
+                <div class="ncc-ced-footer">
+                    <span id="ncc-ced-footer-stats" style="color: var(--text-muted);">Đang hiển thị 0 sự kiện</span>
+                    <button class="ncc-ced-search-btn" onclick="openCameraInSearchTab()" title="Mở trang tìm kiếm cho camera này">🔍 Mở trong Tìm kiếm AI</button>
+                </div>
+            </div>
+        </div>
+
         <!-- 3. Right Vision Agent Panel (OPEN BY DEFAULT matching media_1788858322440.png) -->
         <aside class="vss-chat-sidebar" id="vss-chat-sidebar">
             <!-- Chat Header -->
@@ -6172,11 +7023,25 @@
     </div>
 
     <!-- 4. Video Playback Modal (matching media_1788857714710.png) -->
+    <!-- 4. Video Playback Modal (matching media_1788857714710.png) -->
     <div class="video-modal-backdrop" id="video-playback-modal" style="display: none;" onclick="if(event.target===this) closeVideoModal()">
         <div class="video-modal-container">
             <div class="video-modal-top">
                 <span class="video-modal-title" id="modal-video-title">warehouse_20250101_000000_3805c.mp4</span>
-                <button class="video-modal-close" onclick="closeVideoModal()">✕</button>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <!-- Speed buttons -->
+                    <div style="display: flex; gap: 3px; background: rgba(255,255,255,0.06); padding: 2px 4px; border-radius: 4px;">
+                        <button class="popover-btn-cancel" style="height: 22px; padding: 0 5px; font-size: 0.65rem;" onclick="setVideoSpeed(1.0)">1.0x</button>
+                        <button class="popover-btn-cancel" style="height: 22px; padding: 0 5px; font-size: 0.65rem;" onclick="setVideoSpeed(1.5)">1.5x</button>
+                        <button class="popover-btn-cancel" style="height: 22px; padding: 0 5px; font-size: 0.65rem;" onclick="setVideoSpeed(2.0)">2.0x</button>
+                    </div>
+                    <!-- Download MP4 Button -->
+                    <a id="modal-video-download-btn" href="#" download class="popover-btn-apply" style="height: 26px; line-height: 26px; padding: 0 8px; font-size: 0.725rem; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;" title="Tải video clip MP4 về máy">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>Tải MP4</span>
+                    </a>
+                    <button class="video-modal-close" onclick="closeVideoModal()">✕</button>
+                </div>
             </div>
             <div class="video-modal-green-line"></div>
             <div class="video-modal-player-wrap">
@@ -7144,10 +8009,18 @@ user=None`;
 
             const fromVal = document.getElementById('filter-from')?.value || '';
             const toVal = document.getElementById('filter-to')?.value || '';
-            const videoSrc = (specificEventIds && specificEventIds.length > 0) ? '' : (document.getElementById('filter-video-sources')?.value || '');
+            let videoSrc = (specificEventIds && specificEventIds.length > 0) ? '' : (document.getElementById('filter-video-sources')?.value || '');
+            if (!videoSrc && typeof selectedPlaybackChannels !== 'undefined' && selectedPlaybackChannels.size > 0) {
+                videoSrc = Array.from(selectedPlaybackChannels).join(',');
+            }
             const minSim = parseFloat(document.getElementById('filter-min-sim')?.value) || 0.0;
-            const topK = parseInt(document.getElementById('filter-topk')?.value) || 10;
+            const topK = parseInt(document.getElementById('filter-topk')?.value) || 12;
             const srcType = document.getElementById('source-type-select')?.value || 'video_file';
+            const selectedCodes = (specificEventIds && specificEventIds.length > 0)
+                ? []
+                : ((typeof selectedPlaybackEventTags !== 'undefined' && selectedPlaybackEventTags.size > 0) 
+                    ? Array.from(selectedPlaybackEventTags) 
+                    : []);
 
             try {
                 const res = await fetch('/api/vss/search', {
@@ -7161,6 +8034,7 @@ user=None`;
                         video_sources: videoSrc,
                         from_time: fromVal,
                         to_time: toVal,
+                        event_codes: selectedCodes,
                         min_cosine_similarity: minSim,
                         top_k: topK
                     })
@@ -7178,7 +8052,8 @@ user=None`;
                     setTimeout(() => {
                         if (!window.isChatActive) {
                             const count = items.length || window.latestSearchResults?.length || 0;
-                            syncWorkflowStage('output', `BƯỚC: XUẤT ${count} VIDEO (CAM ${String(targetChannel).padStart(2, '0')})`);
+                            const outChLabel = targetChannel ? `CAM ${String(targetChannel).padStart(2, '0')}` : 'ĐA KÊNH';
+                            syncWorkflowStage('output', `BƯỚC: XUẤT ${count} VIDEO (${outChLabel})`);
                         }
                     }, 600);
                 }
@@ -7792,7 +8667,12 @@ user=None`;
                         <div class="card-info-pane">
                             <div class="card-header-bar">
                                 <span class="card-title" title="${escapeHtml(cardTitle)}">${escapeHtml(cardTitle)}</span>
-                                <button class="card-chat-btn" onclick="event.stopPropagation(); attachVideoByIndex(${idx})" title="Phân tích chi tiết video này với Server AI">+ Chat</button>
+                                <div style="display: flex; gap: 4px; align-items: center;">
+                                    <a href="${escapeHtml(videoUrl)}${videoUrl.includes('?') ? '&' : '?'}download=1" download="${escapeHtml(cardTitle)}.mp4" class="card-chat-btn" onclick="event.stopPropagation()" title="Tải trực tiếp video clip MP4 về máy" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding: 0 6px;">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    </a>
+                                    <button class="card-chat-btn" onclick="event.stopPropagation(); attachVideoByIndex(${idx})" title="Phân tích chi tiết video này với Server AI">+ Chat</button>
+                                </div>
                             </div>
                             <div class="card-footer-bar">
                                 <div class="similarity-row">
@@ -8008,21 +8888,213 @@ user=None`;
             });
         }
 
-        function resetAllFilters() {
-            closeAllToolbarMenus();
-            const fromEl = document.getElementById('filter-from');
-            const toEl = document.getElementById('filter-to');
-            const srcEl = document.getElementById('filter-video-sources');
+        // ==========================================================================
+        // HẠNG MỤC 6: BỘ LỌC & PLAYBACK VIDEO THỰC THỤ (FLATPICKR, GRID, PRESETS)
+        // ==========================================================================
+        let flatpickrFromInstance = null;
+        let flatpickrToInstance = null;
+        let selectedPlaybackChannels = new Set();
+        let selectedPlaybackEventTags = new Set();
+        let isCamGridVisible = false;
+
+        function initPlaybackCalendarPickers() {
+            if (typeof flatpickr === 'undefined') {
+                console.warn('Flatpickr library not loaded yet');
+                return;
+            }
+            try {
+                const config = {
+                    enableTime: true,
+                    dateFormat: "Y-m-d H:i:S",
+                    altInput: true,
+                    altFormat: "d/m/Y H:i",
+                    time_24hr: true,
+                    minuteIncrement: 1,
+                    locale: {
+                        firstDayOfWeek: 1
+                    }
+                };
+                flatpickrFromInstance = flatpickr("#filter-from", {
+                    ...config,
+                    onChange: function() {
+                        clearPresetChipsActive();
+                    }
+                });
+                flatpickrToInstance = flatpickr("#filter-to", {
+                    ...config,
+                    onChange: function() {
+                        clearPresetChipsActive();
+                    }
+                });
+            } catch (err) {
+                console.error('Error initializing flatpickr:', err);
+            }
+        }
+
+        function formatDateTimeLocal(dt) {
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+        }
+
+        function clearPresetChipsActive() {
+            document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+        }
+
+        function applyTimePreset(preset, btnEl) {
+            clearPresetChipsActive();
+            if (btnEl) btnEl.classList.add('active');
+
+            const now = new Date();
+            let fromDate = null;
+            let toDate = new Date();
+
+            if (preset === '1h') {
+                fromDate = new Date(now.getTime() - 60 * 60 * 1000);
+            } else if (preset === 'today') {
+                fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+            } else if (preset === 'yesterday') {
+                const y = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                fromDate = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 0, 0, 0);
+                toDate = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59);
+            } else if (preset === '3days') {
+                fromDate = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+            } else if (preset === 'this_week') {
+                const day = now.getDay() || 7;
+                fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1, 0, 0, 0);
+            } else if (preset === 'all') {
+                if (flatpickrFromInstance) flatpickrFromInstance.clear();
+                if (flatpickrToInstance) flatpickrToInstance.clear();
+                const fromEl = document.getElementById('filter-from');
+                const toEl = document.getElementById('filter-to');
+                if (fromEl) fromEl.value = '';
+                if (toEl) toEl.value = '';
+                return;
+            }
+
+            if (fromDate && toDate) {
+                const fStr = formatDateTimeLocal(fromDate);
+                const tStr = formatDateTimeLocal(toDate);
+                if (flatpickrFromInstance) {
+                    flatpickrFromInstance.setDate(fStr, true);
+                } else {
+                    const fromEl = document.getElementById('filter-from');
+                    if (fromEl) fromEl.value = fStr;
+                }
+                if (flatpickrToInstance) {
+                    flatpickrToInstance.setDate(tStr, true);
+                } else {
+                    const toEl = document.getElementById('filter-to');
+                    if (toEl) toEl.value = tStr;
+                }
+            }
+        }
+
+        function toggleEventTagChip(chip) {
+            const code = chip.getAttribute('data-code');
+            if (!code) return;
+            if (chip.classList.contains('active')) {
+                chip.classList.remove('active');
+                selectedPlaybackEventTags.delete(code);
+            } else {
+                chip.classList.add('active');
+                selectedPlaybackEventTags.add(code);
+            }
+        }
+
+        function toggleCamGridMode() {
+            const gridEl = document.getElementById('cam-grid-container');
+            const dropEl = document.getElementById('cam-dropdown-wrap');
+            const toggleBtn = document.getElementById('toggle-cam-grid-btn');
+            if (!gridEl || !dropEl) return;
+            isCamGridVisible = !isCamGridVisible;
+            if (isCamGridVisible) {
+                gridEl.style.display = 'grid';
+                dropEl.style.display = 'none';
+                if (toggleBtn) toggleBtn.innerText = 'Xem Menu';
+                render32CameraGrid();
+            } else {
+                gridEl.style.display = 'none';
+                dropEl.style.display = 'block';
+                if (toggleBtn) toggleBtn.innerText = 'Xem Lưới';
+            }
+        }
+
+        function render32CameraGrid() {
+            const gridEl = document.getElementById('cam-grid-container');
+            if (!gridEl) return;
+            let html = '';
+            for (let i = 1; i <= 32; i++) {
+                const isActive = selectedPlaybackChannels.has(i);
+                html += `<div class="cam-grid-chip ${isActive ? 'active' : ''}" onclick="toggleCamGridChip(${i}, this)" title="Camera Kênh ${i}">C${i < 10 ? '0' + i : i}</div>`;
+            }
+            gridEl.innerHTML = html;
+        }
+
+        function toggleCamGridChip(channel, chipEl) {
+            if (selectedPlaybackChannels.has(channel)) {
+                selectedPlaybackChannels.delete(channel);
+                chipEl.classList.remove('active');
+            } else {
+                selectedPlaybackChannels.add(channel);
+                chipEl.classList.add('active');
+            }
+            syncCamGridToDropdown();
+        }
+
+        function selectAllCamGrid(select) {
+            selectedPlaybackChannels.clear();
+            if (select) {
+                for (let i = 1; i <= 32; i++) selectedPlaybackChannels.add(i);
+            }
+            render32CameraGrid();
+            syncCamGridToDropdown();
+        }
+
+        function syncDropdownToCamGrid(val) {
+            selectedPlaybackChannels.clear();
+            if (val) {
+                const ch = parseInt(val);
+                if (!isNaN(ch)) selectedPlaybackChannels.add(ch);
+            }
+            render32CameraGrid();
+        }
+
+        function syncCamGridToDropdown() {
+            const selectEl = document.getElementById('filter-video-sources');
+            if (!selectEl) return;
+            if (selectedPlaybackChannels.size === 1) {
+                const singleCh = Array.from(selectedPlaybackChannels)[0];
+                selectEl.value = String(singleCh);
+            } else {
+                selectEl.value = '';
+            }
+        }
+
+        function resetAllPlaybackFilters() {
+            if (flatpickrFromInstance) flatpickrFromInstance.clear();
+            if (flatpickrToInstance) flatpickrToInstance.clear();
+            clearPresetChipsActive();
+            selectedPlaybackChannels.clear();
+            render32CameraGrid();
+            syncCamGridToDropdown();
+
+            selectedPlaybackEventTags.clear();
+            document.querySelectorAll('#event-tags-filter-wrap .event-tag-chip').forEach(chip => {
+                chip.classList.remove('active');
+            });
+
             const simEl = document.getElementById('filter-min-sim');
             const topkEl = document.getElementById('filter-topk');
             const topkTag = document.getElementById('topk-tag-val');
-            if (fromEl) fromEl.value = '';
-            if (toEl) toEl.value = '';
-            if (srcEl) srcEl.value = '';
             if (simEl) simEl.value = '0.00';
-            if (topkEl) topkEl.value = '10';
-            if (topkTag) topkTag.innerText = '10';
+            if (topkEl) topkEl.value = '12';
+            if (topkTag) topkTag.innerText = '12';
+            closeAllToolbarMenus();
             executeSearch();
+        }
+
+        function resetAllFilters() {
+            resetAllPlaybackFilters();
         }
 
         // Global click-outside listener to close toolbar menus
@@ -8038,12 +9110,24 @@ user=None`;
             const modal = document.getElementById('video-playback-modal');
             const titleEl = document.getElementById('modal-video-title');
             const videoEl = document.getElementById('modal-video-element');
+            const downloadBtn = document.getElementById('modal-video-download-btn');
             
             if (titleEl) titleEl.innerText = title;
             if (videoEl && url) {
                 videoEl.src = url;
+                videoEl.playbackRate = 1.0;
+            }
+            if (downloadBtn && url) {
+                const downloadUrl = url.includes('?') ? `${url}&download=1` : `${url}?download=1`;
+                downloadBtn.href = downloadUrl;
+                downloadBtn.download = title || 'camera_clip.mp4';
             }
             if (modal) modal.style.display = 'flex';
+        }
+
+        function setVideoSpeed(speed) {
+            const videoEl = document.getElementById('modal-video-element');
+            if (videoEl) videoEl.playbackRate = speed;
         }
 
         function closeVideoModal() {
@@ -8051,6 +9135,349 @@ user=None`;
             const videoEl = document.getElementById('modal-video-element');
             if (videoEl) videoEl.pause();
             if (modal) modal.style.display = 'none';
+        }
+
+        // ==========================================================================
+        // HẠNG MỤC 1: REALTIME NOTIFICATION SYSTEM (CHUÔNG THÔNG BÁO)
+        // ==========================================================================
+        let notifPopoverOpen = false;
+        let recentNotificationsList = [];
+        let readNotifIds = new Set();
+        try {
+            const savedRead = localStorage.getItem('vss_read_notif_ids');
+            if (savedRead) readNotifIds = new Set(JSON.parse(savedRead));
+        } catch(e) {}
+
+        function initNotificationSystem() {
+            fetchRecentNotifications();
+            // Polling every 25 seconds for new anomalies
+            setInterval(fetchRecentNotifications, 25000);
+
+            // Close on click outside
+            document.addEventListener('click', (e) => {
+                const wrap = document.getElementById('header-notif-wrap');
+                if (notifPopoverOpen && wrap && !wrap.contains(e.target)) {
+                    closeNotificationPopover();
+                }
+            });
+        }
+
+        function toggleNotificationPopover(e) {
+            if (e) e.stopPropagation();
+            const popover = document.getElementById('notif-popover');
+            if (!popover) return;
+            notifPopoverOpen = !notifPopoverOpen;
+            popover.style.display = notifPopoverOpen ? 'flex' : 'none';
+            if (notifPopoverOpen) {
+                fetchRecentNotifications();
+            }
+        }
+
+        function closeNotificationPopover() {
+            const popover = document.getElementById('notif-popover');
+            if (popover) popover.style.display = 'none';
+            notifPopoverOpen = false;
+        }
+
+        async function fetchRecentNotifications() {
+            try {
+                const res = await fetch('/api/events?only_anomalies=true&limit=15');
+                if (!res.ok) return;
+                const data = await res.json();
+                const events = data.events || [];
+                recentNotificationsList = events;
+                renderNotificationsList(events);
+            } catch (err) {
+                console.warn('[Notification] fetch error:', err);
+            }
+        }
+
+        function renderNotificationsList(events) {
+            const body = document.getElementById('notif-popover-body');
+            const badge = document.getElementById('notif-badge');
+            const countTag = document.getElementById('notif-count-tag');
+            if (!body) return;
+
+            // Filter unread
+            const unreadEvents = events.filter(ev => !readNotifIds.has(String(ev.id)));
+            const unreadCount = unreadEvents.length;
+
+            if (badge) {
+                if (unreadCount > 0) {
+                    badge.innerText = unreadCount > 99 ? '99+' : unreadCount;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+            if (countTag) {
+                countTag.innerText = unreadCount;
+            }
+
+            if (!events || events.length === 0) {
+                body.innerHTML = `
+                    <div class="notif-empty-state">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#76b900" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        <span style="color: #76b900; font-weight: 600;">Hệ thống an toàn!</span>
+                        <span style="font-size: 0.72rem;">Không ghi nhận cảnh báo nguy hiểm nào gần đây.</span>
+                    </div>
+                `;
+                return;
+            }
+
+            body.innerHTML = events.map(ev => {
+                const isRead = readNotifIds.has(String(ev.id));
+                const code = ev.event_code || ev.event_type || 'Alarm';
+                const isDanger = ['Fight', 'Intrusion', 'CrossLine'].includes(code) || ev.severity === 'high';
+                const isWarning = ['AudioMutation', 'SoundDetection', 'AudioAnomaly'].includes(code) || ev.severity === 'medium';
+                const tagClass = isDanger ? 'notif-tag-danger' : (isWarning ? 'notif-tag-warning' : 'notif-tag-info');
+                
+                // Friendly Vietnamese event label
+                let label = code;
+                if (code === 'Intrusion') label = '⚠️ Đột nhập vùng cấm';
+                else if (code === 'Fight') label = '🚨 Đánh nhau / Xô xát';
+                else if (code === 'CrossLine') label = '⚠️ Vượt hàng rào ảo';
+                else if (code === 'AudioMutation' || code === 'SoundDetection') label = '🔊 Âm thanh bất thường';
+                else if (code === 'VideoMotion') label = 'Chuyển động';
+
+                const ch = ev.channel || 1;
+                const camName = (window.NCC_CAMERAS && NCC_CAMERAS.find(c => c.id === ch)?.name) || `Camera Kênh ${ch}`;
+                const hasClip = Boolean(ev.clip_filename);
+                const clipUrl = ev.clip_filename ? `/clips/${ev.clip_filename.replace(/\\/g, '/')}` : '';
+                const titleStr = `${label} - CAM ${ch} (${ev.timestamp || ''})`.replace(/'/g, "\\'");
+
+                return `
+                    <div class="notif-item" style="${isRead ? 'opacity: 0.65;' : 'background: rgba(118, 185, 0, 0.04);'}" onclick="handleNotifItemClick(${ev.id}, '${titleStr}', '${clipUrl}')">
+                        <div class="notif-item-top">
+                            <span class="notif-item-tag ${tagClass}">${label}</span>
+                            <span class="notif-item-time">${formatTimeAgo(ev.timestamp)}</span>
+                        </div>
+                        <div class="notif-item-desc">${ev.description || 'Phát hiện sự kiện an ninh từ đầu ghi NVR'}</div>
+                        <div class="notif-item-meta">
+                            <span class="notif-item-cam">📹 Kênh ${ch < 10 ? '0' + ch : ch} &bull; ${camName}</span>
+                            ${hasClip ? `<button type="button" class="notif-item-clip-btn" onclick="event.stopPropagation(); openVideoModal('${titleStr}', '${clipUrl}')">▶ Xem Clip</button>` : `<span style="font-size: 0.68rem; color: var(--text-muted);">${ev.timestamp ? ev.timestamp.split(' ')[1] : ''}</span>`}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function handleNotifItemClick(eventId, title, clipUrl) {
+            readNotifIds.add(String(eventId));
+            try {
+                localStorage.setItem('vss_read_notif_ids', JSON.stringify(Array.from(readNotifIds).slice(-200)));
+            } catch(e) {}
+            renderNotificationsList(recentNotificationsList);
+
+            if (clipUrl) {
+                openVideoModal(title, clipUrl);
+            }
+        }
+
+        function markAllNotificationsAsRead() {
+            recentNotificationsList.forEach(ev => readNotifIds.add(String(ev.id)));
+            try {
+                localStorage.setItem('vss_read_notif_ids', JSON.stringify(Array.from(readNotifIds).slice(-200)));
+            } catch(e) {}
+            renderNotificationsList(recentNotificationsList);
+        }
+
+        function formatTimeAgo(ts) {
+            if (!ts) return '';
+            try {
+                const parts = ts.split(' ');
+                if (parts.length === 2) {
+                    return parts[1]; // Return HH:mm:ss
+                }
+            } catch(e) {}
+            return ts;
+        }
+
+        // ==========================================================================
+        // HẠNG MỤC 2: CAMERA EVENTS DRAWER (XEM SỰ KIỆN RIÊNG TỪNG CAMERA)
+        // ==========================================================================
+        let currentCedCameraId = null;
+        let currentCedCameraName = '';
+        let currentCedRawEvents = [];
+        let currentCedFilter = 'all';
+
+        function openCameraEventsDrawer(camId, camName) {
+            currentCedCameraId = camId;
+            currentCedCameraName = camName || `Camera Kênh ${camId}`;
+            currentCedFilter = 'all';
+
+            const backdrop = document.getElementById('ncc-cam-events-backdrop');
+            const badge = document.getElementById('ncc-ced-cam-badge');
+            const nameEl = document.getElementById('ncc-ced-cam-name');
+            const subEl = document.getElementById('ncc-ced-sub');
+
+            if (badge) badge.innerText = `CAM ${camId < 10 ? '0' + camId : camId}`;
+            if (nameEl) nameEl.innerText = currentCedCameraName;
+            if (subEl) subEl.innerText = `Nhật ký sự kiện & video clip riêng biệt của Camera Kênh ${camId}`;
+
+            // Reset tabs
+            ['all', 'anomalies', 'clips'].forEach(t => {
+                const tab = document.getElementById(`ced-filter-${t}`);
+                if (tab) tab.classList.toggle('active', t === 'all');
+            });
+
+            if (backdrop) backdrop.classList.add('open');
+
+            fetchCameraEvents(camId);
+        }
+
+        function closeCameraEventsDrawer() {
+            const backdrop = document.getElementById('ncc-cam-events-backdrop');
+            if (backdrop) backdrop.classList.remove('open');
+            currentCedCameraId = null;
+        }
+
+        function reloadCurrentCameraEvents() {
+            if (currentCedCameraId !== null) {
+                fetchCameraEvents(currentCedCameraId);
+            }
+        }
+
+        async function fetchCameraEvents(camId) {
+            const body = document.getElementById('ncc-ced-body');
+            if (body) {
+                body.innerHTML = `
+                    <div class="ncc-ced-loading" style="padding: 30px 10px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">
+                        <div class="ncc-pulse-dot" style="margin-bottom: 8px;"></div>
+                        <div>Đang tải dữ liệu sự kiện của Camera Kênh ${camId}...</div>
+                    </div>
+                `;
+            }
+
+            try {
+                const res = await fetch(`/api/events?channel=${camId}&limit=80`);
+                if (!res.ok) throw new Error('API status ' + res.status);
+                const data = await res.json();
+                currentCedRawEvents = data.events || [];
+                updateCedFilterCounts();
+                renderCedEventsList();
+            } catch (err) {
+                console.error('[CED] fetch error:', err);
+                if (body) {
+                    body.innerHTML = `
+                        <div style="padding: 24px; text-align: center; color: #ef4444; font-size: 0.8rem;">
+                            ⚠️ Không thể tải dữ liệu sự kiện của Camera Kênh ${camId}. Vui lòng thử lại.
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function updateCedFilterCounts() {
+            const allCount = currentCedRawEvents.length;
+            const anomalyCount = currentCedRawEvents.filter(e => 
+                ['Intrusion', 'Fight', 'CrossLine', 'AudioMutation', 'SoundDetection', 'AudioAnomaly'].includes(e.event_code) ||
+                e.severity === 'high' || e.severity === 'medium'
+            ).length;
+            const clipsCount = currentCedRawEvents.filter(e => Boolean(e.clip_filename)).length;
+
+            const elAll = document.getElementById('ced-count-all');
+            const elAnom = document.getElementById('ced-count-anomalies');
+            const elClips = document.getElementById('ced-count-clips');
+            if (elAll) elAll.innerText = allCount;
+            if (elAnom) elAnom.innerText = anomalyCount;
+            if (elClips) elClips.innerText = clipsCount;
+        }
+
+        function filterCedEvents(type) {
+            currentCedFilter = type;
+            ['all', 'anomalies', 'clips'].forEach(t => {
+                const tab = document.getElementById(`ced-filter-${t}`);
+                if (tab) tab.classList.toggle('active', t === type);
+            });
+            renderCedEventsList();
+        }
+
+        function renderCedEventsList() {
+            const body = document.getElementById('ncc-ced-body');
+            const stats = document.getElementById('ncc-ced-footer-stats');
+            if (!body) return;
+
+            let filtered = currentCedRawEvents;
+            if (currentCedFilter === 'anomalies') {
+                filtered = currentCedRawEvents.filter(e => 
+                    ['Intrusion', 'Fight', 'CrossLine', 'AudioMutation', 'SoundDetection', 'AudioAnomaly'].includes(e.event_code) ||
+                    e.severity === 'high' || e.severity === 'medium'
+                );
+            } else if (currentCedFilter === 'clips') {
+                filtered = currentCedRawEvents.filter(e => Boolean(e.clip_filename));
+            }
+
+            if (stats) {
+                stats.innerText = `Đang hiển thị ${filtered.length} / ${currentCedRawEvents.length} sự kiện`;
+            }
+
+            if (filtered.length === 0) {
+                body.innerHTML = `
+                    <div style="padding: 36px 14px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 8px; opacity: 0.6;"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                        <div>Không có sự kiện nào phù hợp với bộ lọc hiện tại.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            body.innerHTML = filtered.map(ev => {
+                const code = ev.event_code || ev.event_type || 'Event';
+                const isDanger = ['Fight', 'Intrusion', 'CrossLine'].includes(code) || ev.severity === 'high';
+                const isWarning = ['AudioMutation', 'SoundDetection', 'AudioAnomaly'].includes(code) || ev.severity === 'medium';
+                const tagClass = isDanger ? 'notif-tag-danger' : (isWarning ? 'notif-tag-warning' : 'notif-tag-info');
+                
+                let label = code;
+                if (code === 'Intrusion') label = 'Đột nhập vùng cấm';
+                else if (code === 'Fight') label = 'Đánh nhau / Xô xát';
+                else if (code === 'CrossLine') label = 'Vượt hàng rào ảo';
+                else if (code === 'AudioMutation' || code === 'SoundDetection') label = 'Âm thanh bất thường';
+                else if (code === 'VideoMotion') label = 'Chuyển động';
+                else if (code === 'HumanTrait') label = 'Nhận diện người';
+                else if (code === 'VehicleTrait') label = 'Nhận diện phương tiện';
+
+                const hasClip = Boolean(ev.clip_filename);
+                const clipUrl = ev.clip_filename ? `/clips/${ev.clip_filename.replace(/\\/g, '/')}` : '';
+                const titleStr = `${label} - CAM ${ev.channel} (${ev.timestamp || ''})`.replace(/'/g, "\\'");
+                const cardClass = isDanger ? 'danger' : (hasClip ? 'has-clip' : '');
+
+                return `
+                    <div class="ncc-ced-card ${cardClass}">
+                        <div class="ncc-ced-card-top">
+                            <span class="ncc-ced-event-tag ${tagClass}">${label}</span>
+                            <span class="ncc-ced-time">🕒 ${ev.timestamp || 'Chưa rõ'}</span>
+                        </div>
+                        <div class="ncc-ced-desc">${ev.description || 'Sự kiện ghi nhận từ camera'}</div>
+                        <div class="ncc-ced-card-actions">
+                            <span style="font-size: 0.68rem; color: var(--text-muted); font-family: monospace;">Mã #ID: ${ev.id}</span>
+                            ${hasClip ? `
+                                <button type="button" class="ncc-ced-play-btn" onclick="openVideoModal('${titleStr}', '${clipUrl}')">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                    <span>Xem Clip MP4</span>
+                                </button>
+                            ` : `
+                                <span class="ncc-ced-no-clip-tag">Không lưu clip</span>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openCameraInSearchTab() {
+            if (currentCedCameraId === null) return;
+            const camId = currentCedCameraId;
+            closeCameraEventsDrawer();
+            switchSidebarTab('search');
+            
+            // Set channel in dropdown and camera grid
+            const selectEl = document.getElementById('filter-video-sources');
+            if (selectEl) {
+                selectEl.value = String(camId);
+            }
+            syncDropdownToCamGrid(String(camId));
+            executeSearch();
         }
 
         // 10. Safe App Initialization (runs whether DOM is ready or already loaded)
@@ -8091,6 +9518,12 @@ user=None`;
 
             // Tải danh sách Camera được phân quyền động theo tài khoản (Phase 3.2 RBAC)
             loadUserAllowedCamerasToDropdown();
+
+            // Khởi tạo hệ thống Chuông Thông báo Realtime (Hạng mục 1)
+            initNotificationSystem();
+
+            // Khởi tạo Lịch Flatpickr & Playback Controls (Hạng mục 6)
+            initPlaybackCalendarPickers();
         }
 
         async function loadUserAllowedCamerasToDropdown() {
@@ -9373,6 +10806,14 @@ user=None`;
                             </div>
                             <div class="ncc-slot-header-right">
                                 <span class="ncc-target-tag" id="ncc-slot-target-tag-${i}" style="${isTarget ? '' : 'display: none;'}">ĐANG CHỌN ĐỔI</span>
+                                <!-- Hạng mục 2: Nút xem toàn bộ sự kiện & clip của đúng camera này -->
+                                <button type="button" class="ncc-slot-btn ncc-slot-btn-events" onclick="event.stopPropagation(); openCameraEventsDrawer(${cam.id}, '${(cam.name || '').replace(/'/g, "\\'")}')" title="Xem toàn bộ sự kiện &amp; clip của Camera này">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    <span>Sự kiện</span>
+                                </button>
                                 <button type="button" class="ncc-slot-btn" onclick="event.stopPropagation(); toggleMaximizeSlot(${i})" title="${isMaximized ? 'Thu nhỏ về lưới 4 ô' : 'Phóng to camera này'}">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         ${isMaximized 
@@ -9652,6 +11093,9 @@ user=None`;
                     <td>
                         <button onclick="assignCameraToTargetSlot(${cam.id}); switchNccView('grid');" style="background: rgba(118, 185, 0, 0.15); color: #76b900; border: 1px solid #76b900; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer;" title="Tải camera này vào lưới 4 ô">
                             ▷ Xem Trực Tiếp
+                        </button>
+                        <button onclick="openCameraEventsDrawer(${cam.id}, '${(cam.name || '').replace(/'/g, "\\'")}')" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid #38bdf8; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; margin-left: 6px;" title="Xem toàn bộ sự kiện &amp; clip của camera này">
+                            📋 Sự Kiện
                         </button>
                     </td>
                 </tr>

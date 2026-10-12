@@ -152,9 +152,9 @@ templates_dir.mkdir(exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-quasar_spa_dir = Path(__file__).resolve().parent / "quasar_spa"
+quasar_spa_dir = Path(__file__).resolve().parent.parent / "quasar-admin" / "dist" / "spa"
 if not (quasar_spa_dir / "index.html").is_file():
-    quasar_spa_dir = Path(__file__).resolve().parent.parent / "quasar-admin" / "dist" / "spa"
+    quasar_spa_dir = Path(__file__).resolve().parent / "quasar_spa"
 
 if (quasar_spa_dir / "assets").is_dir():
     app.mount("/admin/assets", StaticFiles(directory=str(quasar_spa_dir / "assets")), name="quasar_assets")
@@ -170,8 +170,8 @@ _gemini_quota_exceeded_until: float = 0.0
 
 @app.get("/clips/{clip_reference:path}")
 @app.get("/api/clips/{clip_reference:path}")
-async def serve_clip(clip_reference: str, request: Request):
-    """Serve a cached clip, fetching it from Synology when necessary, with Channel-Level RBAC."""
+async def serve_clip(clip_reference: str, request: Request, download: Optional[int] = 0):
+    """Serve a cached clip, fetching it from Synology when necessary, with Channel-Level RBAC and optional direct attachment download."""
     allowed = get_current_user_allowed_channels(request)
     if allowed is not None:
         clip_ch = get_clip_channel(clip_reference)
@@ -186,6 +186,15 @@ async def serve_clip(clip_reference: str, request: Request):
         raise HTTPException(status_code=400, detail="Invalid clip reference")
     if not clip_path.is_file():
         raise HTTPException(status_code=404, detail="Clip not found")
+
+    filename = Path(clip_reference).name
+    if download:
+        return FileResponse(
+            clip_path, 
+            media_type="video/mp4",
+            filename=filename,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
     return FileResponse(clip_path, media_type="video/mp4")
 
 
@@ -790,7 +799,10 @@ async def admin_portal_page(request: Request):
         )
     spa_index = quasar_spa_dir / "index.html"
     if spa_index.is_file():
-        return HTMLResponse(content=spa_index.read_text(encoding="utf-8"))
+        return HTMLResponse(
+            content=spa_index.read_text(encoding="utf-8"),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+        )
     return templates.TemplateResponse(request=request, name="admin.html")
 
 
@@ -1292,7 +1304,7 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
             }
         active_channels = sorted(list(set(allowed_channels).intersection(set(config.ACTIVE_CHANNELS)))) or allowed_channels
     else:
-        active_channels = config.ACTIVE_CHANNELS
+        active_channels = list(range(1, 33))
 
     query_text = req.query.strip()
     lowered = query_text.lower()
@@ -1322,7 +1334,12 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
             "event_ids": []
         }
 
-    ch_label = f"Camera Kênh {ch:02d}" if ch else f"các Camera được phân quyền (Kênh {', '.join(str(c) for c in active_channels)})"
+    if ch:
+        ch_label = f"Camera Kênh {ch:02d}"
+    elif allowed_channels is None:
+        ch_label = "toàn bộ 32 Camera trong hệ thống (Kênh 01 đến Kênh 32)"
+    else:
+        ch_label = f"các Camera được phân quyền (Kênh {', '.join(str(c) for c in active_channels)})"
 
     if not query_text:
         return {
@@ -1381,7 +1398,7 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
                 matched_events.append(ev)
 
         if only_anomalies and matched_events:
-            alarm_check = set(event_codes or ['VideoMotion', 'AudioMutation', 'SoundDetection', 'Intrusion', 'CrossLine', 'Fight', 'RtspSessionDisconnect'])
+            alarm_check = set(event_codes or config.CRITICAL_ANOMALY_CODES)
             matched_events = [
                 e for e in matched_events
                 if e.get("event_code") in alarm_check
@@ -1390,7 +1407,7 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
 
     elif only_anomalies:
         # User asked for abnormal / alarms on this date
-        alarm_codes = event_codes or ['VideoMotion', 'AudioMutation', 'SoundDetection', 'Intrusion', 'CrossLine', 'Fight', 'RtspSessionDisconnect']
+        alarm_codes = event_codes or config.CRITICAL_ANOMALY_CODES
         # 1. Prioritize real alarm events that have actual video clips across channels
         alarms_with_clips = database.get_events(
             channel=ch,
@@ -1486,8 +1503,7 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
     events_with_clips = [e for e in matched_events if _has_physical_clip(e)]
     if events_with_clips:
         matched_events = events_with_clips
-    else:
-        # If no clips found in specific search, fetch recent verified clips from database
+    elif not matched_events and not only_anomalies and not search_kw and not is_time_filtered and not event_codes:
         recent_verified = database.get_diverse_channel_events(
             channel=ch,
             total_limit=fetch_limit,
@@ -1507,7 +1523,11 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
     elif target_date:
         context_lines.append(f"Mốc thời gian/Ngày truy vấn: {target_date}.")
 
-    if is_time_filtered and not matched_events:
+    if only_anomalies and not matched_events:
+        context_lines.append(
+            f"KẾT QUẢ TRUY VẤN CSDL: Trong khoảng thời gian truy vấn, hệ thống KHÔNG GHI NHẬN bất kỳ sự kiện bất thường hay cảnh báo nguy hiểm nào trên {ch_label}. Toàn bộ hệ thống camera an toàn tuyệt đối."
+        )
+    elif is_time_filtered and not matched_events:
         context_lines.append(
             f"KẾT QUẢ TRUY VẤN CSDL: Trong khung thời gian yêu cầu ({start_time} đến {end_time}), hệ thống hoàn toàn KHÔNG GHI NHẬN bất kỳ video clip sự kiện nào trên {ch_label}."
         )
@@ -1793,6 +1813,7 @@ class NVRConfigModel(BaseModel):
     demo_mode: bool = False
     abnormal_event_codes: List[str] = []
     camera_names: Optional[Dict[str, str]] = None
+    camera_alert_rules: Optional[Dict[str, List[str]]] = None
 
 class CosmosPromptProfileModel(BaseModel):
     profile: str
@@ -1843,6 +1864,9 @@ async def get_nvr_config():
         "abnormal_event_codes": config.ABNORMAL_EVENT_CODES,
         "abnormal_behavior_options": config.ABNORMAL_BEHAVIOR_OPTIONS,
         "camera_names": config.CAMERA_NAMES,
+        "camera_alert_rules": config.CAMERA_ALERT_RULES,
+        "critical_anomaly_codes": config.CRITICAL_ANOMALY_CODES,
+        "routine_event_codes": config.ROUTINE_EVENT_CODES,
         "ffmpeg_available": True
     }
 
@@ -2914,6 +2938,8 @@ async def update_nvr_config(cfg: NVRConfigModel):
     # Keep the persisted configuration predictable if a client submits the
     # same checkbox value more than once.
     cfg_dict["abnormal_event_codes"] = list(dict.fromkeys(cfg.abnormal_event_codes))
+    if cfg.camera_alert_rules is not None:
+        cfg_dict["camera_alert_rules"] = cfg.camera_alert_rules
     config.update_global_config(cfg_dict)
     restart_listener_service()
     return {"status": "success", "message": f"Cấu hình kết nối NVR ({cfg.nvr_host}) đã được cập nhật thành công!"}

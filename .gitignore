@@ -48,6 +48,10 @@ id_rsa*
 *.jpeg
 *.png
 !CameraAI/static/*.png
+!CameraAI/quasar_spa/**/*.png
+!CameraAI/quasar_spa/**/*.jpg
+!CameraAI/quasar_spa/**/*.jpeg
+!CameraAI/quasar_spa/**/*.ico
 !Login/*.png
 !Login/*.jpg
 

@@ -92,7 +92,7 @@ DEFAULT_CONFIG = {
     "rtsp_port": int(os.getenv("RTSP_PORT", "33554")),
     "nvr_user": os.getenv("NVR_USER", "user2"),
     "nvr_password": os.getenv("NVR_PASSWORD", "User#$168"),
-    "active_channels": [3, 11, 18, 19, 20],
+    "active_channels": list(range(1, 33)),
     "demo_mode": False,
     "pre_buffer_sec": 5,
     "post_buffer_sec": 5,
@@ -101,13 +101,10 @@ DEFAULT_CONFIG = {
     "abnormal_event_codes": [
         "Intrusion",
         "Fight",
-        "AudioAnomaly",
+        "AudioMutation",
         "CrossLine",
         "SoundDetection",
-        "VideoMotion",
-        "HumanTrait",
-        "FaceDetection",
-        "VehicleTrait"
+        "RtspSessionDisconnect",
     ],
     "camera_names": {
         "1": "1.T1. ĐÀO TẠO VÀ NCKH CAM1",
@@ -179,6 +176,39 @@ ACTIVE_CHANNELS = _current_cfg.get("active_channels", list(range(1, 33)))
 CAMERA_NAMES = _current_cfg.get("camera_names", {})
 DEMO_MODE = _current_cfg.get("demo_mode", False)
 ABNORMAL_EVENT_CODES = _current_cfg.get("abnormal_event_codes", DEFAULT_CONFIG["abnormal_event_codes"])
+CRITICAL_ANOMALY_CODES = [
+    "Intrusion",
+    "Fight",
+    "CrossLine",
+    "AudioMutation",
+    "SoundDetection",
+    "RtspSessionDisconnect",
+]
+ROUTINE_EVENT_CODES = [
+    "VideoMotion",
+    "HumanTrait",
+    "FaceDetection",
+    "VehicleTrait",
+]
+CAMERA_ALERT_RULES = _current_cfg.get("camera_alert_rules", {})
+
+def is_channel_anomaly(channel: int, event_code: str) -> bool:
+    """Determine if an event is considered a high/medium anomaly for a specific channel.
+    If specific rules are defined for the camera, use them authoritatively;
+    otherwise fallback to ABNORMAL_EVENT_CODES and CRITICAL_ANOMALY_CODES.
+    """
+    ch_key = str(channel)
+    if ch_key in CAMERA_ALERT_RULES and isinstance(CAMERA_ALERT_RULES[ch_key], list):
+        rules = CAMERA_ALERT_RULES[ch_key]
+        if event_code in rules:
+            return True
+        if event_code == "SmartMotionHuman" and "HumanTrait" in rules:
+            return True
+        if event_code in ("SoundDetection", "AudioAnomaly") and "AudioMutation" in rules:
+            return True
+        return False
+    return event_code in ABNORMAL_EVENT_CODES or event_code in CRITICAL_ANOMALY_CODES
+
 PRE_BUFFER_SEC = _current_cfg.get("pre_buffer_sec", 5)
 POST_BUFFER_SEC = _current_cfg.get("post_buffer_sec", 5)
 CLIP_DURATION_SEC = PRE_BUFFER_SEC + POST_BUFFER_SEC
@@ -272,7 +302,7 @@ ABNORMAL_BEHAVIOR_OPTIONS = [
 AUDIO_EVENT_CODES = {"AudioAnomaly", "SoundDetection", "FightSound"}
 
 def update_global_config(new_cfg: dict):
-    global NVR_HOST, USE_HTTPS, NVR_PORT, RTSP_PORT, NVR_USER, NVR_PASSWORD, ACTIVE_CHANNELS, DEMO_MODE, ABNORMAL_EVENT_CODES, CAMERA_NAMES
+    global NVR_HOST, USE_HTTPS, NVR_PORT, RTSP_PORT, NVR_USER, NVR_PASSWORD, ACTIVE_CHANNELS, DEMO_MODE, ABNORMAL_EVENT_CODES, CAMERA_NAMES, CAMERA_ALERT_RULES
     save_config(new_cfg)
     NVR_HOST = new_cfg.get("nvr_host", NVR_HOST)
     USE_HTTPS = new_cfg.get("use_https", USE_HTTPS)
@@ -285,6 +315,8 @@ def update_global_config(new_cfg: dict):
     ABNORMAL_EVENT_CODES = new_cfg.get("abnormal_event_codes", ABNORMAL_EVENT_CODES)
     if "camera_names" in new_cfg:
         CAMERA_NAMES = new_cfg["camera_names"]
+    if "camera_alert_rules" in new_cfg:
+        CAMERA_ALERT_RULES = new_cfg["camera_alert_rules"]
 
 def set_cosmos_prompt_profile(profile: str):
     global COSMOS_PROMPT_PROFILE
