@@ -175,8 +175,8 @@
                                 </select>
                             </div>
                             <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-                                <button type="button" id="camera-view-notif-pill" onclick="if(typeof openNotificationForCamera==='function') openNotificationForCamera('all', event)" style="height: 22px; padding: 0 7px; font-size: 0.68rem; font-weight: 600; border-radius: 4px; border: 1px solid rgba(118,185,0,0.45); background: rgba(118,185,0,0.12); color: #9be62b; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Xem thông báo gộp chung của tất cả Camera bạn quản lý (24h qua)">
-                                    <span>🔔 Thông báo 24h</span>
+                                <button type="button" id="camera-view-notif-pill" onclick="if(typeof openNotificationForCamera==='function') openNotificationForCamera('all', event)" style="height: 22px; padding: 0 7px; font-size: 0.68rem; font-weight: 600; border-radius: 4px; border: 1px solid rgba(118,185,0,0.45); background: rgba(118,185,0,0.12); color: #9be62b; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Thông báo 24h">
+                                    <span>Thông báo</span>
                                 </button>
                                 <span class="camera-badge-live">
                                     <span class="camera-live-dot"></span> LIVE

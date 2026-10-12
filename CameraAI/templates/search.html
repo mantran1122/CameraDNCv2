@@ -712,25 +712,25 @@
             font-weight: 600;
         }
 
-        /* Filter Popover Dialog - Fixed truncation, adaptive positioning & Fluent */
+        /* Filter Popover Dialog */
         .filter-popover {
             position: absolute;
             top: calc(100% + 6px);
             right: 0;
             left: auto;
-            width: 440px;
-            min-width: 380px;
-            max-width: min(480px, calc(100vw - 24px));
+            width: 360px;
+            min-width: 320px;
+            max-width: calc(100vw - 24px);
             background-color: var(--popover-bg);
             border: 1px solid var(--border-main);
-            border-radius: 10px;
+            border-radius: 8px;
             box-shadow: 0 20px 35px -5px var(--shadow-color), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(20px);
-            padding: 1.1rem;
+            padding: 0.9rem;
             z-index: 9999;
             display: flex;
             flex-direction: column;
-            gap: 0.85rem;
+            gap: 0.65rem;
             box-sizing: border-box;
             max-height: calc(100vh - 120px);
             overflow-y: auto;
@@ -751,7 +751,7 @@
         }
 
         .filter-popover-title {
-            font-size: 0.875rem;
+            font-size: 0.85rem;
             font-weight: 700;
             color: var(--text-main);
             display: flex;
@@ -813,10 +813,11 @@
         }
 
         /* Calendar Datetime Inputs */
+        .filter-input-wrap input.datetime-picker-input,
         .datetime-picker-input {
             width: 100%;
             height: 32px;
-            padding: 0 0.65rem 0 2rem;
+            padding: 0 0.65rem 0 2rem !important;
             background: var(--input-bg);
             color: var(--input-text);
             border: 1px solid var(--input-border);
@@ -832,6 +833,7 @@
             left: 8px;
             pointer-events: none;
             color: var(--text-muted);
+            z-index: 2;
         }
 
         /* Event Tag Filter Chips */
@@ -5776,41 +5778,38 @@
                     <span class="notif-badge" id="notif-badge" style="display: none;">0</span>
                 </button>
 
-                <!-- Popover Bảng Thông Báo Cảnh Báo Realtime (Gộp chung tất cả Camera được phân quyền cho tài khoản trong 24h) -->
-                <div class="notif-popover" id="notif-popover" style="display: none; width: 390px;">
+                <div class="notif-popover" id="notif-popover" style="display: none; width: 360px;">
                     <div class="notif-popover-header">
                         <div class="notif-popover-title-row">
                             <span class="notif-pulse-dot"></span>
-                            <span class="notif-popover-title" id="notif-popover-title-text">Thông Báo Camera Quản Lý (24h)</span>
+                            <span class="notif-popover-title" id="notif-popover-title-text">Thông báo (24h)</span>
                             <span class="notif-count-tag" id="notif-count-tag">0</span>
                         </div>
                         <div class="notif-header-actions">
-                            <button class="notif-action-btn" onclick="markAllNotificationsAsRead()" title="Đánh dấu tất cả đã đọc">✓ Đã xem</button>
-                            <button class="notif-action-btn" onclick="fetchRecentNotifications()" title="Làm mới">🔄</button>
+                            <button class="notif-action-btn" onclick="markAllNotificationsAsRead()" title="Đánh dấu đã đọc">Đã xem</button>
+                            <button class="notif-action-btn" onclick="fetchRecentNotifications()" title="Làm mới">Làm mới</button>
                             <button class="notif-close-btn" onclick="closeNotificationPopover()">&times;</button>
                         </div>
                     </div>
-                    <!-- Thanh Hiển Thị Quyền Quản Lý Camera & Bộ Lọc Nhanh -->
-                    <div style="padding: 8px 12px; background: rgba(15, 23, 42, 0.92); border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 6px;">
+                    <div style="padding: 6px 12px; background: rgba(15, 23, 42, 0.92); border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 6px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-                            <span id="notif-rbac-badge" style="font-size: 0.68rem; color: #8ae300; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
-                                🔒 Tất cả Camera bạn quản lý (24h qua)
+                            <span id="notif-rbac-badge" style="font-size: 0.7rem; color: #8ae300; font-weight: 600;">
+                                Camera quản lý
                             </span>
-                            <select id="notif-camera-select" onchange="setNotificationCameraChannel(this.value)" style="background: #18181b; color: #f4f4f5; border: 1px solid rgba(118, 185, 0, 0.45); border-radius: 4px; padding: 3px 6px; font-size: 0.72rem; font-weight: 600; max-width: 215px; outline: none; cursor: pointer;">
-                                <option value="all">📹 Tất cả Camera quản lý</option>
+                            <select id="notif-camera-select" onchange="setNotificationCameraChannel(this.value)" style="background: #18181b; color: #f4f4f5; border: 1px solid rgba(118, 185, 0, 0.45); border-radius: 4px; padding: 3px 6px; font-size: 0.72rem; font-weight: 600; max-width: 190px; outline: none; cursor: pointer;">
+                                <option value="all">Tất cả camera</option>
                             </select>
                         </div>
                         <div id="notif-camera-pills" style="display: flex; align-items: center; gap: 5px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin;"></div>
                     </div>
                     <div class="notif-popover-body" id="notif-popover-body">
                         <div class="notif-empty-state">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
-                            <span>Đang tải thông báo 24h của các camera bạn quản lý...</span>
+                            <span>Đang tải...</span>
                         </div>
                     </div>
                     <div class="notif-popover-footer">
-                        <span class="notif-footer-info" id="notif-footer-cam-label">Gộp chung thông báo các Camera thuộc quyền quản lý (24h)</span>
-                        <a href="/admin" class="notif-footer-link" target="_blank">Phân quyền &rarr;</a>
+                        <span class="notif-footer-info" id="notif-footer-cam-label">Trong 24 giờ qua</span>
+                        <a href="/admin" class="notif-footer-link" target="_blank">Phân quyền</a>
                     </div>
                 </div>
             </div>
@@ -5967,91 +5966,74 @@
 
                         <div class="filter-popover win11-dropdown" id="filter-popover" style="display: none;">
                             <div class="filter-popover-header">
-                                <span class="filter-popover-title">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                                    </svg>
-                                    Bộ Lọc &amp; Playback Video
-                                </span>
+                                <span class="filter-popover-title">Bộ lọc</span>
                                 <button class="filter-popover-close" onclick="closeAllToolbarMenus()">&times;</button>
                             </div>
 
-                            <!-- Phím tắt thời gian nhanh -->
                             <div>
-                                <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">PHÍM TẮT MỐC THỜI GIAN:</div>
+                                <div style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Thời gian</div>
                                 <div class="time-presets-bar">
-                                    <span class="preset-chip" onclick="applyTimePreset('1h', this)">1 giờ qua</span>
+                                    <span class="preset-chip" onclick="applyTimePreset('1h', this)">1 giờ</span>
                                     <span class="preset-chip" onclick="applyTimePreset('today', this)">Hôm nay</span>
                                     <span class="preset-chip" onclick="applyTimePreset('yesterday', this)">Hôm qua</span>
-                                    <span class="preset-chip" onclick="applyTimePreset('3days', this)">3 ngày qua</span>
+                                    <span class="preset-chip" onclick="applyTimePreset('3days', this)">3 ngày</span>
                                     <span class="preset-chip" onclick="applyTimePreset('this_week', this)">Tuần này</span>
                                     <span class="preset-chip" onclick="applyTimePreset('all', this)">Tất cả</span>
                                 </div>
                             </div>
 
-                            <!-- Lịch chọn Từ ngày/giờ -> Đến ngày/giờ -->
                             <div class="filter-row">
-                                <span class="filter-label">Từ ngày:</span>
+                                <span class="filter-label">Từ:</span>
                                 <div class="filter-input-wrap">
                                     <svg class="datetime-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                                    <input type="text" id="filter-from" class="datetime-picker-input" placeholder="Chọn ngày &amp; giờ bắt đầu...">
+                                    <input type="text" id="filter-from" class="datetime-picker-input" placeholder="Từ ngày giờ">
                                 </div>
                             </div>
                             <div class="filter-row">
-                                <span class="filter-label">Đến ngày:</span>
+                                <span class="filter-label">Đến:</span>
                                 <div class="filter-input-wrap">
                                     <svg class="datetime-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                                    <input type="text" id="filter-to" class="datetime-picker-input" placeholder="Chọn ngày &amp; giờ kết thúc...">
+                                    <input type="text" id="filter-to" class="datetime-picker-input" placeholder="Đến ngày giờ">
                                 </div>
                             </div>
 
-                            <!-- Nhãn cảnh báo (Event Tag Chips) -->
                             <div>
-                                <div style="font-size: 0.725rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">LỌC THEO NHÃN SỰ KIỆN:</div>
+                                <div style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Sự kiện</div>
                                 <div class="event-tags-wrap" id="event-tags-filter-wrap">
-                                    <span class="event-tag-chip danger" data-code="Fight" onclick="toggleEventTagChip(this)">🥊 Ẩu đả (Fight)</span>
-                                    <span class="event-tag-chip danger" data-code="Intrusion" onclick="toggleEventTagChip(this)">🚷 Đột nhập (Intrusion)</span>
-                                    <span class="event-tag-chip danger" data-code="CrossLine" onclick="toggleEventTagChip(this)">🚧 Vượt rào (CrossLine)</span>
-                                    <span class="event-tag-chip" data-code="AudioMutation" onclick="toggleEventTagChip(this)">🔊 La hét (Audio)</span>
-                                    <span class="event-tag-chip" data-code="HumanTrait" onclick="toggleEventTagChip(this)">👤 Có người (Human)</span>
-                                    <span class="event-tag-chip" data-code="VideoMotion" onclick="toggleEventTagChip(this)">🏃 Chuyển động (Motion)</span>
+                                    <span class="event-tag-chip danger" data-code="Fight" onclick="toggleEventTagChip(this)">Ẩu đả</span>
+                                    <span class="event-tag-chip danger" data-code="Intrusion" onclick="toggleEventTagChip(this)">Đột nhập</span>
+                                    <span class="event-tag-chip danger" data-code="CrossLine" onclick="toggleEventTagChip(this)">Vượt rào</span>
+                                    <span class="event-tag-chip" data-code="AudioMutation" onclick="toggleEventTagChip(this)">Âm thanh</span>
+                                    <span class="event-tag-chip" data-code="HumanTrait" onclick="toggleEventTagChip(this)">Có người</span>
+                                    <span class="event-tag-chip" data-code="VideoMotion" onclick="toggleEventTagChip(this)">Chuyển động</span>
                                 </div>
                             </div>
 
-                            <!-- Bộ chọn Camera (Dropdown + Lưới 32 Cam nhanh) -->
                             <div>
                                 <div class="cam-selector-actions">
-                                    <span style="font-size: 0.725rem; font-weight: 600; color: var(--text-muted);">CHỌN CAMERA GIÁM SÁT:</span>
-                                    <div style="display: flex; gap: 8px;">
-                                        <button type="button" class="cam-quick-link" onclick="selectAllCamGrid(true)">Tất cả (32)</button>
+                                    <span style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted);">Camera</span>
+                                    <div style="display: flex; gap: 10px;">
+                                        <button type="button" class="cam-quick-link" onclick="selectAllCamGrid(true)">Tất cả</button>
                                         <button type="button" class="cam-quick-link" onclick="selectAllCamGrid(false)" style="color: var(--text-muted);">Bỏ chọn</button>
-                                        <button type="button" class="cam-quick-link" onclick="toggleCamGridMode()" id="toggle-cam-grid-btn">Xem Lưới</button>
+                                        <button type="button" class="cam-quick-link" onclick="toggleCamGridMode()" id="toggle-cam-grid-btn">Lưới</button>
                                     </div>
                                 </div>
 
-                                <!-- Dropdown truyền thống -->
                                 <div class="filter-input-wrap" id="cam-dropdown-wrap">
                                     <select id="filter-video-sources" onchange="syncDropdownToCamGrid(this.value)">
-                                        <option value="" selected>Tất cả Camera Được Phép</option>
+                                        <option value="" selected>Tất cả camera</option>
                                     </select>
                                 </div>
 
-                                <!-- Lưới nút 32 Camera (ẩn/hiện linh hoạt) -->
-                                <div class="cam-grid-container" id="cam-grid-container" style="display: none;">
-                                    <!-- Rendered dynamically by render32CameraGrid() -->
-                                </div>
+                                <div class="cam-grid-container" id="cam-grid-container" style="display: none;"></div>
                             </div>
 
-                            <!-- Min Similarity & Top K -->
                             <div class="filter-row">
-                                <span class="filter-label">Độ tương đồng:</span>
+                                <span class="filter-label">Tương đồng:</span>
                                 <div class="filter-input-wrap">
                                     <input type="number" id="filter-min-sim" value="0.00" step="0.05" min="0" max="1" style="height: 28px;">
                                 </div>
-                                <span class="filter-label" style="width: 60px;">Top K:</span>
+                                <span class="filter-label" style="width: 55px;">Top K:</span>
                                 <div class="filter-input-wrap">
                                     <input type="number" id="filter-topk" value="12" min="1" max="100" style="height: 28px;">
                                 </div>
@@ -6059,8 +6041,8 @@
 
                             <div class="filter-popover-divider"></div>
                             <div class="filter-popover-actions">
-                                <button class="popover-btn-cancel" onclick="resetAllPlaybackFilters()">Đặt Lại</button>
-                                <button class="popover-btn-apply" onclick="applyFilters()">Áp Dụng Lọc</button>
+                                <button class="popover-btn-cancel" onclick="resetAllPlaybackFilters()">Đặt lại</button>
+                                <button class="popover-btn-apply" onclick="applyFilters()">Áp dụng</button>
                             </div>
                         </div>
                     </div>
@@ -8762,13 +8744,10 @@ user=None`;
             if (!menu || !btn) return;
             menu.classList.remove('align-left');
             const btnRect = btn.getBoundingClientRect();
-            const container = document.getElementById('vss-search-column') || document.getElementById('search-toolbar') || document.body;
-            const containerRect = container.getBoundingClientRect();
-            
-            // If the space from container left to button right is less than 345px,
-            // right: 0 would push the 340px popover off the left edge. Align to left instead.
-            const spaceToLeft = btnRect.right - containerRect.left;
-            if (spaceToLeft < 345) {
+            const menuWidth = menu.offsetWidth || 360;
+            const spaceToLeft = btnRect.right - 12;
+            const spaceToRight = window.innerWidth - btnRect.left - 12;
+            if (spaceToLeft < menuWidth && spaceToRight >= menuWidth) {
                 menu.classList.add('align-left');
             }
         }
@@ -9036,12 +9015,12 @@ user=None`;
             if (isCamGridVisible) {
                 gridEl.style.display = 'grid';
                 dropEl.style.display = 'none';
-                if (toggleBtn) toggleBtn.innerText = 'Xem Menu';
+                if (toggleBtn) toggleBtn.innerText = 'Danh sách';
                 render32CameraGrid();
             } else {
                 gridEl.style.display = 'none';
                 dropEl.style.display = 'block';
-                if (toggleBtn) toggleBtn.innerText = 'Xem Lưới';
+                if (toggleBtn) toggleBtn.innerText = 'Lưới';
             }
         }
 
@@ -9054,7 +9033,7 @@ user=None`;
             let html = '';
             allowedList.forEach(i => {
                 const isActive = selectedPlaybackChannels.has(i);
-                html += `<div class="cam-grid-chip ${isActive ? 'active' : ''}" onclick="toggleCamGridChip(${i}, this)" title="Camera Kênh ${i}">C${i < 10 ? '0' + i : i}</div>`;
+                html += `<div class="cam-grid-chip ${isActive ? 'active' : ''}" onclick="toggleCamGridChip(${i}, this)" title="Kênh ${i}">C${i < 10 ? '0' + i : i}</div>`;
             });
             gridEl.innerHTML = html;
         }
@@ -9091,9 +9070,6 @@ user=None`;
                 const ch = parseInt(val, 10);
                 if (!isNaN(ch)) {
                     selectedPlaybackChannels.add(ch);
-                    if (typeof setNotificationCameraChannel === 'function') {
-                        setNotificationCameraChannel(ch);
-                    }
                 }
             }
             render32CameraGrid();
@@ -9105,9 +9081,6 @@ user=None`;
             if (selectedPlaybackChannels.size === 1) {
                 const singleCh = Array.from(selectedPlaybackChannels)[0];
                 selectEl.value = String(singleCh);
-                if (typeof setNotificationCameraChannel === 'function') {
-                    setNotificationCameraChannel(singleCh);
-                }
             } else {
                 selectEl.value = '';
             }
@@ -9396,21 +9369,17 @@ user=None`;
             const totalUnread = (Array.isArray(recentNotificationsList) ? recentNotificationsList : []).filter(
                 ev => isChannelPermittedForCurrentUser(ev.channel) && isEventWithin24Hours(ev) && !readNotifIds.has(String(ev.id))
             ).length;
-            const camCount = Array.isArray(window.userAllowedCamerasList) ? window.userAllowedCamerasList.length : 0;
-            const camLabel = camCount > 0 ? `${camCount} Cam quản lý` : 'Thông báo 24h';
             pill.innerHTML = totalUnread > 0
-                ? `<span>🔔 ${camLabel} (${totalUnread})</span>`
-                : `<span>🔔 ${camLabel}</span>`;
+                ? `<span>Thông báo (${totalUnread})</span>`
+                : `<span>Thông báo</span>`;
         }
 
         window.onActiveCameraChannelChanged = function(newChannel) {
-            // Giữ nguyên chế độ nhận thông báo gộp chung tất cả các camera mà tài khoản quản lý
             updateCameraViewNotifPill();
         };
 
         function openNotificationForCamera(channel, e) {
             if (e) e.stopPropagation();
-            // Mở bảng thông báo chung của tất cả các camera được phân quyền
             setNotificationCameraChannel('all');
             const popover = document.getElementById('notif-popover');
             if (popover) {
@@ -9431,14 +9400,12 @@ user=None`;
                 }
             }
 
-            // Sync dropdown & pills inside notification popover
             const selectEl = document.getElementById('notif-camera-select');
             if (selectEl && String(selectEl.value) !== String(selectedNotifCameraChannel)) {
                 selectEl.value = String(selectedNotifCameraChannel);
             }
             renderNotificationCameraSelectorUI();
 
-            // Subscribe WebSocket to 'all' permitted channels (backend enforces RBAC)
             if (notifWs && notifWs.readyState === WebSocket.OPEN) {
                 try {
                     notifWs.send(JSON.stringify({ action: 'subscribe_channel', channel: 'all' }));
@@ -9463,32 +9430,25 @@ user=None`;
             const isAll = (selectedNotifCameraChannel === 'all');
             const camNumsStr = cams.length <= 6
                 ? cams.map(c => c.channel < 10 ? '0' + c.channel : c.channel).join(', ')
-                : `${cams.length} camera`;
+                : `${cams.length} kênh`;
 
             if (titleText) {
                 if (isAll) {
-                    titleText.innerText = `Thông Báo Camera Quản Lý (24h)`;
+                    titleText.innerText = `Thông báo (24h)`;
                 } else {
                     const chStr = selectedNotifCameraChannel < 10 ? '0' + selectedNotifCameraChannel : String(selectedNotifCameraChannel);
-                    titleText.innerText = `Thông Báo Kênh ${chStr} (24h)`;
+                    titleText.innerText = `Kênh ${chStr} (24h)`;
                 }
             }
             if (footerLabel) {
-                if (isAll) {
-                    footerLabel.innerText = cams.length > 0
-                        ? `🔒 Nhận chung thông báo 24h của các Kênh: ${camNumsStr}`
-                        : `🔒 Nhận chung thông báo 24h của các Camera bạn quản lý`;
-                } else {
-                    const chStr = selectedNotifCameraChannel < 10 ? '0' + selectedNotifCameraChannel : String(selectedNotifCameraChannel);
-                    footerLabel.innerText = `🔒 Đang lọc Kênh ${chStr} trong nhóm Camera bạn quản lý (24h)`;
-                }
+                footerLabel.innerText = isAll
+                    ? `Kênh quản lý: ${camNumsStr || cams.length}`
+                    : `Đang lọc: Kênh ${selectedNotifCameraChannel < 10 ? '0' + selectedNotifCameraChannel : selectedNotifCameraChannel}`;
             }
             if (rbacBadge) {
-                if (window.isCurrentUserAdmin) {
-                    rbacBadge.innerHTML = `🔒 Quản trị viên (Tất cả ${cams.length} camera &bull; 24h)`;
-                } else {
-                    rbacBadge.innerHTML = `🔒 Camera bạn quản lý: ${camNumsStr || cams.length} (24h)`;
-                }
+                rbacBadge.innerText = window.isCurrentUserAdmin
+                    ? `Quản trị (${cams.length} kênh)`
+                    : `Quản lý: ${camNumsStr || cams.length}`;
             }
 
             const totalUnreadAll = (Array.isArray(recentNotificationsList) ? recentNotificationsList : []).filter(
@@ -9496,11 +9456,11 @@ user=None`;
             ).length;
 
             if (selectEl) {
-                const allOption = `<option value="all" ${isAll ? 'selected' : ''}>📹 Tất cả Camera quản lý (${cams.length})${totalUnreadAll > 0 ? ` - ${totalUnreadAll} mới` : ''}</option>`;
+                const allOption = `<option value="all" ${isAll ? 'selected' : ''}>Tất cả (${cams.length} kênh)${totalUnreadAll > 0 ? ` [${totalUnreadAll}]` : ''}</option>`;
                 const camOptions = cams.map(c => {
                     const cnt = notifCountsByChannel[c.channel] || 0;
-                    const suffix = cnt > 0 ? ` (${cnt} cảnh báo)` : '';
-                    return `<option value="${c.channel}" ${!isAll && Number(c.channel) === Number(selectedNotifCameraChannel) ? 'selected' : ''}>📹 ${c.name}${suffix}</option>`;
+                    const suffix = cnt > 0 ? ` [${cnt}]` : '';
+                    return `<option value="${c.channel}" ${!isAll && Number(c.channel) === Number(selectedNotifCameraChannel) ? 'selected' : ''}>${c.name}${suffix}</option>`;
                 }).join('');
                 selectEl.innerHTML = allOption + camOptions;
             }
@@ -9508,7 +9468,7 @@ user=None`;
             if (pillsEl) {
                 const allPill = `
                     <button type="button" onclick="event.stopPropagation(); setNotificationCameraChannel('all')" style="flex-shrink: 0; padding: 2px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 600; cursor: pointer; border: 1px solid ${isAll ? '#76b900' : 'rgba(255,255,255,0.14)'}; background: ${isAll ? 'rgba(118,185,0,0.22)' : 'rgba(255,255,255,0.04)'}; color: ${isAll ? '#9be62b' : '#a1a1aa'};">
-                        Tất cả (${cams.length})${totalUnreadAll > 0 ? ` <span style="color:#f87171;">(${totalUnreadAll})</span>` : ''}
+                        Tất cả${totalUnreadAll > 0 ? ` (${totalUnreadAll})` : ''}
                     </button>
                 `;
                 const camPills = cams.slice(0, 12).map(c => {
@@ -9517,7 +9477,7 @@ user=None`;
                     const cStr = c.channel < 10 ? '0' + c.channel : c.channel;
                     return `
                         <button type="button" onclick="event.stopPropagation(); setNotificationCameraChannel(${c.channel})" style="flex-shrink: 0; padding: 2px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 600; cursor: pointer; border: 1px solid ${isAct ? '#76b900' : 'rgba(255,255,255,0.14)'}; background: ${isAct ? 'rgba(118,185,0,0.22)' : 'rgba(255,255,255,0.04)'}; color: ${isAct ? '#9be62b' : '#a1a1aa'};">
-                            Kênh ${cStr}${cnt > 0 ? ` <span style="color:#f87171;">(${cnt})</span>` : ''}
+                            C${cStr}${cnt > 0 ? ` (${cnt})` : ''}
                         </button>
                     `;
                 }).join('');
@@ -9567,14 +9527,12 @@ user=None`;
                         if (!ev || !ev.id) return;
 
                         const evCh = Number(ev.channel || 0);
-                        // 1. Kiểm tra chặt chẽ quyền quản lý Camera của tài khoản đang đăng nhập
                         if (!isChannelPermittedForCurrentUser(evCh)) return;
 
                         if (!ev.clip_url && ev.clip_filename) {
                             ev.clip_url = `/clips/${String(ev.clip_filename).replace(/\\/g, '/')}`;
                         }
 
-                        // 2. Đưa ngay vào danh sách thông báo gộp chung của tất cả Camera mà người này quản lý
                         const exists = recentNotificationsList.some(x => Number(x.id) === Number(ev.id));
                         if (!exists) {
                             recentNotificationsList = [ev, ...recentNotificationsList]
@@ -9624,7 +9582,6 @@ user=None`;
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5500);
             try {
-                // Lấy toàn bộ cảnh báo phát sinh trong vòng 24 giờ qua của tất cả các camera mà tài khoản quản lý
                 const res = await fetch(`/api/events?only_anomalies=true&hours=24&limit=50`, {
                     signal: controller.signal,
                     cache: 'no-store'
@@ -9646,18 +9603,17 @@ user=None`;
                 renderNotificationsList(recentNotificationsList);
             } catch (err) {
                 clearTimeout(timeoutId);
-                console.warn('[Notification] fetch warning (using 24h unified cache):', err);
                 renderNotificationsList(recentNotificationsList);
             }
         }
 
         function getFriendlyNotifLabel(ev) {
             const code = ev.event_code || ev.event_type || 'Alarm';
-            if (code === 'Intrusion') return '⚠️ Đột nhập vùng cấm';
-            if (code === 'Fight') return '🚨 Đánh nhau / Xô xát';
-            if (code === 'CrossLine') return '⚠️ Vượt hàng rào ảo';
-            if (code === 'AudioMutation' || code === 'SoundDetection' || code === 'AudioAnomaly') return '🔊 Âm thanh bất thường';
-            if (code === 'VideoMotion') return '🏃 Chuyển động bất thường';
+            if (code === 'Intrusion') return 'Đột nhập';
+            if (code === 'Fight') return 'Ẩu đả';
+            if (code === 'CrossLine') return 'Vượt rào';
+            if (code === 'AudioMutation' || code === 'SoundDetection' || code === 'AudioAnomaly') return 'Âm thanh';
+            if (code === 'VideoMotion') return 'Chuyển động';
             return code;
         }
 
@@ -9670,16 +9626,12 @@ user=None`;
             const isAll = (selectedNotifCameraChannel === 'all');
             const targetCh = isAll ? null : Number(selectedNotifCameraChannel);
 
-            // Tất cả sự kiện hợp lệ trong 24h thuộc các camera mà người dùng quản lý
             const allPermittedEvents = (Array.isArray(events) ? events : []).filter(
                 ev => isChannelPermittedForCurrentUser(ev.channel) && isEventWithin24Hours(ev)
             );
             recomputeNotifCountsByChannel(allPermittedEvents);
 
-            // Tổng số thông báo chưa đọc của TẤT CẢ các camera mà tài khoản quản lý (luôn hiển thị trên quả chuông)
             const totalUnreadAll = allPermittedEvents.filter(ev => !readNotifIds.has(String(ev.id))).length;
-
-            // Danh sách hiển thị trong popover (mặc định là Tất cả Camera quản lý, hoặc lọc theo 1 kênh nếu người dùng bấm chọn pill)
             const displayedEvents = isAll
                 ? allPermittedEvents
                 : allPermittedEvents.filter(ev => Number(ev.channel) === targetCh);
@@ -9699,17 +9651,9 @@ user=None`;
             updateCameraViewNotifPill();
 
             if (displayedEvents.length === 0) {
-                const emptyTitle = isAll
-                    ? 'Các Camera bạn quản lý đều an toàn!'
-                    : `Camera Kênh ${targetCh < 10 ? '0' + targetCh : targetCh} an toàn!`;
-                const emptySub = isAll
-                    ? 'Không có cảnh báo bất thường nào trong vòng 24 giờ qua trên các camera được phân quyền.'
-                    : `Không có cảnh báo bất thường nào trong vòng 24 giờ qua trên Camera Kênh ${targetCh < 10 ? '0' + targetCh : targetCh}.`;
                 body.innerHTML = `
                     <div class="notif-empty-state">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#76b900" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                        <span style="color: #76b900; font-weight: 600;">${emptyTitle}</span>
-                        <span style="font-size: 0.72rem;">${emptySub}</span>
+                        <span style="color: #76b900; font-weight: 600;">Không có cảnh báo (24h)</span>
                     </div>
                 `;
                 return;
@@ -9724,8 +9668,8 @@ user=None`;
                 const label = getFriendlyNotifLabel(ev);
 
                 const ch = ev.channel || 1;
-                const camName = (window.NCC_CAMERAS && NCC_CAMERAS.find(c => c.id === ch)?.name) || `Camera Kênh ${ch}`;
-                const descSafe = (ev.description || 'Phát hiện sự kiện an ninh từ đầu ghi NVR').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const camName = (window.NCC_CAMERAS && NCC_CAMERAS.find(c => c.id === ch)?.name) || `Kênh ${ch}`;
+                const descSafe = (ev.description || 'Sự kiện an ninh').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
                 return `
                     <div class="notif-item" style="${isRead ? 'opacity: 0.72;' : 'background: rgba(118, 185, 0, 0.06); border-left: 3px solid #76b900;'}" onclick="handleNotifItemClick(${ev.id}, true)">
@@ -9735,10 +9679,10 @@ user=None`;
                         </div>
                         <div class="notif-item-desc">${descSafe}</div>
                         <div class="notif-item-meta" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px;">
-                            <span class="notif-item-cam">📹 Kênh ${ch < 10 ? '0' + ch : ch} &bull; ${camName}</span>
+                            <span class="notif-item-cam">Kênh ${ch < 10 ? '0' + ch : ch} - ${camName}</span>
                             <div style="display: inline-flex; align-items: center; gap: 5px;">
-                                <button type="button" class="notif-item-clip-btn" onclick="event.stopPropagation(); handleNotifItemClick(${ev.id}, false)" title="Xem đoạn video của Camera Kênh ${ch}">▶ Xem Clip</button>
-                                <button type="button" class="notif-item-clip-btn" style="background: rgba(118, 185, 0, 0.2); border-color: rgba(118, 185, 0, 0.55); color: #9be62b;" onclick="event.stopPropagation(); handleNotifItemClick(${ev.id}, true)" title="Xem video &amp; gửi AI phân tích nhanh trong 3 giây">⚡ AI 3s</button>
+                                <button type="button" class="notif-item-clip-btn" onclick="event.stopPropagation(); handleNotifItemClick(${ev.id}, false)">Xem clip</button>
+                                <button type="button" class="notif-item-clip-btn" style="background: rgba(118, 185, 0, 0.2); border-color: rgba(118, 185, 0, 0.55); color: #9be62b;" onclick="event.stopPropagation(); handleNotifItemClick(${ev.id}, true)">AI</button>
                             </div>
                         </div>
                     </div>
@@ -10060,26 +10004,21 @@ user=None`;
                     adminLink.style.display = 'flex';
                 }
 
-                // Cập nhật Dropdown chọn Camera trong Filter Search
                 const selectEl = document.getElementById('filter-video-sources');
                 if (selectEl && Array.isArray(data.cameras)) {
-                    let optionsHtml = `<option value="" selected>Tất cả Camera Được Phép (${data.cameras.length} kênh)</option>`;
+                    let optionsHtml = `<option value="" selected>Tất cả (${data.cameras.length} kênh)</option>`;
                     data.cameras.forEach(cam => {
                         optionsHtml += `<option value="${cam.channel}">${cam.name}</option>`;
                     });
                     selectEl.innerHTML = optionsHtml;
                 }
 
-                // Đồng bộ phân quyền với Hệ thống Thông báo Tách riêng theo từng Camera
                 if (window.userAllowedChannels.length > 0) {
-                    const activeCh = Number(window.currentActiveChannel || selectedNotifCameraChannel);
-                    if (window.userAllowedChannels.includes(activeCh)) {
-                        selectedNotifCameraChannel = activeCh;
-                    } else {
-                        selectedNotifCameraChannel = window.userAllowedChannels[0];
-                        window.currentActiveChannel = selectedNotifCameraChannel;
+                    const activeCh = Number(window.currentActiveChannel);
+                    if (!window.userAllowedChannels.includes(activeCh)) {
+                        window.currentActiveChannel = window.userAllowedChannels[0];
                     }
-                    setNotificationCameraChannel(selectedNotifCameraChannel);
+                    setNotificationCameraChannel('all');
                 }
 
                 // Cập nhật lưới chọn Camera 32 kênh theo đúng quyền
