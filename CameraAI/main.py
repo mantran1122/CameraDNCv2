@@ -30,6 +30,7 @@ import database
 import summary_engine
 import video_clipper
 import data_health
+import synology_storage
 from temporal_parser import parse_query_temporal
 from ai_search_planner import plan_search_intent
 from clip_storage import mirror_clip, resolve_clip_path, storage_timestamp
@@ -968,17 +969,18 @@ def _find_local_fallback_clip(channel: int = 1, event: Optional[Dict[str, Any]] 
     return None
 
 
-def _resolve_playable_clip_for_event(conn, event: Dict[str, Any]) -> Optional[str]:
+def _resolve_playable_clip_for_event(conn, event: Dict[str, Any], allow_generate: bool = True) -> Optional[str]:
     """Ensure every event/notification has a playable MP4 clip strictly belonging to its own camera channel."""
     ch = int(event.get("channel") or 1)
     raw_clip = (event.get("clip_filename") or "").strip().replace("\\", "/")
     if raw_clip:
         raw_ch = get_clip_channel(raw_clip)
         if raw_ch is None or raw_ch == ch:
+            if not allow_generate:
+                return raw_clip
             try:
                 if resolve_clip_path(raw_clip, fetch_remote=False).is_file():
                     return raw_clip
-                # If offloaded to Synology NAS under this camera's folder, keep its exact reference
                 if synology_storage.enabled() and f"cam-{ch:03d}" in raw_clip:
                     return raw_clip
             except Exception:
@@ -987,7 +989,7 @@ def _resolve_playable_clip_for_event(conn, event: Dict[str, Any]) -> Optional[st
     ts = event.get("timestamp") or ""
     cursor = conn.cursor()
 
-    # 1. Nearest clip on the EXACT SAME camera channel that exists on local disk
+    # 1. Nearest clip on the EXACT SAME camera channel
     try:
         cursor.execute(
             """
@@ -1003,10 +1005,14 @@ def _resolve_playable_clip_for_event(conn, event: Dict[str, Any]) -> Optional[st
         for row in cursor.fetchall():
             cand = (row[0] or "").strip().replace("\\", "/")
             cand_ch = get_clip_channel(cand)
-            if cand and (cand_ch is None or cand_ch == ch) and resolve_clip_path(cand, fetch_remote=False).is_file():
-                return cand
+            if cand and (cand_ch is None or cand_ch == ch):
+                if not allow_generate or synology_storage.enabled() or resolve_clip_path(cand, fetch_remote=False).is_file():
+                    return cand
     except Exception:
         pass
+
+    if not allow_generate:
+        return raw_clip or None
 
     # 2. Dedicated local clip for this specific camera channel (generates one for channel `ch` if needed)
     local_fb = _find_local_fallback_clip(ch, event=event)
@@ -1064,7 +1070,7 @@ def _fetch_enriched_events_sync(
             event["start_time"] = ts
             event["end_time"] = ts
 
-            resolved_clip = _resolve_playable_clip_for_event(conn, event)
+            resolved_clip = _resolve_playable_clip_for_event(conn, event, allow_generate=False)
             if resolved_clip:
                 event["clip_filename"] = resolved_clip
                 event["clip_url"] = f"/clips/{resolved_clip}"

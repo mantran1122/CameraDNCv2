@@ -9339,7 +9339,7 @@ user=None`;
                         isChannelPermittedForCurrentUser(ev.channel) &&
                         isEventWithin24Hours(ev) &&
                         (scope === 'all' || Number(ev.channel) === Number(scope))
-                    ).slice(0, 50);
+                    ).slice(0, 150);
                     localStorage.setItem(getNotifCacheKey(scope), JSON.stringify(filtered));
                 }
             } catch (e) {}
@@ -9371,7 +9371,7 @@ user=None`;
                 ev => isChannelPermittedForCurrentUser(ev.channel) && isEventWithin24Hours(ev) && !readNotifIds.has(String(ev.id))
             ).length;
             pill.innerHTML = totalUnread > 0
-                ? `<span>Thông báo (${totalUnread})</span>`
+                ? `<span>Thông báo (${totalUnread > 99 ? '99+' : totalUnread})</span>`
                 : `<span>Thông báo</span>`;
         }
 
@@ -9538,7 +9538,7 @@ user=None`;
                         if (!exists) {
                             recentNotificationsList = [ev, ...recentNotificationsList]
                                 .filter(x => isChannelPermittedForCurrentUser(x.channel) && isEventWithin24Hours(x))
-                                .slice(0, 50);
+                                .slice(0, 150);
                             saveNotificationsCacheForChannel('all', recentNotificationsList);
                             recomputeNotifCountsByChannel(recentNotificationsList);
                             renderNotificationCameraSelectorUI();
@@ -9581,9 +9581,9 @@ user=None`;
             }
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5500);
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
             try {
-                const res = await fetch(`/api/events?only_anomalies=true&hours=24&limit=50`, {
+                const res = await fetch(`/api/events?hours=24&limit=150`, {
                     signal: controller.signal,
                     cache: 'no-store'
                 });
@@ -9593,13 +9593,26 @@ user=None`;
                     return;
                 }
                 const data = await res.json();
-                const events = (Array.isArray(data.events) ? data.events : []).filter(
+                const fetched = (Array.isArray(data.events) ? data.events : []).filter(
                     ev => isChannelPermittedForCurrentUser(ev.channel) && isEventWithin24Hours(ev)
                 );
 
-                recentNotificationsList = events;
-                saveNotificationsCacheForChannel('all', events);
-                recomputeNotifCountsByChannel(events);
+                // Merge with existing realtime notifications so WebSocket arrivals are never lost
+                const mergedMap = new Map();
+                [...fetched, ...recentNotificationsList].forEach(ev => {
+                    if (ev && ev.id && isChannelPermittedForCurrentUser(ev.channel) && isEventWithin24Hours(ev)) {
+                        if (!mergedMap.has(Number(ev.id))) {
+                            mergedMap.set(Number(ev.id), ev);
+                        }
+                    }
+                });
+                const merged = Array.from(mergedMap.values())
+                    .sort((a, b) => Number(b.id) - Number(a.id))
+                    .slice(0, 150);
+
+                recentNotificationsList = merged;
+                saveNotificationsCacheForChannel('all', merged);
+                recomputeNotifCountsByChannel(merged);
                 renderNotificationCameraSelectorUI();
                 renderNotificationsList(recentNotificationsList);
             } catch (err) {
@@ -9615,6 +9628,9 @@ user=None`;
             if (code === 'CrossLine') return 'Vượt rào';
             if (code === 'AudioMutation' || code === 'SoundDetection' || code === 'AudioAnomaly') return 'Âm thanh';
             if (code === 'VideoMotion') return 'Chuyển động';
+            if (code === 'HumanTrait' || code === 'SmartMotionHuman') return 'Có người';
+            if (code === 'FaceDetection') return 'Khuôn mặt';
+            if (code === 'VehicleTrait') return 'Phương tiện';
             return code;
         }
 
