@@ -195,7 +195,7 @@ def call_qwen_chat(
         load_dotenv(config.BASE_DIR / ".env", override=True)
     except Exception:
         pass
-    active_key = os.getenv("QWEN_API_KEY", config.QWEN_API_KEY).strip()
+    active_key = (os.getenv("QWEN_API_KEY") or "").strip() or config.QWEN_API_KEY
     active_server = (os.getenv("QWEN_SERVER_URL") or config.QWEN_SERVER_URL).rstrip("/")
 
     url = f"{active_server}/chat/completions"
