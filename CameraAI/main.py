@@ -171,22 +171,24 @@ _gemini_quota_exceeded_until: float = 0.0
 @app.get("/clips/{clip_reference:path}")
 @app.get("/api/clips/{clip_reference:path}")
 async def serve_clip(clip_reference: str, request: Request, download: Optional[int] = 0):
-    """Serve a cached clip with Channel-Level RBAC and automatic local fallback so video playback never 404s."""
+    """Serve a cached or NAS-stored clip with strict Channel-Level RBAC and per-camera fallback."""
     allowed = get_current_user_allowed_channels(request)
+    clip_ch = get_clip_channel(clip_reference)
     if allowed is not None:
-        clip_ch = get_clip_channel(clip_reference)
         if clip_ch is not None and clip_ch not in allowed:
             raise HTTPException(status_code=403, detail="Bạn không có quyền xem video clip từ camera này.")
 
     try:
         clip_path = resolve_clip_path(clip_reference, fetch_remote=False)
+        if not clip_path.is_file() and synology_storage.enabled():
+            # Fetch this exact camera's clip on-demand from Synology NAS if offloaded
+            clip_path = await asyncio.to_thread(resolve_clip_path, clip_reference, True)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid clip reference")
 
     if not clip_path.is_file():
-        # Try finding any local MP4 for the same channel or fallback local MP4
-        clip_ch = get_clip_channel(clip_reference) or 1
-        fallback_rel = await asyncio.to_thread(_find_local_fallback_clip, clip_ch)
+        # Strictly fallback only to a clip of the exact same camera channel
+        fallback_rel = await asyncio.to_thread(_find_local_fallback_clip, clip_ch or 1)
         if fallback_rel:
             clip_path = resolve_clip_path(fallback_rel, fetch_remote=False)
 
@@ -976,7 +978,7 @@ def _find_local_fallback_clip(channel: int = 1, event: Optional[Dict[str, Any]] 
 
 
 def _resolve_playable_clip_for_event(conn, event: Dict[str, Any]) -> Optional[str]:
-    """Ensure every event/notification has a playable local MP4 clip strictly belonging to its own camera channel."""
+    """Ensure every event/notification has a playable MP4 clip strictly belonging to its own camera channel."""
     ch = int(event.get("channel") or 1)
     raw_clip = (event.get("clip_filename") or "").strip().replace("\\", "/")
     if raw_clip:
@@ -984,6 +986,9 @@ def _resolve_playable_clip_for_event(conn, event: Dict[str, Any]) -> Optional[st
         if raw_ch is None or raw_ch == ch:
             try:
                 if resolve_clip_path(raw_clip, fetch_remote=False).is_file():
+                    return raw_clip
+                # If offloaded to Synology NAS under this camera's folder, keep its exact reference
+                if synology_storage.enabled() and f"cam-{ch:03d}" in raw_clip:
                     return raw_clip
             except Exception:
                 pass
@@ -1016,7 +1021,7 @@ def _resolve_playable_clip_for_event(conn, event: Dict[str, Any]) -> Optional[st
     local_fb = _find_local_fallback_clip(ch, event=event)
     if local_fb:
         try:
-            if event.get("id"):
+            if event.get("id") and not (raw_clip and f"cam-{ch:03d}" in raw_clip):
                 cursor.execute("UPDATE events SET clip_filename = ? WHERE id = ?", (local_fb, event["id"]))
                 conn.commit()
         except Exception:
