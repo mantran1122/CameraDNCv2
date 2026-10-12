@@ -88,13 +88,35 @@ def resolve_clip_path(reference: str, fetch_remote: bool = True) -> Path:
 
 
 def mirror_clip(reference: str) -> bool:
-    """Upload an existing local clip to the configured remote backend."""
+    """Upload an existing local clip to the configured remote backend and keep local cache bounded."""
     local_path = resolve_clip_path(reference, fetch_remote=False)
     if not local_path.is_file():
         return False
     try:
         from synology_storage import enabled, upload_clip
-        return upload_clip(reference, local_path) if enabled() else False
+        ok = upload_clip(reference, local_path) if enabled() else False
+        if ok:
+            # Keep only the 5 newest local MP4 clips per camera so the 30GB server disk never fills up
+            try:
+                normalized = reference.replace("\\", "/")
+                parts = PurePosixPath(normalized).parts
+                if len(parts) >= 2 and parts[0] == "cameras":
+                    cam_dir = Path(config.CLIPS_DIR).resolve() / "cameras" / parts[1]
+                    if cam_dir.is_dir():
+                        mp4s = sorted(
+                            (p for p in cam_dir.rglob("*.mp4") if p.is_file()),
+                            key=lambda p: p.stat().st_mtime,
+                            reverse=True,
+                        )
+                        for old_mp4 in mp4s[5:]:
+                            try:
+                                if old_mp4.resolve() != local_path.resolve():
+                                    old_mp4.unlink()
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+        return ok
     except Exception as exc:
         print(f"[Synology Storage] Upload failed for {reference}: {exc}")
         return False
