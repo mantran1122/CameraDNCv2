@@ -31,6 +31,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      # Mount source directory so git pull updates templates/static/code immediately without image rebuild
+      - ./CameraAI:/app
       # Mount host storage directory to persist SQLite DB, clips, and NVR config
       - ./CameraAI/storage:/app/storage
       # (Tuy chon) Mount o dia NAS truc tiep de luu tru video khong ton dung luong may chu:
