@@ -8590,14 +8590,7 @@ user=None`;
         function openVideoModalByIndex(idx) {
             const item = window.latestSearchResults?.[idx];
             if (!item) return;
-            if (window.cameraViewInstance && item.video_url) {
-                window.cameraViewInstance.setSource({
-                    type: 'video',
-                    url: item.video_url,
-                    label: `${item.title || ('Clip #' + item.event_id)} [Recorded]`
-                });
-            }
-            openVideoModal(item.title, item.video_url);
+            openVideoModal(item.title, item.video_url, item.event_id);
         }
 
         function renderVideoCards(items) {
