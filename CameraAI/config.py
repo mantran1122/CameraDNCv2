@@ -223,10 +223,10 @@ COSMOS_AUDIO_MODEL = os.getenv("COSMOS_AUDIO_MODEL", "whisper-large-v3-turbo")
 COSMOS_VIDEO_URL = os.getenv("COSMOS_VIDEO_URL", "http://127.0.0.1:8765/analyze")
 COSMOS_PROMPT_PROFILE = _current_cfg.get("cosmos_prompt_profile", "comprehensive")
 
-# Internal AI Server
-QWEN_SERVER_URL = os.getenv("QWEN_SERVER_URL", "").strip() or "https://llm.ttpmsandbox.us.kg/v1"
-QWEN_API_KEY = os.getenv("QWEN_API_KEY", "").strip() or "sk-trk_qWvCJmqSjV7MOibnWiAJL_zsHR-WjvIKLiCx8ypf5og"
-_env_qwen_model = os.getenv("QWEN_MODEL_NAME", "").strip()
+# Internal AI Server (API key must only be provided via git-ignored .env or storage/nvr_config.json)
+QWEN_SERVER_URL = os.getenv("QWEN_SERVER_URL", "").strip() or _current_cfg.get("qwen_server_url", "https://llm.ttpmsandbox.us.kg/v1")
+QWEN_API_KEY = os.getenv("QWEN_API_KEY", "").strip() or _current_cfg.get("qwen_api_key", "")
+_env_qwen_model = os.getenv("QWEN_MODEL_NAME", "").strip() or _current_cfg.get("qwen_model_name", "")
 QWEN_MODEL_NAME = "GLM-5.3-Flash" if (not _env_qwen_model or _env_qwen_model == "Qwen3.8-27B") else _env_qwen_model
 QWEN_USER_AGENT = os.getenv(
     "QWEN_USER_AGENT",
