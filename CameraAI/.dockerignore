@@ -9,6 +9,7 @@
 # Runtime databases, logs, and evidence clips
 storage/*
 !storage/.gitkeep
+!storage/users.example.json
 *.db
 *.db-*
 *.log
