@@ -180,13 +180,20 @@ function createEventCard(ev) {
         badgeLabel = `VIDEO: ${ev.event_code}`;
     }
 
+function formatVnDateTime(val) {
+    if (val === null || val === undefined) return '';
+    return String(val)
+        .replace(/T(\d{2}:\d{2}(?::\d{2})?)(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g, ' $1')
+        .replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, '$3/$2/$1');
+}
+
     const hasClip = Boolean(ev.clip_filename);
     const audioStatus = formatAudioStatus(ev.audio_analysis);
 
     card.innerHTML = `
         <div class="event-top">
             <span class="event-badge ${badgeClass}">${badgeLabel}</span>
-            <span class="event-time">${ev.timestamp}</span>
+            <span class="event-time">${formatVnDateTime(ev.timestamp)}</span>
         </div>
         <div class="event-desc">${ev.description}</div>
         <div class="event-bottom">
@@ -226,7 +233,7 @@ function selectEventForAgent(event, card) {
     const workerStatus = event.video_analysis?.status || event.audio_analysis?.status || 'Chưa phân tích';
     setText('agent-status', formatVideoAnalysisStatus(event.video_analysis) || formatAudioStatus(event.audio_analysis) || workerStatus);
     const clipState = event.clip_filename ? 'Có clip evidence.' : 'Chưa có clip evidence.';
-    setText('agent-context', `${event.description || 'Không có mô tả.'} Camera Ch ${String(event.channel || 0).padStart(2, '0')} · ${event.timestamp || 'Không rõ thời gian'}. ${clipState}`);
+    setText('agent-context', `${event.description || 'Không có mô tả.'} Camera Ch ${String(event.channel || 0).padStart(2, '0')} · ${formatVnDateTime(event.timestamp) || 'Không rõ thời gian'}. ${clipState}`);
 }
 
 function renderAbnormalBehaviorOptions(options, selectedCodes) {
@@ -605,7 +612,7 @@ async function openClipModal(eventId, clipFilename, description) {
         const ev = await res.json();
         
         document.getElementById('clip-detail-ch').innerText = `Ch ${String(ev.channel).padStart(2, '0')}`;
-        document.getElementById('clip-detail-time').innerText = ev.timestamp;
+        document.getElementById('clip-detail-time').innerText = formatVnDateTime(ev.timestamp);
         document.getElementById('clip-detail-type').innerText = `${ev.event_code} (${ev.event_type})`;
         document.getElementById('clip-detail-audio').innerText = ev.audio_level_db ? `${ev.audio_level_db} dB` : 'N/A';
         renderAudioAnalysis(ev.audio_analysis);
@@ -880,11 +887,11 @@ function renderVssActiveChips() {
     }
 
     if (vssStartDate) {
-        chips.push({ key: 'start', label: `Từ: ${vssStartDate.replace('T', ' ')}`, val: 'start' });
+        chips.push({ key: 'start', label: `Từ: ${formatVnDateTime(vssStartDate.replace('T', ' '))}`, val: 'start' });
     }
 
     if (vssEndDate) {
-        chips.push({ key: 'end', label: `Đến: ${vssEndDate.replace('T', ' ')}`, val: 'end' });
+        chips.push({ key: 'end', label: `Đến: ${formatVnDateTime(vssEndDate.replace('T', ' '))}`, val: 'end' });
     }
 
     if (vssMinSimilarity > 0.70) {
@@ -1175,7 +1182,7 @@ function addVssCardToChat(ev, btn) {
         notice.className = "vss-chat-bubble agent thinking";
         notice.style.fontSize = "0.76rem";
         notice.style.borderColor = "#76b900";
-        notice.innerHTML = `<strong>Đã gắn ngữ cảnh:</strong> ${ev.video_name} · [#${ev.id}] ${ev.description} (${ev.timestamp})`;
+        notice.innerHTML = `<strong>Đã gắn ngữ cảnh:</strong> ${ev.video_name} · [#${ev.id}] ${ev.description} (${formatVnDateTime(ev.timestamp)})`;
         chatContainer.appendChild(notice);
 
         const conv = document.getElementById("vss-agent-conversation");
@@ -1235,7 +1242,7 @@ function sendVssAgentSuggestion(text) {
 
 function formatVssAgentReply(text) {
     if (!text) return 'Đã ghi nhận thông tin.';
-    const escaped = text
+    const escaped = formatVnDateTime(text)
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");

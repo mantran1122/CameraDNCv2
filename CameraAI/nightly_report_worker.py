@@ -664,13 +664,15 @@ class NightlyReportWorker:
                     f"{s_human} lượt người, {s_vehicle} phương tiện."
                 ]
                 if s_anom:
+                    import re
                     notable_strs = []
                     for ae in s_anom[:3]:
                         lbl = EVENT_VI_LABELS.get(str(ae.get("event_code")), str(ae.get("event_code")))
                         ai_sum = (ae.get("video_analysis_summary") or ae.get("description") or "").strip()
                         if len(ai_sum) > 140:
                             ai_sum = ai_sum[:137] + "..."
-                        notable_strs.append(f"`{ae.get('timestamp')}` [#{ae.get('id')} - {lbl}]: {ai_sum}")
+                        ae_ts = re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", r"\3/\2/\1", str(ae.get("timestamp") or ""))
+                        notable_strs.append(f"`{ae_ts}` [#{ae.get('id')} - {lbl}]: {ai_sum}")
                     parts.append("Sự kiện đáng chú ý: " + "; ".join(notable_strs))
                 else:
                     # Check if any event has VLM analysis summary
@@ -707,6 +709,10 @@ class NightlyReportWorker:
             ),
         )[:12]
 
+        import re
+        def _vn_dt(val: Any) -> str:
+            return re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", r"\3/\2/\1", str(val or ""))
+
         notable_items: List[Dict[str, Any]] = []
         for ev in notable_events_sorted:
             clip_fn = str(ev.get("clip_filename") or "").strip()
@@ -714,25 +720,29 @@ class NightlyReportWorker:
             code = str(ev.get("event_code") or "")
             notable_items.append({
                 "id": ev.get("id"),
-                "timestamp": ev.get("timestamp"),
+                "timestamp": _vn_dt(ev.get("timestamp")),
                 "event_code": code,
                 "event_label": EVENT_VI_LABELS.get(code, code),
                 "severity": ev.get("severity") or "info",
-                "description": ev.get("description") or "",
-                "ai_summary": ev.get("video_analysis_summary") or "",
+                "description": _vn_dt(ev.get("description") or ""),
+                "ai_summary": _vn_dt(ev.get("video_analysis_summary") or ""),
                 "audio_transcript": ev.get("audio_transcript") or "",
                 "clip_url": clip_url,
             })
 
+        vn_report_date = _vn_dt(report_date)
+        vn_window_start = _vn_dt(window_start)
+        vn_window_end = _vn_dt(window_end)
+
         # Construct executive narrative (deterministic fallback + optional LLM refinement for active cameras)
         if total_events == 0:
             executive_summary = (
-                f"Trong chu kỳ 24 giờ (từ {window_start} đến {window_end}), {cam_name} (Kênh {channel:02d}) "
+                f"Trong chu kỳ 24 giờ (từ {vn_window_start} đến {vn_window_end}), {cam_name} (Kênh {channel:02d}) "
                 f"hoàn toàn yên tĩnh, không phát sinh bất kỳ sự kiện chuyển động hay cảnh báo an ninh nào."
             )
         else:
             executive_summary = (
-                f"Trong chu kỳ cuốn chiếu 24 giờ ({window_start} → {window_end}), **{cam_name} (Kênh {channel:02d})** "
+                f"Trong chu kỳ cuốn chiếu 24 giờ ({vn_window_start} → {vn_window_end}), **{cam_name} (Kênh {channel:02d})** "
                 f"ghi nhận tổng cộng **{total_events} sự kiện** ({human_count} lượt người, {vehicle_count} lượt phương tiện, "
                 f"{clip_count} đoạn video trích xuất). "
             )
@@ -750,8 +760,8 @@ class NightlyReportWorker:
                 llm_summary = self._synthesize_llm_executive_summary(
                     channel=channel,
                     cam_name=cam_name,
-                    window_start=window_start,
-                    window_end=window_end,
+                    window_start=vn_window_start,
+                    window_end=vn_window_end,
                     total_events=total_events,
                     human_count=human_count,
                     vehicle_count=vehicle_count,
@@ -762,15 +772,15 @@ class NightlyReportWorker:
                     notable_items=notable_items,
                 )
                 if llm_summary:
-                    executive_summary = llm_summary
+                    executive_summary = _vn_dt(llm_summary)
 
-        generated_at = datetime.now().astimezone().isoformat(timespec="seconds")
+        generated_at = datetime.now().astimezone().strftime("%d/%m/%Y %H:%M:%S")
 
         # Build concise 1-page Markdown report
         md_lines = [
-            f"# BÁO CÁO PHÂN TÍCH AI NGÀY {report_date} — D{channel:02d}: {cam_name}",
+            f"# BÁO CÁO PHÂN TÍCH AI NGÀY {vn_report_date} — D{channel:02d}: {cam_name}",
             "",
-            f"- **Cửa sổ thời gian cuốn chiếu:** `{window_start}` → `{window_end}` *(Video từ sau 22:00 được đẩy sang báo cáo ngày kế tiếp)*",
+            f"- **Cửa sổ thời gian cuốn chiếu:** `{vn_window_start}` → `{vn_window_end}` *(Video từ sau 22:00 được đẩy sang báo cáo ngày kế tiếp)*",
             f"- **Thời điểm xuất báo cáo:** `{generated_at}`",
             f"- **Đánh giá an ninh:** {risk_badge}",
             f"- **Thống kê nhanh:** Tổng `{total_events}` sự kiện | `{len(anomalies)}` Bất thường | `{human_count}` Lượt người | `{vehicle_count}` Phương tiện | `{clip_count}` Video Clip",
@@ -809,8 +819,8 @@ class NightlyReportWorker:
             "channel": channel,
             "camera_code": f"D{channel}",
             "camera_name": cam_name,
-            "window_start": window_start,
-            "window_end": window_end,
+            "window_start": vn_window_start,
+            "window_end": vn_window_end,
             "generated_at": generated_at,
             "risk_level": risk_level,
             "risk_label": risk_label,
@@ -864,7 +874,8 @@ class NightlyReportWorker:
             )
             prompt = (
                 f"Hãy viết 1 đoạn tóm tắt điều hành ngắn gọn (từ 2 đến 4 câu tiếng Việt chuyên nghiệp, "
-                f"tuyệt đối KHÔNG dùng emoji hay biểu tượng cảm xúc, KHÔNG dùng tiêu đề markdown) "
+                f"tuyệt đối KHÔNG dùng emoji hay biểu tượng cảm xúc, KHÔNG dùng tiêu đề markdown, "
+                f"mọi ngày tháng hiển thị theo định dạng DD/MM/YYYY) "
                 f"tổng kết diễn biến an ninh 24 giờ qua của {cam_name} (Kênh D{channel:02d}).\n"
                 f"- Cửa sổ dữ liệu: {window_start} đến {window_end}\n"
                 f"- Tổng sự kiện: {total_events} (Người: {human_count}, Phương tiện: {vehicle_count}, "
@@ -880,6 +891,7 @@ class NightlyReportWorker:
                         "content": (
                             "Bạn là chuyên gia phân tích an ninh hệ thống Camera AI DNC. "
                             "Chỉ trả về đúng 1 đoạn văn tóm tắt mạch lạc bằng tiếng Việt (2-4 câu), "
+                            "hiển thị ngày tháng theo định dạng DD/MM/YYYY, "
                             "không dùng emoji, không xuống dòng gạch đầu dòng."
                         ),
                     },
@@ -898,6 +910,7 @@ class NightlyReportWorker:
                 "",
                 text,
             ).strip()
+            text = re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", r"\3/\2/\1", text)
             text = " ".join(line.strip() for line in text.splitlines() if line.strip())
             return text if len(text) >= 30 else None
         except Exception as exc:

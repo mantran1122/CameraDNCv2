@@ -67,12 +67,19 @@
             const savingUser = ref(false);
             const showDialogPass = ref(false);
 
+            const formatVnDateTime = (val) => {
+                if (val === null || val === undefined) return '';
+                return String(val)
+                    .replace(/T(\d{2}:\d{2}(?::\d{2})?)(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g, ' $1')
+                    .replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, '$3/$2/$1');
+            };
+
             const userColumns = [
                 { name: 'username', label: 'Tài khoản', field: 'username', sortable: true, align: 'left' },
                 { name: 'full_name', label: 'Họ và tên / Phòng ban', field: 'full_name', sortable: true, align: 'left' },
                 { name: 'role', label: 'Vai trò', field: 'role', sortable: true, align: 'center' },
                 { name: 'channels', label: 'Quyền Camera (RBAC)', field: 'allowed_channels', align: 'left' },
-                { name: 'created_at', label: 'Thời gian tạo', field: 'created_at', sortable: true, align: 'left' },
+                { name: 'created_at', label: 'Thời gian tạo', field: 'created_at', format: val => formatVnDateTime(val), sortable: true, align: 'left' },
                 { name: 'actions', label: 'Thao tác', field: 'actions', align: 'center' }
             ];
 
@@ -104,12 +111,12 @@
                 { name: 'username', label: 'Tài khoản', field: 'username', sortable: true, align: 'left' },
                 { name: 'role', label: 'Vai trò', field: 'role', sortable: true, align: 'center' },
                 { name: 'user_agent', label: 'Trình duyệt / Thiết bị', field: 'user_agent', align: 'left' },
-                { name: 'last_active', label: 'Hoạt động gần nhất', field: 'last_active', sortable: true, align: 'left' },
+                { name: 'last_active', label: 'Hoạt động gần nhất', field: 'last_active', format: val => formatVnDateTime(val), sortable: true, align: 'left' },
                 { name: 'actions', label: 'Thao tác', align: 'center' }
             ];
 
             const auditColumns = [
-                { name: 'timestamp', label: 'Thời gian', field: 'timestamp', sortable: true, align: 'left' },
+                { name: 'timestamp', label: 'Thời gian', field: 'timestamp', format: val => formatVnDateTime(val), sortable: true, align: 'left' },
                 { name: 'username', label: 'Tài khoản', field: 'username', sortable: true, align: 'left' },
                 { name: 'ip_address', label: 'Địa chỉ IP', field: 'ip_address', sortable: true, align: 'left' },
                 { name: 'status', label: 'Kết quả', field: 'status', align: 'center' },

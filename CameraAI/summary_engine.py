@@ -56,12 +56,16 @@ def generate_daily_summary(target_date_str: str = None) -> Dict[str, Any]:
     peak_hour = hourly_distribution.index(max(hourly_distribution)) if total_events > 0 else 12
     top_channels = sorted(channel_counts.items(), key=lambda x: x[1], reverse=True)[:3]
     
+    import re
+    vn_date_str = re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", r"\3/\2/\1", str(target_date_str or ""))
+    vn_loudest_time = re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", r"\3/\2/\1", str(loudest_audio_time or ""))
+
     # Construct Natural Language Executive AI Report (Vietnamese)
     if total_events == 0:
-        ai_narrative = f"Trạng thái ngày {target_date_str}: Không ghi nhận dữ liệu metadata hoặc sự kiện bất thường nào từ đầu ghi Dahua DHI-NVR5832-EI2."
+        ai_narrative = f"Trạng thái ngày {vn_date_str}: Không ghi nhận dữ liệu metadata hoặc sự kiện bất thường nào từ đầu ghi Dahua DHI-NVR5832-EI2."
     else:
         ai_narrative = (
-            f"**TÓM TẮT BÁO CÁO HOẠT ĐỘNG NGÀY {target_date_str} (HỆ THỐNG DAHUA AI NVR5832-EI2)**\n\n"
+            f"**TÓM TẮT BÁO CÁO HOẠT ĐỘNG NGÀY {vn_date_str} (HỆ THỐNG DAHUA AI NVR5832-EI2)**\n\n"
             f"1. **Tổng quan Hoạt động:**\n"
             f"   - Tổng số lượt phát hiện Metadata: **{total_events} lượt**.\n"
             f"   - Ghi nhận **{len(human_events)}** lượt diện mạo con người và **{len(vehicle_events)}** phương tiện giao thông di chuyển trong khu vực quan sát.\n"
@@ -71,7 +75,7 @@ def generate_daily_summary(target_date_str: str = None) -> Dict[str, Any]:
             f"   - **Bất thường Âm thanh ({len(audio_anomalies)} vụ):** Đã ghi nhận các đỉnh âm thanh bất thường (tiếng la gào, cãi vã, tiếng đập phá)."
         )
         if max_audio_db > 0:
-            ai_narrative += f" Độ ồn cao nhất đạt **{max_audio_db} dB** tại Camera Kênh {loudest_audio_channel:02d} lúc {loudest_audio_time}."
+            ai_narrative += f" Độ ồn cao nhất đạt **{max_audio_db} dB** tại Camera Kênh {loudest_audio_channel:02d} lúc {vn_loudest_time}."
         ai_narrative += (
             f"\n   - **Bất thường Video ({len(video_anomalies)} vụ):** Ghi nhận các hành vi đột nhập vi phạm ranh giới an ninh (Intrusion/Tripwire/Fight).\n\n"
             f"3. **Tự động Cắt Video 10s Xem lại:**\n"

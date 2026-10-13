@@ -1507,8 +1507,9 @@ def _build_concise_fast_summary(
     else:
         action_line = "Mức độ THÔNG TIN — Hoạt động đã được ghi nhận bình thường trên Kênh {:02d}, không phát hiện rủi ro khẩn cấp.".format(ch)
 
+    vn_ts = re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", r"\3/\2/\1", str(ts or ""))
     return (
-        f"Sự kiện: {vn_label} tại Camera Kênh {ch:02d} ({ts}).\n"
+        f"Sự kiện: {vn_label} tại Camera Kênh {ch:02d} ({vn_ts}).\n"
         f"Phân tích nhanh: {detail_line}\n"
         f"Đánh giá: {action_line}"
     )
@@ -1567,7 +1568,7 @@ async def fast_analyze_event_api(event_id: int, request: Request):
     remaining_budget = max(0.2, 2.0 - elapsed)
     if remaining_budget >= 0.6:
         prompt = (
-            "Hãy tóm tắt cực kỳ ngắn gọn (tối đa 3 dòng ngắn, dưới 55 từ, tiếng Việt) sự kiện an ninh camera sau cho nhân viên trực:\n"
+            "Hãy tóm tắt cực kỳ ngắn gọn (tối đa 3 dòng ngắn, dưới 55 từ, tiếng Việt, ngày tháng định dạng DD/MM/YYYY) sự kiện an ninh camera sau cho nhân viên trực:\n"
             f"{base_summary}\n"
             "Giữ đúng 3 đầu mục: Sự kiện:, Phân tích nhanh:, Đánh giá:"
         )
@@ -1583,7 +1584,7 @@ async def fast_analyze_event_api(event_id: int, request: Request):
                 timeout=min(1.7, remaining_budget),
             )
             if llm_text and len(llm_text.strip()) > 20:
-                concise_summary = llm_text.strip()
+                concise_summary = re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", r"\3/\2/\1", llm_text.strip())
                 model_used = config.QWEN_VISION_MODEL
         except Exception:
             pass
@@ -1835,14 +1836,21 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
 
     daily_summary = summary_engine.generate_daily_summary()
 
+    def _vn_dt(val):
+        return re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", r"\3/\2/\1", str(val or ""))
+
+    vn_start_time = _vn_dt(start_time)
+    vn_end_time = _vn_dt(end_time)
+    vn_target_date = _vn_dt(target_date)
+
     # 4. Construct Grounded RAG Context Lines for Qwen3.8-27B
     context_lines = [
         f"Phạm vi camera đang giám sát: {ch_label}.",
     ]
     if is_time_filtered:
-        context_lines.append(f"Khung thời gian người dùng yêu cầu: Từ {start_time} đến {end_time}.")
+        context_lines.append(f"Khung thời gian người dùng yêu cầu: Từ {vn_start_time} đến {vn_end_time}.")
     elif target_date:
-        context_lines.append(f"Mốc thời gian/Ngày truy vấn: {target_date}.")
+        context_lines.append(f"Mốc thời gian/Ngày truy vấn: {vn_target_date}.")
 
     if only_anomalies and not matched_events:
         context_lines.append(
@@ -1850,13 +1858,13 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
         )
     elif is_time_filtered and not matched_events:
         context_lines.append(
-            f"KẾT QUẢ TRUY VẤN CSDL: Trong khung thời gian yêu cầu ({start_time} đến {end_time}), hệ thống hoàn toàn KHÔNG GHI NHẬN bất kỳ video clip sự kiện nào trên {ch_label}."
+            f"KẾT QUẢ TRUY VẤN CSDL: Trong khung thời gian yêu cầu ({vn_start_time} đến {vn_end_time}), hệ thống hoàn toàn KHÔNG GHI NHẬN bất kỳ video clip sự kiện nào trên {ch_label}."
         )
     elif db_stats.get("total_events", 0) > 0:
         counts_detail = []
         for code, info in db_stats["code_counts"].items():
             clip_note = f", trong đó {info['clips']} có video clip lưu trữ" if info['clips'] > 0 else ""
-            counts_detail.append(f"+ {code}: {info['count']} sự kiện{clip_note} (từ {info['earliest']} đến {info['latest']})")
+            counts_detail.append(f"+ {code}: {info['count']} sự kiện{clip_note} (từ {_vn_dt(info['earliest'])} đến {_vn_dt(info['latest'])})")
         
         context_lines.append(
             f"DỮ LIỆU TỔNG QUAN THỰC TẾ TRONG CSDL ({ch_label}):\n"
@@ -1864,7 +1872,7 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
             f"- Phân loại chi tiết theo mã sự kiện:\n" + "\n".join(counts_detail)
         )
     else:
-        context_lines.append(f"CSDL Camera ({ch_label}): Hiện chưa ghi nhận sự kiện nào trong mốc thời gian {target_date or 'được chọn'}.")
+        context_lines.append(f"CSDL Camera ({ch_label}): Hiện chưa ghi nhận sự kiện nào trong mốc thời gian {vn_target_date or 'được chọn'}.")
 
     if matched_events:
         context_lines.append(f"DANH SÁCH CÁC SỰ KIỆN CÓ VIDEO CLIP MP4 THỰC TẾ (Người dùng sẽ click vào mã #ID để phát video):")
@@ -1882,10 +1890,10 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
                 extra_notes.append(f"Mức âm lượng: {a_an.get('audio_rms'):.1f}dBFS")
             extra_str = f" | {'; '.join(extra_notes)}"
             ch_tag = f"Kênh {ev_ch}" if ev_ch else "N/A"
-            context_lines.append(f"- [#{ev_id} | {ch_tag} | {ev.get('timestamp')}] {ev.get('event_code')}: {ev.get('description')} (Mức độ: {ev.get('severity')}){extra_str}")
+            context_lines.append(f"- [#{ev_id} | {ch_tag} | {_vn_dt(ev.get('timestamp'))}] {ev.get('event_code')}: {ev.get('description')} (Mức độ: {ev.get('severity')}){extra_str}")
 
         context_lines.append(
-            "QUY TẮC BẮT BUỘC: Khi nêu dẫn chứng mã sự kiện (ví dụ #47653, #47664...), bạn CHỈ ĐƯỢC PHÉP dùng các mã #ID có trong danh sách clip thực tế ở trên. "
+            "QUY TẮC BẮT BUỘC: Khi nêu dẫn chứng mã sự kiện (ví dụ #47653, #47664...), bạn CHỈ ĐƯỢC PHÉP dùng các mã #ID có trong danh sách clip thực tế ở trên, và hiển thị ngày tháng theo định dạng DD/MM/YYYY. "
             "Giao diện sẽ gắn nút bấm phát video trực tiếp vào từng mã #ID. Tuyệt đối KHÔNG tự bịa hoặc nêu mã sự kiện không có trong danh sách trên vì sẽ không có video để phát."
         )
 
@@ -1901,8 +1909,8 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
 
         qwen_res = await asyncio.to_thread(_call_qwen_text)
         return {
-            "reply": qwen_res["reply"],
-            "reasoning": qwen_res.get("reasoning", ""),
+            "reply": _vn_dt(qwen_res["reply"]),
+            "reasoning": _vn_dt(qwen_res.get("reasoning", "")),
             "source": qwen_res.get("source", f"Vision Agent (Server AI: {config.QWEN_MODEL_NAME})"),
             "channel": ch,
             "event_ids": clip_event_ids,
@@ -1916,29 +1924,29 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
     
     if any(k in lowered for k in ["bất thường", "nguy hiểm", "cảnh báo", "alarm", "anomaly"]):
         if anomalies:
-            ev_descs = "; ".join([f"#{e.get('id')} (Kênh {e.get('channel')}) - {e.get('description')} ({e.get('timestamp')})" for e in anomalies[:4]])
+            ev_descs = "; ".join([f"#{e.get('id')} (Kênh {e.get('channel')}) - {e.get('description')} ({_vn_dt(e.get('timestamp'))})" for e in anomalies[:4]])
             reply = f"Hệ thống truy vấn được {len(anomalies)} sự kiện bất thường trên {ch_label}: {ev_descs}. Bạn có thể xem lại clip và bấm 'Phân tích AI' ở danh sách giữa."
         else:
             reply = f"Chưa ghi nhận sự kiện bất thường nào đáng chú ý trên {ch_label}. Trạng thái giám sát an toàn."
     elif any(k in lowered for k in ["tóm tắt", "tổng quan", "summary", "báo cáo", "tình hình"]):
-        reply = f"{ch_label} đang hoạt động ổn định. Tổng cộng ghi nhận {len(matched_events)} sự kiện liên quan. {daily_summary.get('summary_text', '')}"
+        reply = f"{ch_label} đang hoạt động ổn định. Tổng cộng ghi nhận {len(matched_events)} sự kiện liên quan. {_vn_dt(daily_summary.get('summary_text', ''))}"
     elif any(k in lowered for k in ["người", "nhân viên", "khách", "human", "ai"]):
         human_events = [e for e in matched_events if "người" in (e.get("description") or "").lower() or "human" in (e.get("event_code") or "").lower()]
         if human_events:
-            reply = f"Tìm thấy {len(human_events)} hoạt động nhận dạng người trên {ch_label}. Sự kiện gần nhất: #{human_events[0].get('id')} (Kênh {human_events[0].get('channel')}) - {human_events[0].get('description')} lúc {human_events[0].get('timestamp')}."
+            reply = f"Tìm thấy {len(human_events)} hoạt động nhận dạng người trên {ch_label}. Sự kiện gần nhất: #{human_events[0].get('id')} (Kênh {human_events[0].get('channel')}) - {human_events[0].get('description')} lúc {_vn_dt(human_events[0].get('timestamp'))}."
         else:
             reply = f"Chưa phát hiện hoạt động nhận dạng người đáng kể trên {ch_label} trong các sự kiện gần đây."
     elif any(k in lowered for k in ["đánh nhau", "xô xát", "ẩu đả", "fight"]):
         fight_events = [e for e in matched_events if "fight" in (e.get("event_code") or "").lower() or "đánh" in (e.get("description") or "").lower()]
         if fight_events:
-            reply = f"Cảnh báo: Phát hiện {len(fight_events)} sự kiện nghi vấn xô xát trên {ch_label}. Sự kiện #{fight_events[0].get('id')} (Kênh {fight_events[0].get('channel')}) lúc {fight_events[0].get('timestamp')}. Đề nghị bấm 'Phân tích AI' để kiểm chứng video và âm thanh thực tế."
+            reply = f"Cảnh báo: Phát hiện {len(fight_events)} sự kiện nghi vấn xô xát trên {ch_label}. Sự kiện #{fight_events[0].get('id')} (Kênh {fight_events[0].get('channel')}) lúc {_vn_dt(fight_events[0].get('timestamp'))}. Đề nghị bấm 'Phân tích AI' để kiểm chứng video và âm thanh thực tế."
         else:
             reply = f"Không ghi nhận sự kiện xô xát hoặc đánh nhau nào trên {ch_label}. Khu vực an toàn."
     elif any(k in lowered for k in ["chào", "hello", "hi", "bạn là ai"]):
         reply = f"Xin chào! Tôi là Vision Agent trong hệ thống VSS Blueprint (vận hành trên Server AI). Tôi đang giám sát {ch_label}. Tôi có thể hỗ trợ truy vấn CSDL, kiểm tra đối tượng/hành vi và chạy phân tích video chuyên sâu."
     else:
         latest = matched_events[0] if matched_events else None
-        latest_info = f"Sự kiện liên quan gần nhất [#{latest.get('id')} - Kênh {latest.get('channel')}] lúc {latest.get('timestamp')}: '{latest.get('description')}'." if latest else "Chưa có sự kiện mới."
+        latest_info = f"Sự kiện liên quan gần nhất [#{latest.get('id')} - Kênh {latest.get('channel')}] lúc {_vn_dt(latest.get('timestamp'))}: '{latest.get('description')}'." if latest else "Chưa có sự kiện mới."
         reply = f"Vision Agent đã truy vấn CSDL cho {ch_label}. {latest_info} Danh sách clip và sự kiện tương ứng đã được cập nhật ở cột giữa."
 
     return {

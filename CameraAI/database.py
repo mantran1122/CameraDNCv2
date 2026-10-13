@@ -793,7 +793,7 @@ def get_kibana_figure5_stats(filter_mode: str = "all", allowed_channels: Optiona
     for i, dt in enumerate(buckets):
         h_key = dt.strftime("%Y-%m-%d %H")
         labels.append(dt.strftime("%H:00"))
-        full_dates.append(dt.strftime("%Y-%m-%d %H:00"))
+        full_dates.append(dt.strftime("%d/%m/%Y %H:00"))
 
         row = data_by_hour.get(h_key, {})
         h_total = row.get("total", 0)
@@ -865,7 +865,7 @@ def get_kibana_figure5_stats(filter_mode: str = "all", allowed_channels: Optiona
     conn.close()
 
     return {
-        "time_range": f"{start_str} to {end_str}",
+        "time_range": f"{start_dt.strftime('%d/%m/%Y %H:00:00')} → {end_dt.strftime('%d/%m/%Y %H:59:59')}",
         "total_db_records": total_db_records,
         "total_clips_in_db": total_clips_in_db,
         "filter_mode": filter_mode,

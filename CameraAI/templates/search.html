@@ -7284,7 +7284,7 @@
             const framesEl = document.getElementById('attached-video-frames');
 
             if (bar) bar.style.display = 'flex';
-            if (titleEl) titleEl.innerText = `${title} [${startTime} - ${endTime}]`;
+            if (titleEl) titleEl.innerText = `${title} [${formatVnDateTime(startTime)} - ${formatVnDateTime(endTime)}]`;
             if (framesEl) framesEl.innerText = `32 frames + Audio (Server AI)`;
 
             // Pre-fill smart prompt with auto-grow up to max 3 lines
@@ -7505,7 +7505,7 @@ user=None`;
                     <div class="chat-user-bubble">
                         <div style="font-size: 0.7rem; color: var(--nv-green); font-weight: 600; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.35rem;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-                            <span>${escapeHtml(videoContext.title)} [${escapeHtml(videoContext.startTime)} - ${escapeHtml(videoContext.endTime)}]</span>
+                            <span>${escapeHtml(videoContext.title)} [${escapeHtml(formatVnDateTime(videoContext.startTime))} - ${escapeHtml(formatVnDateTime(videoContext.endTime))}]</span>
                         </div>
                         <div>${escapeHtml(queryText)}</div>
                     </div>
@@ -7934,6 +7934,9 @@ user=None`;
             content = content.replace(/\bchimb xếp tài computer li computer\b/gi, 'bàn làm việc và các thiết bị máy tính');
             content = content.replace(/\bchimb xếp tài computer\b/gi, 'bàn làm việc và máy tính');
             content = content.replace(/\btài computer\b/gi, 'bàn máy tính');
+
+            // 0.2 Chuẩn hóa mọi ngày tháng YYYY-MM-DD sang DD/MM/YYYY khi hiển thị cho người dùng
+            content = formatVnDateTime(content);
 
             // 1. Tạm thời trích xuất và bảo vệ các mã sự kiện dạng #14752 (bấm để xem clip)
             const eventChips = {};
@@ -8426,7 +8429,7 @@ user=None`;
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>
                                 </div>
                             </div>
-                            <div class="thumb-time-badge">${escapeHtml(item.start_time)} / ${escapeHtml(item.end_time)}</div>
+                            <div class="thumb-time-badge">${escapeHtml(formatVnDateTime(item.start_time))} / ${escapeHtml(formatVnDateTime(item.end_time))}</div>
                         </div>
                         <div class="card-info-pane">
                             <div class="card-header-bar">
@@ -8457,6 +8460,18 @@ user=None`;
 
         function escapeHtml(str) {
             return (str || '').toString().replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+        }
+
+        function formatVnDate(str) {
+            if (str === null || str === undefined) return '';
+            return String(str).replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, '$3/$2/$1');
+        }
+
+        function formatVnDateTime(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/T(\d{2}:\d{2}(?::\d{2})?)(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g, ' $1')
+                .replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, '$3/$2/$1');
         }
 
         // 8. Toolbar Dropdown Menus & Actions
@@ -8650,7 +8665,7 @@ user=None`;
                 alert('Không có kết quả video nào để copy.');
                 return;
             }
-            const text = window.latestSearchResults.map((it, idx) => `#${idx + 1} (${it.video_name || 'Cam'}): ${it.start_time || ''} -> ${it.end_time || ''}`).join('\n');
+            const text = window.latestSearchResults.map((it, idx) => `#${idx + 1} (${it.video_name || 'Cam'}): ${formatVnDateTime(it.start_time || '')} -> ${formatVnDateTime(it.end_time || '')}`).join('\n');
             navigator.clipboard.writeText(text).then(() => {
                 alert('Đã sao chép danh sách sự kiện vào clipboard!');
             }).catch(() => {
@@ -8899,7 +8914,7 @@ user=None`;
             const aiBox = document.getElementById('modal-fast-ai-box');
 
             currentModalEventId = eventId || null;
-            currentModalVideoTitle = title || 'Video sự kiện an ninh';
+            currentModalVideoTitle = formatVnDateTime(title || 'Video sự kiện an ninh');
             currentModalVideoUrl = url || '';
 
             if (titleEl) titleEl.innerText = currentModalVideoTitle;
@@ -8997,7 +9012,7 @@ user=None`;
                     }
                 }
 
-                const summaryText = data.summary || 'Đã xác nhận sự kiện an ninh trên camera.';
+                const summaryText = formatVnDateTime(data.summary || 'Đã xác nhận sự kiện an ninh trên camera.');
                 if (aiMeta) aiMeta.innerText = `Hoàn tất trong ${elapsedSec}s • ${data.model || 'VSS Fast AI'}`;
                 if (aiContent) aiContent.innerText = summaryText;
 
@@ -9010,7 +9025,7 @@ user=None`;
                 const code = evObj.event_code || evObj.event_type || 'Cảnh báo';
                 const desc = evObj.description || 'Phát hiện tín hiệu cảnh báo an ninh từ đầu ghi NVR';
                 const fallbackSummary =
-                    `Sự kiện: ${code} tại Camera Kênh ${ch < 10 ? '0' + ch : ch} (${evObj.timestamp || 'Vừa ghi nhận'}).\n` +
+                    `Sự kiện: ${code} tại Camera Kênh ${ch < 10 ? '0' + ch : ch} (${formatVnDateTime(evObj.timestamp || 'Vừa ghi nhận')}).\n` +
                     `Phân tích nhanh: ${desc}.\n` +
                     `Đánh giá: Đã tải đoạn video liên quan, vui lòng quan sát trực tiếp diễn biến trên trình phát.`;
                 if (aiMeta) aiMeta.innerText = `Phản hồi tức thì (${elapsedSec}s)`;
@@ -9490,7 +9505,7 @@ user=None`;
 
             const ch = ev.channel || 1;
             const label = getFriendlyNotifLabel(ev);
-            const titleStr = `${label} - CAM ${ch < 10 ? '0' + ch : ch} (${ev.timestamp || ''})`;
+            const titleStr = `${label} - CAM ${ch < 10 ? '0' + ch : ch} (${formatVnDateTime(ev.timestamp || '')})`;
             let clipUrl = ev.clip_url || (ev.clip_filename ? `/clips/${String(ev.clip_filename).replace(/\\/g, '/')}` : '');
 
             if (!clipUrl) {
@@ -9527,12 +9542,12 @@ user=None`;
         function formatTimeAgo(ts) {
             if (!ts) return '';
             try {
-                const parts = ts.split(' ');
+                const parts = String(ts).split(' ');
                 if (parts.length === 2) {
-                    return parts[1]; // Return HH:mm:ss
+                    return `${parts[1]} (${formatVnDate(parts[0])})`;
                 }
             } catch(e) {}
-            return ts;
+            return formatVnDateTime(ts);
         }
 
         // ==========================================================================
@@ -9681,14 +9696,15 @@ user=None`;
 
                 const hasClip = Boolean(ev.clip_filename);
                 const clipUrl = ev.clip_filename ? `/clips/${ev.clip_filename.replace(/\\/g, '/')}` : '';
-                const titleStr = `${label} - CAM ${ev.channel} (${ev.timestamp || ''})`.replace(/'/g, "\\'");
+                const vnTime = formatVnDateTime(ev.timestamp || '');
+                const titleStr = `${label} - CAM ${ev.channel} (${vnTime})`.replace(/'/g, "\\'");
                 const cardClass = isDanger ? 'danger' : (hasClip ? 'has-clip' : '');
 
                 return `
                     <div class="ncc-ced-card ${cardClass}">
                         <div class="ncc-ced-card-top">
                             <span class="ncc-ced-event-tag ${tagClass}">${label}</span>
-                            <span class="ncc-ced-time">${ev.timestamp || 'Chưa rõ'}</span>
+                            <span class="ncc-ced-time">${vnTime || 'Chưa rõ'}</span>
                         </div>
                         <div class="ncc-ced-desc">${ev.description || 'Sự kiện ghi nhận từ camera'}</div>
                         <div class="ncc-ced-card-actions">
@@ -10028,10 +10044,10 @@ user=None`;
                 '08:00', '09:00', '10:00', '11:00', '12:00', '13:00'
             ],
             fullDates: [
-                '2018-06-19 14:00', '2018-06-19 15:00', '2018-06-19 16:00', '2018-06-19 17:00', '2018-06-19 18:00', '2018-06-19 19:00',
-                '2018-06-19 20:00', '2018-06-19 21:00', '2018-06-19 22:00', '2018-06-19 23:00', '2018-06-20 00:00', '2018-06-20 01:00',
-                '2018-06-20 02:00', '2018-06-20 03:00', '2018-06-20 04:00', '2018-06-20 05:00', '2018-06-20 06:00', '2018-06-20 07:00',
-                '2018-06-20 08:00', '2018-06-20 09:00', '2018-06-20 10:00', '2018-06-20 11:00', '2018-06-20 12:00', '2018-06-20 13:00'
+                '19/06/2018 14:00', '19/06/2018 15:00', '19/06/2018 16:00', '19/06/2018 17:00', '19/06/2018 18:00', '19/06/2018 19:00',
+                '19/06/2018 20:00', '19/06/2018 21:00', '19/06/2018 22:00', '19/06/2018 23:00', '20/06/2018 00:00', '20/06/2018 01:00',
+                '20/06/2018 02:00', '20/06/2018 03:00', '20/06/2018 04:00', '20/06/2018 05:00', '20/06/2018 06:00', '20/06/2018 07:00',
+                '20/06/2018 08:00', '20/06/2018 09:00', '20/06/2018 10:00', '20/06/2018 11:00', '20/06/2018 12:00', '20/06/2018 13:00'
             ],
             entry: [4, 5, 7, 3, 4, 5, 3, 0, 0, 0, 1, 0, 0, 0, 0, 3, 6, 17, 108, 273, 441, 303, 107, 87],
             exit:  [5, 21, 27, 46, 103, 54, 53, 23, 9, 3, 1, 4, 5, 2, 2, 0, 0, 3, 4, 9, 18, 42, 77, 62],
@@ -10100,7 +10116,7 @@ user=None`;
                 // Top Bar metrics
                 const timeRangeEl = document.getElementById('kb-time-range-text');
                 if (timeRangeEl && data.time_range) {
-                    timeRangeEl.textContent = data.time_range;
+                    timeRangeEl.textContent = formatVnDateTime(data.time_range);
                 }
 
                 const dbRecEl = document.getElementById('kb-db-record-count');
@@ -10140,7 +10156,7 @@ user=None`;
                 // Synchronize Hourly Series
                 if (data.labels && data.labels.length > 0) {
                     KB_HOURLY_DATA.labels = data.labels;
-                    KB_HOURLY_DATA.fullDates = data.full_dates || data.labels;
+                    KB_HOURLY_DATA.fullDates = (data.full_dates || data.labels).map(d => formatVnDateTime(d));
                     KB_HOURLY_DATA.entry = data.entry || [];
                     KB_HOURLY_DATA.lobbyFlow = data.lobby_flow || (data.channel_matrix ? data.channel_matrix.ch18.map((v, i) => v + data.channel_matrix.ch19[i] + data.channel_matrix.ch20[i]) : []);
                     KB_HOURLY_DATA.officeFlow = data.office_flow || (data.channel_matrix ? data.channel_matrix.ch11 : []);
@@ -10659,10 +10675,11 @@ user=None`;
                 }
 
                 const hasClip = Boolean(ev.clip_filename && ev.clip_filename.trim());
+                const vnTime = formatVnDateTime(ev.timestamp || '');
                 let actionBtnHtml = '';
                 if (hasClip) {
                     const clipUrl = `/clips/${ev.clip_filename}`;
-                    actionBtnHtml = `<button onclick="openVideoModal('${camName} - ${eventLabel} (${ev.timestamp})', '${clipUrl}')" class="win11-tb-btn" style="height: 22px; padding: 0 8px; font-size: 0.68rem; background: #0077cc; color: #fff; border: none; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; border-radius: 3px; font-weight: 600;" title="Phát lại video 10 giây ghi nhận sự kiện">▷ Xem Clip</button>`;
+                    actionBtnHtml = `<button onclick="openVideoModal('${camName} - ${eventLabel} (${vnTime})', '${clipUrl}')" class="win11-tb-btn" style="height: 22px; padding: 0 8px; font-size: 0.68rem; background: #0077cc; color: #fff; border: none; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; border-radius: 3px; font-weight: 600;" title="Phát lại video 10 giây ghi nhận sự kiện">▷ Xem Clip</button>`;
                 } else {
                     actionBtnHtml = `
                         <div style="display: inline-flex; align-items: center; gap: 4px; justify-content: center;">
@@ -10674,7 +10691,7 @@ user=None`;
 
                 return `
                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); transition: background-color 0.1s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
-                        <td style="padding: 7px 12px; font-family: monospace; color: #a1a1aa;">${ev.timestamp || '-'}</td>
+                        <td style="padding: 7px 12px; font-family: monospace; color: #a1a1aa;">${vnTime || '-'}</td>
                         <td style="padding: 7px 10px;">${camBadge}</td>
                         <td style="padding: 7px 12px;">${codeBadge}</td>
                         <td style="padding: 7px 10px;">${sevBadge}</td>
@@ -10697,7 +10714,7 @@ user=None`;
                     const parent = btn.parentElement;
                     if (parent) {
                         const clipUrl = `/clips/${res.clip_filename}`;
-                        parent.innerHTML = `<button onclick="openVideoModal('CAM ${channel} - Cắt mới (${res.timestamp || ''})', '${clipUrl}')" class="win11-tb-btn" style="height: 22px; padding: 0 8px; font-size: 0.68rem; background: #0077cc; color: #fff; border: none; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; border-radius: 3px; font-weight: 600;">▷ Xem Clip</button>`;
+                        parent.innerHTML = `<button onclick="openVideoModal('CAM ${channel} - Cắt mới (${formatVnDateTime(res.timestamp || '')})', '${clipUrl}')" class="win11-tb-btn" style="height: 22px; padding: 0 8px; font-size: 0.68rem; background: #0077cc; color: #fff; border: none; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; border-radius: 3px; font-weight: 600;">▷ Xem Clip</button>`;
                     }
                     // Refresh clip badge count
                     const badge = document.getElementById('kb-clips-count-badge');
@@ -12191,11 +12208,36 @@ user=None`;
         let currentNightlyCameraList = [];
         let currentNightlySelectedChannel = null;
         let nightlyPollTimer = null;
+        let nightlyCustomDatePicker = null;
+
+        function ensureNightlyDatePicker(defaultDateStr = '') {
+            const customDateInput = document.getElementById('nightly-custom-date-input');
+            if (!customDateInput) return;
+            if (typeof flatpickr !== 'undefined' && !nightlyCustomDatePicker) {
+                try {
+                    nightlyCustomDatePicker = flatpickr(customDateInput, {
+                        dateFormat: 'Y-m-d',
+                        altInput: true,
+                        altFormat: 'd/m/Y',
+                        defaultDate: defaultDateStr || new Date().toISOString().slice(0, 10),
+                        locale: { firstDayOfWeek: 1 }
+                    });
+                } catch (e) {}
+            }
+            if (defaultDateStr) {
+                if (nightlyCustomDatePicker) {
+                    nightlyCustomDatePicker.setDate(defaultDateStr, false);
+                } else {
+                    customDateInput.value = defaultDateStr;
+                }
+            }
+        }
 
         async function openNightlyReportsModal() {
             const modal = document.getElementById('nightly-reports-modal');
             if (!modal) return;
             modal.style.display = 'flex';
+            ensureNightlyDatePicker();
             await loadNightlyReportDates();
         }
 
@@ -12228,7 +12270,7 @@ user=None`;
                     if (activeJob && activeJob.status === 'running') {
                         statusBanner.style.display = 'flex';
                         statusBanner.innerHTML = `
-                            <span><strong>Đang tổng hợp ${activeJob.report_date}:</strong> ${activeJob.processed_cameras || 0}/${activeJob.total_cameras || 32} camera...</span>
+                            <span><strong>Đang tổng hợp ${formatVnDate(activeJob.report_date)}:</strong> ${activeJob.processed_cameras || 0}/${activeJob.total_cameras || 32} camera...</span>
                         `;
                         if (!nightlyPollTimer) {
                             nightlyPollTimer = setInterval(() => loadNightlyReportDates(currentNightlyReportDate), 3000);
@@ -12245,12 +12287,12 @@ user=None`;
                 const todayStr = new Date().toISOString().slice(0, 10);
                 if (selectEl) {
                     if (dates.length === 0) {
-                        selectEl.innerHTML = `<option value="${todayStr}">${todayStr} (Chưa có dữ liệu)</option>`;
+                        selectEl.innerHTML = `<option value="${todayStr}">${formatVnDate(todayStr)} (Chưa có dữ liệu)</option>`;
                         currentNightlyReportDate = todayStr;
                     } else {
                         selectEl.innerHTML = dates.map(d => `
                             <option value="${d.report_date}">
-                                ${d.report_date} (${d.total_events} SK • ${d.total_anomalies} CB${d.nas_synced ? ' • NAS' : ''})
+                                ${formatVnDate(d.report_date)} (${d.total_events} SK • ${d.total_anomalies} CB${d.nas_synced ? ' • NAS' : ''})
                             </option>
                         `).join('');
                         if (preferredDate && dates.some(d => d.report_date === preferredDate)) {
@@ -12263,10 +12305,7 @@ user=None`;
                     }
                 }
 
-                const customDateInput = document.getElementById('nightly-custom-date-input');
-                if (customDateInput && !customDateInput.value) {
-                    customDateInput.value = currentNightlyReportDate || todayStr;
-                }
+                ensureNightlyDatePicker(currentNightlyReportDate || todayStr);
 
                 if (currentNightlyReportDate) {
                     await loadNightlyReportForDate(currentNightlyReportDate);
@@ -12278,8 +12317,7 @@ user=None`;
 
         async function loadNightlyReportForDate(reportDate) {
             currentNightlyReportDate = reportDate;
-            const customDateInput = document.getElementById('nightly-custom-date-input');
-            if (customDateInput) customDateInput.value = reportDate;
+            ensureNightlyDatePicker(reportDate);
 
             const camListEl = document.getElementById('nightly-camera-list');
             const detailEl = document.getElementById('nightly-camera-detail');
@@ -12296,7 +12334,7 @@ user=None`;
 
                 if (!data.exists || !Array.isArray(data.cameras) || data.cameras.length === 0) {
                     if (metaBar) {
-                        metaBar.textContent = `${reportDate} • Chưa có dữ liệu`;
+                        metaBar.textContent = `${formatVnDate(reportDate)} • Chưa có dữ liệu`;
                     }
                     if (camListEl) {
                         camListEl.innerHTML = `<div style="padding: 20px; text-align: center; color: #71717a; font-size: 0.78rem;">Chưa có dữ liệu</div>`;
@@ -12304,7 +12342,7 @@ user=None`;
                     if (detailEl) {
                         detailEl.innerHTML = `
                             <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#a1a1aa; gap:10px; padding:24px; text-align:center;">
-                                <div style="font-size:0.92rem; font-weight:600; color:#f4f4f5;">Chưa có báo cáo ngày ${reportDate}</div>
+                                <div style="font-size:0.92rem; font-weight:600; color:#f4f4f5;">Chưa có báo cáo ngày ${formatVnDate(reportDate)}</div>
                                 <div style="font-size:0.78rem; color:#71717a;">Tự động tổng hợp lúc 22:00 – 04:00 và đồng bộ NAS.</div>
                                 <button type="button" onclick="triggerNightlyReportGeneration()" style="background:#76b900; color:#000; font-weight:700; border:none; border-radius:6px; padding:7px 14px; font-size:0.78rem; cursor:pointer;">
                                     Tạo báo cáo
@@ -12320,7 +12358,7 @@ user=None`;
                     const nasBadge = data.nas_synced
                         ? `<span style="padding:1px 6px; border-radius:4px; background:rgba(34,197,94,0.16); color:#86efac; font-weight:700; font-size:0.68rem;" title="${data.nas_path || 'Synology NAS'}">NAS</span>`
                         : `<span style="padding:1px 6px; border-radius:4px; background:rgba(255,255,255,0.06); color:#a1a1aa; font-size:0.68rem;">Local</span>`;
-                    metaBar.innerHTML = `${data.window_start} → ${data.window_end} • <strong>${data.total_events} SK</strong> (${data.total_anomalies} bất thường) • ${nasBadge}`;
+                    metaBar.innerHTML = `${formatVnDateTime(data.window_start)} → ${formatVnDateTime(data.window_end)} • <strong>${data.total_events} SK</strong> (${data.total_anomalies} bất thường) • ${nasBadge}`;
                 }
 
                 renderNightlyCameraSidebar();
@@ -12403,31 +12441,34 @@ user=None`;
                             </span>
                         </div>
                         <div style="font-size: 0.78rem; color: #d4d4d8; line-height: 1.5;">
-                            ${String(s.summary_text || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/`(.*?)`/g, '<code style="background:#090a0f;padding:1px 5px;border-radius:4px;color:#38bdf8;">$1</code>')}
+                            ${formatVnDateTime(String(s.summary_text || '')).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/`(.*?)`/g, '<code style="background:#090a0f;padding:1px 5px;border-radius:4px;color:#38bdf8;">$1</code>')}
                         </div>
                     </div>
                 `).join('');
 
                 const notableHtml = (rep.notable_events && rep.notable_events.length > 0)
-                    ? rep.notable_events.map(ev => `
+                    ? rep.notable_events.map(ev => {
+                        const vnTs = formatVnDateTime(ev.timestamp);
+                        return `
                         <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; background: #14161e; border: 1px solid #252836; border-radius: 7px;">
                             <div style="min-width: 0; flex: 1;">
                                 <div style="display: flex; align-items: center; gap: 8px; font-size: 0.76rem;">
-                                    <span style="color: #38bdf8; font-family: monospace; font-weight: 700;">${ev.timestamp}</span>
+                                    <span style="color: #38bdf8; font-family: monospace; font-weight: 700;">${vnTs}</span>
                                     <span style="color: #a3e635; font-weight: 700;">#${ev.id}</span>
                                     <span style="padding: 1px 6px; border-radius: 4px; background: rgba(239,68,68,0.16); color: #fca5a5; font-size: 0.68rem; font-weight: 600;">${ev.event_label}</span>
                                 </div>
                                 <div style="font-size: 0.75rem; color: #d4d4d8; margin-top: 3px;">
-                                    ${ev.ai_summary || ev.description || 'Đã ghi nhận.'}
+                                    ${formatVnDateTime(ev.ai_summary || ev.description || 'Đã ghi nhận.')}
                                 </div>
                             </div>
                             ${ev.clip_url ? `
-                                <button type="button" onclick="openVideoModal('D${rep.channel < 10 ? '0' + rep.channel : rep.channel} - #${ev.id} (${ev.timestamp})', '${ev.clip_url}', ${ev.id || 'null'})" style="flex-shrink: 0; background: rgba(118,185,0,0.18); border: 1px solid #76b900; color: #a3e635; border-radius: 6px; padding: 5px 10px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">
+                                <button type="button" onclick="openVideoModal('D${rep.channel < 10 ? '0' + rep.channel : rep.channel} - #${ev.id} (${vnTs})', '${ev.clip_url}', ${ev.id || 'null'})" style="flex-shrink: 0; background: rgba(118,185,0,0.18); border: 1px solid #76b900; color: #a3e635; border-radius: 6px; padding: 5px 10px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">
                                     Xem Clip
                                 </button>
                             ` : ''}
                         </div>
-                    `).join('')
+                    `;
+                    }).join('')
                     : `<div style="padding: 10px; color: #71717a; font-size: 0.76rem; font-style: italic;">Không có sự kiện nổi bật.</div>`;
 
                 detailEl.innerHTML = `
@@ -12438,7 +12479,7 @@ user=None`;
                                     D${rep.channel < 10 ? '0' + rep.channel : rep.channel}: ${rep.camera_name}
                                 </div>
                                 <div style="font-size: 0.73rem; color: #a1a1aa; margin-top: 2px;">
-                                    ${rep.window_start} → ${rep.window_end}
+                                    ${formatVnDateTime(rep.window_start)} → ${formatVnDateTime(rep.window_end)}
                                 </div>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
@@ -12472,7 +12513,7 @@ user=None`;
                         </div>
 
                         <div style="background: rgba(56, 189, 248, 0.07); border-left: 3px solid #38bdf8; padding: 10px 12px; border-radius: 6px; font-size: 0.8rem; color: #e4e4e7; line-height: 1.55;">
-                            <strong>Tóm tắt:</strong> ${String(rep.executive_summary || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
+                            <strong>Tóm tắt:</strong> ${formatVnDateTime(String(rep.executive_summary || '')).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
                         </div>
 
                         <div>
@@ -12550,7 +12591,7 @@ user=None`;
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <select id="nightly-date-select" onchange="loadNightlyReportForDate(this.value)" style="background: #090a0f; color: #f4f4f5; border: 1px solid #334155; border-radius: 6px; padding: 5px 9px; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;"></select>
-                    <input type="date" id="nightly-custom-date-input" style="background: #090a0f; color: #f4f4f5; border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; font-size: 0.75rem; outline: none;" title="Chọn ngày">
+                    <input type="text" id="nightly-custom-date-input" placeholder="DD/MM/YYYY" style="background: #090a0f; color: #f4f4f5; border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; width: 112px; font-size: 0.75rem; outline: none; text-align: center;" title="Chọn ngày (DD/MM/YYYY)">
                     <button type="button" id="btn-trigger-nightly-now" onclick="triggerNightlyReportGeneration()" style="background: #76b900; color: #000000; font-weight: 700; border: none; border-radius: 6px; padding: 5px 11px; font-size: 0.75rem; cursor: pointer;" title="Tổng hợp báo cáo cho ngày đã chọn">
                         Tổng hợp
                     </button>
