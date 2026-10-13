@@ -1,11 +1,28 @@
 import os
 import json
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env")
 STORAGE_DIR = BASE_DIR / "storage"
+
+
+def _load_env_files_safely() -> None:
+    """Load .env from repo root, CameraAI/.env, and storage/.env without letting blank keys wipe out existing env vars."""
+    for candidate in (BASE_DIR.parent / ".env", BASE_DIR / ".env", STORAGE_DIR / ".env"):
+        try:
+            if candidate.is_file():
+                for key, val in dotenv_values(candidate).items():
+                    if not key:
+                        continue
+                    cleaned = (val or "").strip()
+                    if cleaned or key not in os.environ:
+                        os.environ[key] = cleaned
+        except Exception:
+            pass
+
+
+_load_env_files_safely()
 # Keep database/config local; video evidence is saved directly to NAS.
 def _detect_clips_dir() -> Path:
     env_dir = os.getenv("CAMERAAI_CLIPS_DIR", "").strip()
@@ -329,3 +346,15 @@ def set_cosmos_prompt_profile(profile: str):
     cfg["cosmos_prompt_profile"] = profile
     save_config(cfg)
     COSMOS_PROMPT_PROFILE = profile
+
+
+# Nightly 22:00 -> 04:00 Automated Video Analysis & Daily Camera Reports
+NIGHTLY_REPORT_DIR = STORAGE_DIR / "nightly_reports"
+NIGHTLY_START_HOUR = int(os.getenv("CAMERAAI_NIGHTLY_START_HOUR", "22"))
+NIGHTLY_END_HOUR = int(os.getenv("CAMERAAI_NIGHTLY_END_HOUR", "4"))
+NIGHTLY_CUTOFF_HOUR = int(os.getenv("CAMERAAI_NIGHTLY_CUTOFF_HOUR", "22"))
+try:
+    NIGHTLY_REPORT_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+

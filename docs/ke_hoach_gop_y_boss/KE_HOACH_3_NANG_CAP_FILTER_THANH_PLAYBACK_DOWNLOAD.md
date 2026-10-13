@@ -1,4 +1,4 @@
-# 🎬 KẾ HOẠCH TRIỂN KHAI 3: NÂNG CẤP BỘ LỌC (FILTER) THÀNH GIAO DIỆN PLAYBACK & TẢI MP4
+# KẾ HOẠCH TRIỂN KHAI 3: NÂNG CẤP BỘ LỌC (FILTER) THÀNH GIAO DIỆN PLAYBACK & TẢI MP4
 
 > **Liên kết Checklist:** Hạng mục 6 (Cải tổ Filter khó dùng thành màn hình Playback thực thụ)  
 > **Dự án:** CameraDNCv2  
@@ -6,7 +6,7 @@
 
 ---
 
-## 🎯 1. MỤC TIÊU
+## 1. MỤC TIÊU
 1. **Khắc phục triệt để trải nghiệm Filter hiện tại:** 
    - Loại bỏ ô multi-select bắt bấm giữ `Ctrl` khó chịu.
    - Thay thế bằng giao diện chọn nhanh trực quan (Card/Chip/Buttons).
@@ -17,7 +17,7 @@
 
 ---
 
-## 🔍 2. SO SÁNH TRẢI NGHIỆM TRƯỚC VÀ SAU CẢI TỔ
+## 2. SO SÁNH TRẢI NGHIỆM TRƯỚC VÀ SAU CẢI TỔ
 
 | Đặc điểm | Hiện tại (Cần thay thế) | Sau cải tổ (Chuẩn Playback) |
 |:---|:---|:---|
@@ -29,7 +29,7 @@
 
 ---
 
-## 🛠️ 3. THIẾT KẾ GIAO DIỆN & TÍNH NĂNG
+## 3. THIẾT KẾ GIAO DIỆN & TÍNH NĂNG
 
 ```mermaid
 flowchart TD
@@ -39,8 +39,8 @@ flowchart TD
     FilterBar --> StepC["Chọn Nhãn: Đột nhập, Vượt rào, Đánh nhau,..."]
     FilterBar --> RunBtn["Bấm 'Lọc & Xem Lại'"]
     RunBtn --> ResultsGrid["2. Lưới kết quả Video Clip"]
-    ResultsGrid --> Action1["▶️ Xem trực tiếp (Inline Player)"]
-    ResultsGrid --> Action2["⬇️ Tải file MP4 về máy tính"]
+    ResultsGrid --> Action1["▶ Xem trực tiếp (Inline Player)"]
+    ResultsGrid --> Action2["⬇ Tải file MP4 về máy tính"]
 ```
 
 ### 3.1. Thiết kế lại Popover / Drawer Bộ lọc Playback
@@ -51,7 +51,7 @@ flowchart TD
   * Các nút tắt nhanh: `[1 Giờ gần nhất]`, `[Hôm nay]`, `[Hôm qua]`.
   * 2 ô chọn thời gian: `Từ mốc` và `Đến mốc`.
 * **Khu vực 3 - Chọn Nhãn sự kiện:**
-  * Danh sách Chip: `[🚨 Đột nhập]`, `[⚔️ Đánh nhau]`, `[🚧 Vượt rào]`, `[🔊 Âm thanh lớn]`, `[👤 Người]`, `[🚗 Xe]`.
+  * Danh sách Chip: `[ Đột nhập]`, `[ Đánh nhau]`, `[ Vượt rào]`, `[ Âm thanh lớn]`, `[ Người]`, `[ Xe]`.
 
 ### 3.2. Thiết kế Thẻ Kết quả & Trình phát Playback
 Trên mỗi thẻ video kết quả trả về:
@@ -82,7 +82,7 @@ Trên mỗi thẻ video kết quả trả về:
 
 ---
 
-## 🏁 4. TIÊU CHÍ NGHIỆM THU
+## 4. TIÊU CHÍ NGHIỆM THU
 1. **Dễ thao tác:** Người dùng chỉ mất dưới 5 giây để chọn camera, thời gian và nhãn mà không cần dùng bàn phím hay giữ phím Ctrl.
 2. **Xem trực tiếp:** Bấm vào clip là video phát ngay tức thì, tua được timeline mượt mà.
 3. **Tải về thành công:** Bấm nút Tải MP4 thì trình duyệt tải về file video chuẩn `.mp4`, mở bằng Windows Media Player / VLC xem bình thường với đầy đủ hình ảnh và âm thanh.

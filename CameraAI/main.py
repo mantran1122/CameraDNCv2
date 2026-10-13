@@ -48,6 +48,11 @@ from gemini_video_report import (
     save_gemini_local_config,
 )
 from clip_capture_worker import ClipCaptureWorker
+from nightly_report_worker import (
+    nightly_report_worker,
+    compute_rolling_window,
+    default_report_date_for_now,
+)
 from postgres_sync import enabled as postgres_dual_write_enabled
 from dahua_client import DahuaNVRListener
 from simulator import NVRDataSimulator
@@ -605,12 +610,14 @@ async def startup_event():
         postgres_sync_thread.start()
         print("[PostgreSQL Sync] Dual-write enabled; SQLite remains the read source.")
     restart_listener_service()
+    nightly_report_worker.start()
     print("[Server Startup] Dahua Internet Metadata & Anomaly Summarizer online.")
     print(f"[Storage] Video Clips Directory: {config.CLIPS_DIR} (Trang thai: {'San sang' if config.CLIPS_DIR.exists() else 'Chua tim thay'})")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     global nvr_listener, simulator_thread, audio_analysis_worker, video_analysis_worker, clip_capture_worker, metadata_cleanup_thread, postgres_sync_thread, server_event_loop
+    nightly_report_worker.stop()
     if nvr_listener:
         nvr_listener.stop()
     if simulator_thread:
@@ -1501,9 +1508,9 @@ def _build_concise_fast_summary(
         action_line = "Mức độ THÔNG TIN — Hoạt động đã được ghi nhận bình thường trên Kênh {:02d}, không phát hiện rủi ro khẩn cấp.".format(ch)
 
     return (
-        f"📍 Sự kiện: {vn_label} tại Camera Kênh {ch:02d} ({ts}).\n"
-        f"🔍 Phân tích nhanh: {detail_line}\n"
-        f"🛡️ Đánh giá: {action_line}"
+        f"Sự kiện: {vn_label} tại Camera Kênh {ch:02d} ({ts}).\n"
+        f"Phân tích nhanh: {detail_line}\n"
+        f"Đánh giá: {action_line}"
     )
 
 
@@ -1562,7 +1569,7 @@ async def fast_analyze_event_api(event_id: int, request: Request):
         prompt = (
             "Hãy tóm tắt cực kỳ ngắn gọn (tối đa 3 dòng ngắn, dưới 55 từ, tiếng Việt) sự kiện an ninh camera sau cho nhân viên trực:\n"
             f"{base_summary}\n"
-            "Giữ đúng 3 đầu mục: 📍 Sự kiện:, 🔍 Phân tích nhanh:, 🛡️ Đánh giá:"
+            "Giữ đúng 3 đầu mục: Sự kiện:, Phân tích nhanh:, Đánh giá:"
         )
         try:
             llm_text = await asyncio.wait_for(
@@ -3239,7 +3246,7 @@ async def test_nvr_connection(cfg: NVRConfigModel):
             "device_model": "DHI-NVR5832-EI2 (Chế độ Giả lập)",
             "serial_number": "7G098234910293",
             "firmware": "v4.002.0000000.1.R",
-            "message": "✅ Chế độ Giả lập (Demo Mode) đang hoạt động hoàn hảo!"
+            "message": "Chế độ Giả lập (Demo Mode) đang hoạt động hoàn hảo!"
         }
 
     protocol = "https" if (cfg.use_https or cfg.nvr_port in (443, 4443, 8443)) else "http"
@@ -3266,27 +3273,27 @@ async def test_nvr_connection(cfg: NVRConfigModel):
                 "device_model": device_type,
                 "serial_number": serial_no,
                 "firmware": firmware_ver,
-                "message": f"✅ KẾT NỐI THÀNH CÔNG TỚI ĐẦU GHI {device_type}! ({protocol.upper()}:{cfg.nvr_port})"
+                "message": f"KẾT NỐI THÀNH CÔNG TỚI ĐẦU GHI {device_type}! ({protocol.upper()}:{cfg.nvr_port})"
             }
         elif res.status_code in [401, 403]:
             return {
                 "success": False,
-                "message": f"❌ Lỗi Xác thực ({res.status_code}): Sai Tên đăng nhập hoặc Mật khẩu NVR."
+                "message": f"Lỗi Xác thực ({res.status_code}): Sai Tên đăng nhập hoặc Mật khẩu NVR."
             }
         else:
             return {
                 "success": False,
-                "message": f"❌ Đầu ghi phản hồi mã lỗi HTTP {res.status_code}. Kiểm tra lại cấu hình NAT/Port Forwarding."
+                "message": f"Đầu ghi phản hồi mã lỗi HTTP {res.status_code}. Kiểm tra lại cấu hình NAT/Port Forwarding."
             }
     except requests.exceptions.Timeout:
         return {
             "success": False,
-            "message": f"❌ Hết thời gian chờ (Timeout 8s). Không thể kết nối tới IP/Tên miền {cfg.nvr_host}:{cfg.nvr_port}. Kiểm tra DDNS/IP Tĩnh và Cổng HTTP."
+            "message": f"Hết thời gian chờ (Timeout 8s). Không thể kết nối tới IP/Tên miền {cfg.nvr_host}:{cfg.nvr_port}. Kiểm tra DDNS/IP Tĩnh và Cổng HTTP."
         }
     except Exception as e:
         return {
             "success": False,
-            "message": f"❌ Không thể kết nối tới NVR qua Internet: {str(e)}"
+            "message": f"Không thể kết nối tới NVR qua Internet: {str(e)}"
         }
 
 @app.post("/api/config/nvr")
@@ -3315,6 +3322,190 @@ async def api_purge_storage_retention(days: Optional[int] = Query(default=None),
     """Manual trigger to purge expired video folders on NAS and database events."""
     summary = purge_expired_metadata(retention_days=days)
     return summary
+
+def require_session_manager_or_admin(request: Request) -> dict:
+    """Only allow accounts with role 'admin' or 'manager' to access nightly reports."""
+    username = request.session.get("username")
+    role = str(request.session.get("role") or "").strip().lower()
+    if not username or role not in ("admin", "manager"):
+        raise HTTPException(
+            status_code=403,
+            detail="Chỉ tài khoản cấp Quản trị viên (Admin) hoặc Quản lý (Manager) mới được xem Báo cáo Phân tích Đêm (22h-4h).",
+        )
+    allowed_channels = get_current_user_allowed_channels(request)
+    return {
+        "username": str(username),
+        "role": role,
+        "allowed_channels": allowed_channels,
+    }
+
+
+@app.get("/api/nightly-reports/dates")
+async def api_list_nightly_report_dates(user_ctx: dict = Depends(require_session_manager_or_admin)):
+    """List available nightly report date folders in storage/nightly_reports/."""
+    base_dir = config.NIGHTLY_REPORT_DIR
+    base_dir.mkdir(parents=True, exist_ok=True)
+    items = []
+    for folder in sorted(base_dir.iterdir(), key=lambda p: p.name, reverse=True):
+        if not folder.is_dir() or not re.match(r"^\d{4}-\d{2}-\d{2}$", folder.name):
+            continue
+        status_file = folder / "_job_status.json"
+        master_file = folder / "_daily_master_summary.json"
+        st_data = {}
+        master_data = {}
+        if status_file.is_file():
+            try:
+                st_data = json.loads(status_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        if master_file.is_file():
+            try:
+                master_data = json.loads(master_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        _, w_start, w_end = compute_rolling_window(folder.name)
+        items.append({
+            "report_date": folder.name,
+            "window_start": master_data.get("window_start") or st_data.get("window_start") or w_start,
+            "window_end": master_data.get("window_end") or st_data.get("window_end") or w_end,
+            "status": st_data.get("status", "completed" if master_data else "pending"),
+            "total_events": master_data.get("total_events", st_data.get("total_events_in_window", 0)),
+            "total_anomalies": master_data.get("total_anomalies", st_data.get("total_anomalies", 0)),
+            "active_cameras": master_data.get("active_cameras", st_data.get("active_cameras", 0)),
+            "total_cameras": master_data.get("total_cameras", 32),
+            "generated_at": master_data.get("generated_at") or st_data.get("completed_at") or st_data.get("updated_at"),
+        })
+
+    return {
+        "dates": items,
+        "active_job": nightly_report_worker.get_active_job(),
+        "schedule_window": "22:00 -> 04:00 (Cuốn chiếu: 22:00 hôm trước -> 21:59:59 hôm nay)",
+        "storage_folder": str(base_dir),
+        "user_role": user_ctx["role"],
+    }
+
+
+@app.get("/api/nightly-reports/{report_date}")
+async def api_get_nightly_report_by_date(
+    report_date: str,
+    user_ctx: dict = Depends(require_session_manager_or_admin),
+):
+    """Return master summary and per-camera list for a given report date, filtered by RBAC allowed_channels."""
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", report_date.strip()):
+        raise HTTPException(status_code=400, detail="Định dạng ngày không hợp lệ (YYYY-MM-DD).")
+
+    folder = config.NIGHTLY_REPORT_DIR / report_date.strip()
+    master_file = folder / "_daily_master_summary.json"
+    status_file = folder / "_job_status.json"
+
+    if not folder.is_dir() or not master_file.is_file():
+        st_data = {}
+        if status_file.is_file():
+            try:
+                st_data = json.loads(status_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        return {
+            "exists": False,
+            "report_date": report_date,
+            "job_status": st_data or nightly_report_worker.get_active_job(),
+            "cameras": [],
+        }
+
+    master_data = json.loads(master_file.read_text(encoding="utf-8"))
+    allowed = user_ctx["allowed_channels"]
+    cameras = master_data.get("cameras") or []
+    if allowed is not None:
+        cameras = [c for c in cameras if int(c.get("channel") or 0) in allowed]
+
+    return {
+        "exists": True,
+        "report_date": master_data.get("report_date", report_date),
+        "window_start": master_data.get("window_start"),
+        "window_end": master_data.get("window_end"),
+        "cutoff_rule": master_data.get("cutoff_rule"),
+        "generated_at": master_data.get("generated_at"),
+        "total_events": sum(int(c.get("total_events") or 0) for c in cameras),
+        "total_anomalies": sum(int(c.get("anomaly_count") or 0) for c in cameras),
+        "active_cameras": sum(1 for c in cameras if int(c.get("total_events") or 0) > 0),
+        "total_cameras": len(cameras),
+        "cameras": cameras,
+        "active_job": nightly_report_worker.get_active_job(),
+    }
+
+
+@app.get("/api/nightly-reports/{report_date}/camera/{channel_id}")
+async def api_get_nightly_camera_report(
+    report_date: str,
+    channel_id: int,
+    user_ctx: dict = Depends(require_session_manager_or_admin),
+):
+    """Get the detailed daily report (.json + .md) for a specific camera on report_date."""
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", report_date.strip()):
+        raise HTTPException(status_code=400, detail="Định dạng ngày không hợp lệ (YYYY-MM-DD).")
+
+    allowed = user_ctx["allowed_channels"]
+    if allowed is not None and int(channel_id) not in allowed:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền xem báo cáo của Camera này.")
+
+    folder = config.NIGHTLY_REPORT_DIR / report_date.strip()
+    cam_file = folder / f"cam_{int(channel_id):02d}.json"
+    if not cam_file.is_file():
+        raise HTTPException(status_code=404, detail=f"Chưa có báo cáo ngày {report_date} cho Camera D{channel_id:02d}.")
+
+    return json.loads(cam_file.read_text(encoding="utf-8"))
+
+
+@app.get("/api/nightly-reports/{report_date}/camera/{channel_id}/download")
+async def api_download_nightly_camera_markdown(
+    report_date: str,
+    channel_id: int,
+    user_ctx: dict = Depends(require_session_manager_or_admin),
+):
+    """Download the concise Markdown (.md) report file for a specific camera."""
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", report_date.strip()):
+        raise HTTPException(status_code=400, detail="Định dạng ngày không hợp lệ (YYYY-MM-DD).")
+
+    allowed = user_ctx["allowed_channels"]
+    if allowed is not None and int(channel_id) not in allowed:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền tải báo cáo của Camera này.")
+
+    folder = config.NIGHTLY_REPORT_DIR / report_date.strip()
+    md_file = folder / f"cam_{int(channel_id):02d}.md"
+    if not md_file.is_file():
+        raise HTTPException(status_code=404, detail="Không tìm thấy file báo cáo Markdown.")
+
+    return FileResponse(
+        md_file,
+        media_type="text/markdown; charset=utf-8",
+        filename=f"BaoCaoDem_{report_date}_Cam_{int(channel_id):02d}.md",
+    )
+
+
+class TriggerNightlyReportRequest(BaseModel):
+    report_date: Optional[str] = None
+    max_vlm_clips: int = 4
+
+
+@app.post("/api/nightly-reports/trigger")
+async def api_trigger_nightly_report_now(
+    req: TriggerNightlyReportRequest,
+    user_ctx: dict = Depends(require_session_manager_or_admin),
+):
+    """Allow Admin or Manager to trigger the 22:00-04:00 rolling report generation immediately."""
+    job = nightly_report_worker.trigger_async(
+        report_date_str=req.report_date,
+        max_vlm_clips=max(0, min(int(req.max_vlm_clips), 30)),
+        use_llm_narrative=True,
+        triggered_by=f"{user_ctx['username']} ({user_ctx['role']})",
+    )
+    return {
+        "status": "started",
+        "message": f"Đã kích hoạt tổng hợp Báo cáo Đêm cho kỳ {job['report_date']} ({job['window_start']} → {job['window_end']}).",
+        "job": job,
+    }
+
 
 @app.websocket("/ws")
 @app.websocket("/ws/events")

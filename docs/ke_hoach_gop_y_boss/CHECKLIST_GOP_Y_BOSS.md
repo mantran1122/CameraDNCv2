@@ -1,4 +1,4 @@
-# 📋 BẢNG CHECKLIST & KẾ HOẠCH NÂNG CẤP CAMERADNCv2 THEO GÓP Ý CỦA SẾP
+# BẢNG CHECKLIST & KẾ HOẠCH NÂNG CẤP CAMERADNCv2 THEO GÓP Ý CỦA SẾP
 *(Bản đối chiếu thực tế mã nguồn & Hiệu chỉnh kế hoạch kỹ thuật toàn diện)*
 
 > **Dự án:** CameraDNCv2 — Hệ thống Giám sát & Quản trị Camera AI  
@@ -8,22 +8,22 @@
 
 ---
 
-## 🎯 TỔNG QUAN HIỆN TRẠNG 8 HẠNG MỤC GÓP Ý TỪ SẾP
+## TỔNG QUAN HIỆN TRẠNG 8 HẠNG MỤC GÓP Ý TỪ SẾP
 
 | STT | Phân hệ | Nội dung yêu cầu từ Sếp | Mức độ ưu tiên | Hiện trạng đối chiếu mã nguồn | Đánh giá tiến độ |
 |:---:|:---|:---|:---:|:---|:---:|
-| **1** | **UI Header** | Thay icon Dark/Light Mode thành **Icon Thông báo (Bell/Notification)** | Trung bình | ✅ **Đã hoàn thành 100%** (Icon Chuông, Badge đỏ realtime, Popover danh sách cảnh báo & clip modal trên cả search.html & Quasar Admin) | 100% |
-| **2** | **Video Manager** | Thêm ô nhỏ trên từng Camera để **xem lại toàn bộ sự kiện của đúng Camera đó** | Cao | ✅ **Đã hoàn thành 100%** (Nút Sự kiện trên từng camera trong lưới 4 ô & danh sách; Drawer lọc riêng biệt cho đúng camera đó kèm phát clip) | 100% |
-| **3** | **AI Agent / Chat** | Sửa lỗi Admin xem đủ mọi cam nhưng chat với AI chỉ nhận 5 kênh (`3, 11, 18, 19, 20`) | Khẩn cấp | ✅ **Đã hoàn thành 100%** (Đã mở rộng 32 kênh cho admin; bỏ hardcode 5 kênh tại `config.py`, `main.py`, `qwen_vision_client.py`) | 100% |
-| **4** | **Search Engine** | Khắc phục tốc độ truy vấn video quá chậm, tối ưu hóa theo **cơ chế chỉ mục (Index) như YouTube** | Khẩn cấp | ✅ **Đã hoàn thành 100%** (Loại bỏ triệt để quét đệ quy NAS SMB `rglob("*.mp4")`; tạo 5 composite indexes trong SQLite; benchmark đạt **~2.18ms**) | 100% |
-| **5** | **Tìm kiếm / Nhãn** | Lọc và tìm kiếm chuẩn xác theo **Nhãn cảnh báo (Alert/Event Labels)** theo nhu cầu | Cao | ✅ **Đã hoàn thành 100%** (Tách `VideoMotion` khỏi `anomaly`; lọc chuẩn xác SQL `WHERE event_code IN (...)`) | 100% |
-| **6** | **Bộ lọc / Playback** | Cải tổ lại Filter khó dùng thành **Playback thực thụ: Xem trực tiếp & Tải video MP4 về** | Cao | ✅ **Đã hoàn thành 100%** (Bộ chọn lịch Flatpickr `DD/MM/YYYY HH:mm`, phím tắt 1-click `1h, Hôm nay, Hôm qua...`, Lưới chọn 32 Cam, Thẻ Chip nhãn sự kiện & Nút Tải MP4 trực tiếp) | 100% |
-| **7** | **Search AI Logic** | Khắc phục AI bị "ngơ": Hỏi nguy hiểm thì lôi cái bình thường ra báo; phân định đúng nhãn nguy hiểm | Khẩn cấp | ✅ **Đã hoàn thành 100%** (Phân tách `CRITICAL_ANOMALY_CODES` vs `ROUTINE_EVENT_CODES`; xóa fallback tự bốc clip bừa `database.get_diverse_channel_events`) | 100% |
-| **8** | **Admin Cấu hình** | Chuyển phần **Cấu hình sự kiện bắt (Event Capture / Metadata Rules)** sang trang `/admin` thành một Tab riêng quản lý tập trung | Cao | ✅ **Đã hoàn thành 100%** (Tab "Cảnh báo Cam" trên `/admin/nvr`, Ma trận báo động đỏ riêng cho từng phòng ban: Chủ tịch, Hiệu trưởng, Kế toán; tiêu đề rút gọn $\le$ 3 từ) | 100% |
+| **1** | **UI Header** | Thay icon Dark/Light Mode thành **Icon Thông báo (Bell/Notification)** | Trung bình |  **Đã hoàn thành 100%** (Icon Chuông, Badge đỏ realtime, Popover danh sách cảnh báo & clip modal trên cả search.html & Quasar Admin) | 100% |
+| **2** | **Video Manager** | Thêm ô nhỏ trên từng Camera để **xem lại toàn bộ sự kiện của đúng Camera đó** | Cao |  **Đã hoàn thành 100%** (Nút Sự kiện trên từng camera trong lưới 4 ô & danh sách; Drawer lọc riêng biệt cho đúng camera đó kèm phát clip) | 100% |
+| **3** | **AI Agent / Chat** | Sửa lỗi Admin xem đủ mọi cam nhưng chat với AI chỉ nhận 5 kênh (`3, 11, 18, 19, 20`) | Khẩn cấp |  **Đã hoàn thành 100%** (Đã mở rộng 32 kênh cho admin; bỏ hardcode 5 kênh tại `config.py`, `main.py`, `qwen_vision_client.py`) | 100% |
+| **4** | **Search Engine** | Khắc phục tốc độ truy vấn video quá chậm, tối ưu hóa theo **cơ chế chỉ mục (Index) như YouTube** | Khẩn cấp |  **Đã hoàn thành 100%** (Loại bỏ triệt để quét đệ quy NAS SMB `rglob("*.mp4")`; tạo 5 composite indexes trong SQLite; benchmark đạt **~2.18ms**) | 100% |
+| **5** | **Tìm kiếm / Nhãn** | Lọc và tìm kiếm chuẩn xác theo **Nhãn cảnh báo (Alert/Event Labels)** theo nhu cầu | Cao |  **Đã hoàn thành 100%** (Tách `VideoMotion` khỏi `anomaly`; lọc chuẩn xác SQL `WHERE event_code IN (...)`) | 100% |
+| **6** | **Bộ lọc / Playback** | Cải tổ lại Filter khó dùng thành **Playback thực thụ: Xem trực tiếp & Tải video MP4 về** | Cao |  **Đã hoàn thành 100%** (Bộ chọn lịch Flatpickr `DD/MM/YYYY HH:mm`, phím tắt 1-click `1h, Hôm nay, Hôm qua...`, Lưới chọn 32 Cam, Thẻ Chip nhãn sự kiện & Nút Tải MP4 trực tiếp) | 100% |
+| **7** | **Search AI Logic** | Khắc phục AI bị "ngơ": Hỏi nguy hiểm thì lôi cái bình thường ra báo; phân định đúng nhãn nguy hiểm | Khẩn cấp |  **Đã hoàn thành 100%** (Phân tách `CRITICAL_ANOMALY_CODES` vs `ROUTINE_EVENT_CODES`; xóa fallback tự bốc clip bừa `database.get_diverse_channel_events`) | 100% |
+| **8** | **Admin Cấu hình** | Chuyển phần **Cấu hình sự kiện bắt (Event Capture / Metadata Rules)** sang trang `/admin` thành một Tab riêng quản lý tập trung | Cao |  **Đã hoàn thành 100%** (Tab "Cảnh báo Cam" trên `/admin/nvr`, Ma trận báo động đỏ riêng cho từng phòng ban: Chủ tịch, Hiệu trưởng, Kế toán; tiêu đề rút gọn $\le$ 3 từ) | 100% |
 
 ---
 
-## 🔍 ĐỐI CHIẾU MÃ NGUỒN CHI TIẾT & NGUYÊN NHÂN GỐC RỄ (ROOT CAUSE)
+## ĐỐI CHIẾU MÃ NGUỒN CHI TIẾT & NGUYÊN NHÂN GỐC RỄ (ROOT CAUSE)
 
 ---
 
@@ -176,7 +176,7 @@
 ### Hạng mục 8: Chuyển Cấu hình Sự kiện bắt sang trang Quản trị (/admin) thành 1 Tab riêng
 * **Thực trạng đối chiếu mã nguồn (Bằng chứng cụ thể):**
   1. File [templates/index.html dòng 38](file:///d:/CameraDNCv2/CameraAI/templates/index.html#L38):  
-     Nút `🌐 Cấu hình NVR` và modal cấu hình (`openConfigModal()`) vẫn tồn tại trên trang chủ của người vận hành, ai cũng có thể bấm vào sửa.
+     Nút ` Cấu hình NVR` và modal cấu hình (`openConfigModal()`) vẫn tồn tại trên trang chủ của người vận hành, ai cũng có thể bấm vào sửa.
   2. File [quasar-admin/src/pages/NvrConfig.vue](file:///d:/CameraDNCv2/quasar-admin/src/pages/NvrConfig.vue):  
      Trang cấu hình NVR trên Quasar Admin mới chỉ có form nhập IP, Cổng, RTSP, User, Mật khẩu, Toggle Demo Mode. **Hoàn toàn chưa có UI chọn các mã sự kiện bắt clip** (`abnormal_event_codes`: Intrusion, Fight, CrossLine, AudioMutation, VideoMotion, ...) và **chưa có bảng chọn bật/tắt 32 Kênh camera**.
   * *Kết luận:* Tiến độ thực tế mới đạt khoảng 30% (mới dựng khung trang NVR cơ bản, chưa hoàn thành phân hệ Cấu hình Quy tắc Bắt sự kiện).
@@ -188,9 +188,9 @@
 
 ---
 
-## 🚀 KẾ HOẠCH HÀNH ĐỘNG KỸ THUẬT CHI TIẾT (ACTION PLAN)
+## KẾ HOẠCH HÀNH ĐỘNG KỸ THUẬT CHI TIẾT (ACTION PLAN)
 
-### 📌 GIAI ĐOẠN 1: XỬ LÝ CÁC LỖI LOGIC KHẨN CẤP (AI AGENT & SEARCH LOGIC)
+### GIAI ĐOẠN 1: XỬ LÝ CÁC LỖI LOGIC KHẨN CẤP (AI AGENT & SEARCH LOGIC)
 *Thời gian dự kiến: 1 ngày | Mức độ ưu tiên: Khẩn cấp*
 
 - [x] **1.1. Sửa phạm vi 32 Kênh Camera cho AI Agent (Hạng mục 3):**
@@ -209,7 +209,7 @@
 
 ---
 
-### 📌 GIAI ĐOẠN 2: TỐI ƯU TỐC ĐỘ SEARCH ENGINE & CHUẨN HÓA LỌC NHÃN
+### GIAI ĐOẠN 2: TỐI ƯU TỐC ĐỘ SEARCH ENGINE & CHUẨN HÓA LỌC NHÃN
 *Thời gian dự kiến: 1-2 ngày | Mức độ ưu tiên: Khẩn cấp & Cao*
 
 - [x] **2.1. Tối ưu tốc độ Search Engine tức thì kiểu YouTube (Hạng mục 4):**
@@ -228,7 +228,7 @@
 
 ---
 
-### 📌 GIAI ĐOẠN 3: NÂNG CẤP FILTER THÀNH GIAO DIỆN PLAYBACK & TẢI MP4
+### GIAI ĐOẠN 3: NÂNG CẤP FILTER THÀNH GIAO DIỆN PLAYBACK & TẢI MP4
 *Thời gian dự kiến: 1-2 ngày | Mức độ ưu tiên: Cao*
 
 - [x] **3.1. Xây dựng giao diện Playback trực quan (Hạng mục 6):**
@@ -242,7 +242,7 @@
 
 ---
 
-### 📌 GIAI ĐOẠN 4: HOÀN THIỆN QUẢN TRỊ NVR & GIAO DIỆN THÔNG BÁO HEADER
+### GIAI ĐOẠN 4: HOÀN THIỆN QUẢN TRỊ NVR & GIAO DIỆN THÔNG BÁO HEADER
 *Thời gian dự kiến: 1-2 ngày | Mức độ ưu tiên: Cao & Trung bình*
 
 - [x] **4.1. Hoàn thiện phân hệ Cấu hình Sự kiện bắt & Ma trận Báo động Đỏ theo từng Camera trên Quasar Admin (Hạng mục 8):**
@@ -269,7 +269,7 @@
 
 ---
 
-## 📊 SƠ ĐỒ LỘ TRÌNH THỰC HIỆN TỔNG THỂ
+## SƠ ĐỒ LỘ TRÌNH THỰC HIỆN TỔNG THỂ
 
 ```mermaid
 flowchart TD
@@ -300,4 +300,4 @@ flowchart TD
 
 ---
 
-> 📝 **Ghi chú nghiệm thu:** Mọi thay đổi code sau khi thực hiện phải được kiểm thử thực tế trên hệ thống, xác nhận bằng log phản hồi API và đối chiếu với tiêu chuẩn yêu cầu của Sếp trước khi cập nhật trạng thái sang `[x] Đã hoàn thành`.
+>  **Ghi chú nghiệm thu:** Mọi thay đổi code sau khi thực hiện phải được kiểm thử thực tế trên hệ thống, xác nhận bằng log phản hồi API và đối chiếu với tiêu chuẩn yêu cầu của Sếp trước khi cập nhật trạng thái sang `[x] Đã hoàn thành`.

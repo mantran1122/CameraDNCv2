@@ -1,4 +1,4 @@
-# ⚡ KẾ HOẠCH TRIỂN KHAI 2: TỐI ƯU SEARCH ENGINE TỐC ĐỘ CAO (CƠ CHẾ YOUTUBE) & LỌC CHUẨN NHÃN
+# KẾ HOẠCH TRIỂN KHAI 2: TỐI ƯU SEARCH ENGINE TỐC ĐỘ CAO (CƠ CHẾ YOUTUBE) & LỌC CHUẨN NHÃN
 
 > **Liên kết Checklist:** Hạng mục 4 (Search Engine cực nhanh kiểu YouTube) & Hạng mục 5 (Lọc chính xác theo Nhãn cảnh báo)  
 > **Dự án:** CameraDNCv2  
@@ -6,14 +6,14 @@
 
 ---
 
-## 🎯 1. MỤC TIÊU
+## 1. MỤC TIÊU
 1. **Tốc độ phản hồi tức thì (< 200ms):** Loại bỏ hoàn toàn độ trễ hàng chục giây khi tìm kiếm video clip. Trải nghiệm tìm kiếm mượt mà như YouTube: gõ từ khóa là kết quả hiện ra ngay lập tức.
 2. **Triệt tiêu tắc nghẽn I/O ổ đĩa và Timeout mạng:** Tuyệt đối không quét ổ cứng hay gọi SMB mạng trong lúc người dùng đang bấm tìm kiếm.
 3. **Lọc chuẩn xác theo nhãn cảnh báo (Alert Labels):** Khi người dùng lọc theo nhãn (ví dụ `Intrusion`, `Fight`, `CrossLine`, `SoundDetection`, `HumanTrait`), hệ thống truy vấn chính xác các bản ghi mang nhãn đó từ Database.
 
 ---
 
-## 🔍 2. NGUYÊN LÝ YOUTUBE & BẢN CHẤT SỰ CỐ HIỆN TẠI
+## 2. NGUYÊN LÝ YOUTUBE & BẢN CHẤT SỰ CỐ HIỆN TẠI
 
 ### 2.1. Tại sao hệ thống hiện tại lại quá chậm?
 ```text
@@ -41,7 +41,7 @@ Query SQLite lấy 200 bản ghi
 
 ---
 
-## 🛠️ 3. GIẢI PHÁP & CÁC BƯỚC THỰC HIỆN
+## 3. GIẢI PHÁP & CÁC BƯỚC THỰC HIỆN
 
 ```mermaid
 flowchart LR
@@ -95,7 +95,7 @@ clip_web_url = f"/clips/{row['clip_filename'].replace('\\', '/')}"
 
 ---
 
-## 🏁 4. TIÊU CHÍ NGHIỆM THU
+## 4. TIÊU CHÍ NGHIỆM THU
 1. **Tốc độ truy vấn:** Bấm tìm kiếm trên thanh search hoặc lọc nhãn, kết quả phản hồi **dưới 200ms**.
 2. **Không nghẽn I/O:** CPU và Disk I/O không bị vọt lên 100% khi thực hiện tìm kiếm.
 3. **Độ chính xác theo nhãn:** 

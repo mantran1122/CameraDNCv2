@@ -3908,7 +3908,8 @@
             align-items: center;
             justify-content: space-between;
             flex-shrink: 0;
-            z-index: 5;
+            position: relative;
+            z-index: 20;
         }
 
         .ncc-slot-header-left {
@@ -5758,7 +5759,13 @@
             <h1 class="header-title">CAMERA AI DNC</h1>
         </div>
 
-        <div class="header-right">
+        <div class="header-right" style="display: flex; align-items: center; gap: 10px;">
+            <!-- Hạng mục 5: Nút mở Thư mục Báo cáo Đêm (22h - 4h sáng) dành cho Admin / Manager -->
+            <button type="button" id="btn-open-nightly-reports" onclick="openNightlyReportsModal()" style="display: none; align-items: center; gap: 6px; background: rgba(118, 185, 0, 0.14); border: 1px solid rgba(118, 185, 0, 0.45); color: #a3e635; padding: 5px 11px; border-radius: 6px; font-size: 0.76rem; font-weight: 600; cursor: pointer; transition: all 0.15s;" title="Xem Thư mục Báo cáo Phân tích Video tự động Ban đêm (22:00 -> 04:00)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                <span>Báo cáo Đêm (22h-4h)</span>
+            </button>
+
             <!-- Hạng mục 1: Thay nút Sáng/Tối thành Icon Chuông Thông báo Cảnh báo Realtime -->
             <div class="notif-bell-wrap" id="header-notif-wrap">
                 <button class="notif-bell-btn" id="notif-bell-btn" onclick="toggleNotificationPopover(event)" title="Thông báo Cảnh báo An ninh (Realtime)">
@@ -6275,15 +6282,15 @@
                         <span>Cấu hình Quản lý Camera</span>
                     </button>
                     <button class="ncc-mode-btn" id="ncc-btn-lock-config" onclick="lockAndHideConfig()" title="Khóa &amp; Ẩn tab Cấu hình" style="display: none; color: #f87171; border-color: rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.1);">
-                        <span>🔒 Khóa &amp; Ẩn</span>
+                        <span>Khóa &amp; Ẩn</span>
                     </button>
                 </div>
 
                 <!-- Right Filter & Status -->
                 <div class="ncc-filter-box">
-                    <input type="text" class="ncc-search-input" id="ncc-search-filter" placeholder="🔍 Lọc camera, vị trí, kênh..." oninput="filterNccCameras(this.value)">
+                    <input type="text" class="ncc-search-input" id="ncc-search-filter" placeholder="Lọc camera, vị trí, kênh..." oninput="filterNccCameras(this.value)">
                     <button class="popover-btn-cancel" onclick="refreshNccVideoManager()" style="height: 28px; padding: 0 10px; font-size: 0.75rem; display: flex; align-items: center; gap: 4px;">
-                        <span>🔄 Làm mới</span>
+                        <span>Làm mới</span>
                     </button>
                 </div>
             </div>
@@ -6347,10 +6354,10 @@
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <button class="ncc-cfg-btn-secondary" onclick="testNccNvrConnection()" id="ncc-cfg-btn-test">
-                                    <span>🔍 Kiểm tra kết nối</span>
+                                    <span>Kiểm tra kết nối</span>
                                 </button>
                                 <button class="ncc-cfg-btn" onclick="saveCameraConfigFromUI()" id="ncc-cfg-btn-save-nvr">
-                                    <span>💾 Lưu thiết lập NVR &amp; Camera</span>
+                                    <span>Lưu thiết lập NVR &amp; Camera</span>
                                 </button>
                             </div>
                         </div>
@@ -6379,7 +6386,9 @@
                                 <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Mật khẩu (Password)</label>
                                 <div style="position: relative;">
                                     <input type="password" class="ncc-cfg-input" id="cfg-nvr-pass" value="User#$168" placeholder="Password" style="padding-right: 32px;">
-                                    <button type="button" onclick="toggleCfgPasswordVisibility()" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #71717a; cursor: pointer; font-size: 0.75rem;">👁️</button>
+                                    <button type="button" onclick="toggleCfgPasswordVisibility()" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #71717a; cursor: pointer; display: inline-flex; align-items: center;" title="Hiện/Ẩn mật khẩu">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -6409,7 +6418,7 @@
                                     <span>Bỏ chọn</span>
                                 </button>
                                 <button type="button" class="ncc-cfg-btn" onclick="saveCameraConfigFromUI()" style="padding: 3px 10px; font-size: 0.72rem;">
-                                    <span>💾 Lưu Cấu hình</span>
+                                    <span>Lưu Cấu hình</span>
                                 </button>
                             </div>
                         </div>
@@ -6435,7 +6444,7 @@
                                     <span>Bỏ chọn</span>
                                 </button>
                                 <button class="ncc-cfg-btn" onclick="saveCameraConfigFromUI()">
-                                    <span>💾 Lưu Danh sách Tên Camera</span>
+                                    <span>Lưu Danh sách Tên Camera</span>
                                 </button>
                             </div>
                         </div>
@@ -6535,38 +6544,6 @@
                     </div>
                     <div class="ncc-panel-list" id="ncc-events-list"></div>
                 </div>
-
-                <!-- 4. Bottom Floating KPI Capacity Bar -->
-                <div class="ncc-kpi-bar">
-                    <div class="ncc-kpi-group">
-                        <div class="ncc-kpi-stat">
-                            <span class="ncc-kpi-val cyan" id="kpi-total-cams">32</span>
-                            <span class="ncc-kpi-lbl">Tổng Camera</span>
-                        </div>
-                        <div class="ncc-kpi-stat">
-                            <span class="ncc-kpi-val green" id="kpi-online-cams">30</span>
-                            <span class="ncc-kpi-lbl">Trực tuyến (Online)</span>
-                        </div>
-                        <div class="ncc-kpi-stat">
-                            <span class="ncc-kpi-val red" id="kpi-alert-cams">2</span>
-                            <span class="ncc-kpi-lbl">Cảnh báo (Alerts)</span>
-                        </div>
-                    </div>
-                    <div class="ncc-kpi-group">
-                        <div class="ncc-kpi-stat">
-                            <span class="ncc-kpi-val" id="kpi-network-bitrate">48.2</span>
-                            <span class="ncc-kpi-lbl">Mbps Băng thông</span>
-                        </div>
-                        <div class="ncc-kpi-stat">
-                            <span class="ncc-kpi-val green" id="kpi-avg-fps">25.0</span>
-                            <span class="ncc-kpi-lbl">FPS Trung bình</span>
-                        </div>
-                        <div class="ncc-kpi-stat">
-                            <span class="ncc-kpi-val" style="color: #a855f7;">ACTIVE</span>
-                            <span class="ncc-kpi-lbl">YOLOv8 + VSS Vision</span>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -6583,7 +6560,6 @@
 
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <div style="display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); font-size: 0.72rem; color: #a1a1aa;">
-                        <span>🕒</span>
                         <span id="kb-time-range-text">24h gần nhất</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 5px; font-size: 0.72rem; color: #86efac; background: rgba(34, 197, 94, 0.1); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(34, 197, 94, 0.25);">
@@ -6591,14 +6567,13 @@
                         <span>DB Sync: <b id="kb-db-record-count">51,791</b> sự kiện</span>
                     </div>
                     <button class="win11-tb-btn" onclick="fetchAndRenderKibanaRealStats()" style="font-size: 0.72rem; height: 26px; padding: 0 8px; display: flex; align-items: center; gap: 4px;" title="Làm mới số liệu thực từ SQLite Database">
-                        <span>🔄</span>
                         <span>Làm mới DB</span>
                     </button>
                     <a href="http://localhost:5601/app/dashboards#/view/school-surveillance-dashboard" target="_blank" class="search-submit-btn" style="height: 26px; padding: 0 10px; font-size: 0.72rem; text-decoration: none; display: flex; align-items: center; gap: 5px; background: #0077cc;" title="Mở Kibana Server nếu đang chạy">
                         <span>Kibana :5601 ↗</span>
                     </a>
                     <button class="win11-tb-btn" onclick="toggleDashboardVisibility()" style="font-size: 0.72rem; height: 26px; padding: 0 8px; display: flex; align-items: center; gap: 4px; background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); cursor: pointer;" title="Ẩn tab Dashboard (Nhấn Ctrl + Shift + D để mở lại)">
-                        <span>🔒 Ẩn Dashboard</span>
+                        <span>Ẩn Dashboard</span>
                     </button>
                 </div>
             </div>
@@ -6754,8 +6729,8 @@
                         <!-- Quick Filter Tabs for Events -->
                         <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
                             <button id="kb-filter-btn-all" class="win11-tb-btn active" onclick="setKibanaTableFilter('all')" style="height: 22px; padding: 0 8px; font-size: 0.68rem; border-radius: 3px;">Tất cả</button>
-                            <button id="kb-filter-btn-clip" class="win11-tb-btn" onclick="setKibanaTableFilter('with_clip')" style="height: 22px; padding: 0 8px; font-size: 0.68rem; border-radius: 3px; color: #38bdf8;" title="Lọc các sự kiện có video clip MP4">🎬 Có Clip (<b id="kb-clips-count-badge">3,640</b>)</button>
-                            <button id="kb-filter-btn-anom" class="win11-tb-btn" onclick="setKibanaTableFilter('anomalies')" style="height: 22px; padding: 0 8px; font-size: 0.68rem; border-radius: 3px; color: #f87171;" title="Chỉ hiển thị các cảnh báo an ninh học đường">⚠️ Cảnh báo</button>
+                            <button id="kb-filter-btn-clip" class="win11-tb-btn" onclick="setKibanaTableFilter('with_clip')" style="height: 22px; padding: 0 8px; font-size: 0.68rem; border-radius: 3px; color: #38bdf8;" title="Lọc các sự kiện có video clip MP4">Có Clip (<b id="kb-clips-count-badge">3,640</b>)</button>
+                            <button id="kb-filter-btn-anom" class="win11-tb-btn" onclick="setKibanaTableFilter('anomalies')" style="height: 22px; padding: 0 8px; font-size: 0.68rem; border-radius: 3px; color: #f87171;" title="Chỉ hiển thị các cảnh báo an ninh học đường">Cảnh báo</button>
                         </div>
 
                         <div style="display: flex; align-items: center; gap: 10px;">
@@ -6810,8 +6785,8 @@
                         
                         <!-- Toggle Live Stream vs Recorded Clip -->
                         <div id="ncc-modal-source-toggle" style="position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; z-index: 10; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); padding: 3px 6px; border-radius: 6px; border: 1px solid #27272a;">
-                            <button id="ncc-btn-source-live" class="ncc-modal-tab-btn active" onclick="switchNccModalSource('live')">🔴 LIVE RTSP</button>
-                            <button id="ncc-btn-source-clip" class="ncc-modal-tab-btn" onclick="switchNccModalSource('clip')" style="display: none;">🎬 CLIP GẦN NHẤT</button>
+                            <button id="ncc-btn-source-live" class="ncc-modal-tab-btn active" onclick="switchNccModalSource('live')">LIVE RTSP</button>
+                            <button id="ncc-btn-source-clip" class="ncc-modal-tab-btn" onclick="switchNccModalSource('clip')" style="display: none;">CLIP GẦN NHẤT</button>
                         </div>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; background: #18181b; padding: 10px 14px; border-radius: 6px; border: 1px solid #27272a; font-size: 0.75rem; flex-wrap: wrap; gap: 8px;">
@@ -6823,7 +6798,7 @@
                         </div>
                         <div style="display: flex; gap: 8px;">
                             <button onclick="jumpToSearchFromCamera()" style="background: #76b900; color: #000; border: none; padding: 6px 14px; border-radius: 4px; font-weight: 700; font-size: 0.75rem; cursor: pointer; transition: opacity 0.15s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-                                🔍 Tìm kiếm Video quanh Camera này
+                                Tìm kiếm Video quanh Camera này
                             </button>
                         </div>
                     </div>
@@ -6849,10 +6824,10 @@
                 <div class="ncc-ced-filter-bar">
                     <div class="ncc-ced-filter-tabs">
                         <button class="ncc-ced-filter-tab active" id="ced-filter-all" onclick="filterCedEvents('all')">Tất cả (<span id="ced-count-all">0</span>)</button>
-                        <button class="ncc-ced-filter-tab" id="ced-filter-anomalies" onclick="filterCedEvents('anomalies')">⚠️ Cảnh báo (<span id="ced-count-anomalies">0</span>)</button>
-                        <button class="ncc-ced-filter-tab" id="ced-filter-clips" onclick="filterCedEvents('clips')">🎬 Có Clip (<span id="ced-count-clips">0</span>)</button>
+                        <button class="ncc-ced-filter-tab" id="ced-filter-anomalies" onclick="filterCedEvents('anomalies')">Cảnh báo (<span id="ced-count-anomalies">0</span>)</button>
+                        <button class="ncc-ced-filter-tab" id="ced-filter-clips" onclick="filterCedEvents('clips')">Có Clip (<span id="ced-count-clips">0</span>)</button>
                     </div>
-                    <button class="popover-btn-cancel" onclick="reloadCurrentCameraEvents()" style="height: 26px; padding: 0 8px; font-size: 0.72rem; cursor: pointer;">🔄 Tải lại</button>
+                    <button class="popover-btn-cancel" onclick="reloadCurrentCameraEvents()" style="height: 26px; padding: 0 8px; font-size: 0.72rem; cursor: pointer;">Tải lại</button>
                 </div>
 
                 <!-- Danh sách sự kiện của Camera -->
@@ -6865,7 +6840,7 @@
                 <!-- Footer Drawer -->
                 <div class="ncc-ced-footer">
                     <span id="ncc-ced-footer-stats" style="color: var(--text-muted);">Đang hiển thị 0 sự kiện</span>
-                    <button class="ncc-ced-search-btn" onclick="openCameraInSearchTab()" title="Mở trang tìm kiếm cho camera này">🔍 Mở trong Tìm kiếm AI</button>
+                    <button class="ncc-ced-search-btn" onclick="openCameraInSearchTab()" title="Mở trang tìm kiếm cho camera này">Mở trong Tìm kiếm AI</button>
                 </div>
             </div>
         </div>
@@ -7008,15 +6983,14 @@
     </div>
 
     <!-- 4. Video Playback Modal (matching media_1788857714710.png) -->
-    <!-- 4. Video Playback Modal (matching media_1788857714710.png) -->
-    <div class="video-modal-backdrop" id="video-playback-modal" style="display: none;" onclick="if(event.target===this) closeVideoModal()">
+    <div class="video-modal-backdrop" id="video-playback-modal" style="display: none; z-index: 10100;" onclick="if(event.target===this) closeVideoModal()">
         <div class="video-modal-container" style="max-width: 820px; width: 92vw;">
             <div class="video-modal-top">
                 <span class="video-modal-title" id="modal-video-title">warehouse_20250101_000000_3805c.mp4</span>
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <!-- Fast 3s AI Analysis Button -->
                     <button type="button" id="modal-fast-ai-btn" onclick="triggerModalFastAiAnalysis()" style="height: 26px; padding: 0 10px; font-size: 0.725rem; font-weight: 600; border-radius: 4px; border: 1px solid rgba(118, 185, 0, 0.55); background: rgba(118, 185, 0, 0.16); color: #9be62b; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;" title="Gửi AI phân tích nhanh sự kiện này (< 3 giây)">
-                        <span>⚡ AI Phân tích (3s)</span>
+                        <span>AI Phân tích (3s)</span>
                     </button>
                     <!-- Speed buttons -->
                     <div style="display: flex; gap: 3px; background: rgba(255,255,255,0.06); padding: 2px 4px; border-radius: 4px;">
@@ -7043,7 +7017,7 @@
             <div id="modal-fast-ai-box" style="display: none; padding: 12px 16px; background: rgba(15, 23, 42, 0.96); border-top: 1px solid rgba(118, 185, 0, 0.35); color: #e4e4e7; font-size: 0.8rem; line-height: 1.5;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
                     <span style="font-weight: 700; color: #8ae300; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 6px;">
-                        <span>🤖 Kết quả AI Phân tích nhanh</span>
+                        <span>Kết quả AI Phân tích nhanh</span>
                         <span id="modal-fast-ai-meta" style="font-weight: 500; color: #a1a1aa; font-size: 0.7rem;"></span>
                     </span>
                 </div>
@@ -7082,7 +7056,7 @@
                     <div class="ncc-login-pass-wrap">
                         <input type="password" id="ncc-login-password" autocomplete="current-password" placeholder="Nhập mật khẩu..." required>
                         <button type="button" class="ncc-login-eye-btn" onclick="toggleNccLoginPasswordVisibility()" title="Hiển thị/Ẩn mật khẩu">
-                            👁️
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                         </button>
                     </div>
                 </div>
@@ -7090,7 +7064,7 @@
                 <div class="ncc-login-footer">
                     <button type="button" class="ncc-login-btn-cancel" onclick="closeNccLoginModal()">Hủy bỏ</button>
                     <button type="submit" class="ncc-login-btn-submit" id="ncc-login-submit-btn">
-                        <span>🔓 Đăng nhập &amp; Mở Cấu hình</span>
+                        <span>Đăng nhập &amp; Mở Cấu hình</span>
                     </button>
                 </div>
             </form>
@@ -7509,7 +7483,6 @@
 
             if (bar) bar.style.display = 'flex';
             if (titleEl) titleEl.innerText = `${title} [${startTime} - ${endTime}]`;
-            if (framesEl) framesEl.innerText = `32 frames (Server AI)`;
             if (framesEl) framesEl.innerText = `32 frames + Audio (Server AI)`;
 
             // Pre-fill smart prompt with auto-grow up to max 3 lines
@@ -7754,14 +7727,11 @@ user=None`;
                             <div style="display: flex; align-items: center; gap: 0.65rem; color: #a1a1aa; font-size: 0.8125rem;">
                                 <div class="camera-spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>
                                 <span id="${timerId}" style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--nv-green); min-width: 58px;">[00:00s]</span>
-                                <span>Đang trích xuất 32 frames & gửi lên Server AI (GLM-5.3-Flash)...</span>
                                 <span>Đang trích xuất 32 frames & phân tích âm thanh thực tế (DeepFilterNet)...</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.6875rem; color: #71717a; font-family: monospace; padding-left: 1.65rem;">
-                                <span style="color: #f97316;">[1. VIOS Cắt 32 Frames]</span>
                                 <span style="color: #f97316;">[1. Cắt 32 Frames & Lọc Âm Thanh]</span>
                                 <span>➔</span>
-                                <span style="color: #a3e635; font-weight: 600;">[2. Server AI VLM Phân tích]</span>
                                 <span style="color: #a3e635; font-weight: 600;">[2. Server AI Đa Phương Thức]</span>
                                 <span>➔</span>
                                 <span>[3. Hoàn tất]</span>
@@ -7836,7 +7806,7 @@ user=None`;
                         const transcriptBadge = a.transcript ? `
                             <div style="background: rgba(34, 197, 94, 0.08); border-left: 3px solid #22c55e; padding: 0.5rem 0.75rem; border-radius: 4px; margin-top: 0.5rem;">
                                 <div style="font-size: 0.6875rem; color: #86efac; font-weight: 600; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 0.35rem;">
-                                    <span>🎙️ LỜI THOẠI BÓC BĂNG (TRANSCRIPT)</span>
+                                    <span>LỜI THOẠI BÓC BĂNG (TRANSCRIPT)</span>
                                 </div>
                                 <div style="font-size: 0.8125rem; color: #f0fdf4; font-style: italic; line-height: 1.5;">"${escapeHtml(a.transcript)}"</div>
                             </div>
@@ -7844,7 +7814,7 @@ user=None`;
 
                         const soundsBadge = (a.detected_sounds && a.detected_sounds.length) ? `
                             <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem;">
-                                ${a.detected_sounds.map(s => `<span style="font-size: 0.6875rem; background: #27272a; color: #e4e4e7; padding: 0.15rem 0.45rem; border-radius: 3px; border: 1px solid #3f3f46;">🔊 ${escapeHtml(s)}</span>`).join('')}
+                                ${a.detected_sounds.map(s => `<span style="font-size: 0.6875rem; background: #27272a; color: #e4e4e7; padding: 0.15rem 0.45rem; border-radius: 3px; border: 1px solid #3f3f46;">${escapeHtml(s)}</span>`).join('')}
                             </div>
                         ` : '';
 
@@ -9188,10 +9158,10 @@ user=None`;
 
             if (aiBox) aiBox.style.display = 'block';
             if (aiMeta) aiMeta.innerText = 'Đang phân tích (< 3s)...';
-            if (aiContent) aiContent.innerText = '⏳ AI đang trích xuất đặc trưng sự kiện và tổng hợp báo cáo ngắn gọn...';
+            if (aiContent) aiContent.innerText = 'AI đang trích xuất đặc trưng sự kiện và tổng hợp báo cáo ngắn gọn...';
             if (aiBtn) {
                 aiBtn.disabled = true;
-                aiBtn.innerHTML = '<span>⏳ Đang phân tích...</span>';
+                aiBtn.innerHTML = '<span>Đang phân tích...</span>';
             }
 
             const evObj = recentNotificationsList.find(x => Number(x.id) === Number(eventId)) || {};
@@ -9226,7 +9196,7 @@ user=None`;
                 }
 
                 const summaryText = data.summary || 'Đã xác nhận sự kiện an ninh trên camera.';
-                if (aiMeta) aiMeta.innerText = `⚡ Hoàn tất trong ${elapsedSec}s • ${data.model || 'VSS Fast AI'}`;
+                if (aiMeta) aiMeta.innerText = `Hoàn tất trong ${elapsedSec}s • ${data.model || 'VSS Fast AI'}`;
                 if (aiContent) aiContent.innerText = summaryText;
 
                 // Also append concise AI result to Vision Agent chat sidebar for history
@@ -9238,16 +9208,16 @@ user=None`;
                 const code = evObj.event_code || evObj.event_type || 'Cảnh báo';
                 const desc = evObj.description || 'Phát hiện tín hiệu cảnh báo an ninh từ đầu ghi NVR';
                 const fallbackSummary =
-                    `📍 Sự kiện: ${code} tại Camera Kênh ${ch < 10 ? '0' + ch : ch} (${evObj.timestamp || 'Vừa ghi nhận'}).\n` +
-                    `🔍 Phân tích nhanh: ${desc}.\n` +
-                    `🛡️ Đánh giá: Đã tải đoạn video liên quan, vui lòng quan sát trực tiếp diễn biến trên trình phát.`;
-                if (aiMeta) aiMeta.innerText = `⚡ Phản hồi tức thì (${elapsedSec}s)`;
+                    `Sự kiện: ${code} tại Camera Kênh ${ch < 10 ? '0' + ch : ch} (${evObj.timestamp || 'Vừa ghi nhận'}).\n` +
+                    `Phân tích nhanh: ${desc}.\n` +
+                    `Đánh giá: Đã tải đoạn video liên quan, vui lòng quan sát trực tiếp diễn biến trên trình phát.`;
+                if (aiMeta) aiMeta.innerText = `Phản hồi tức thì (${elapsedSec}s)`;
                 if (aiContent) aiContent.innerText = fallbackSummary;
                 appendFastAiResultToChat(evObj, fallbackSummary, elapsedSec);
             } finally {
                 if (aiBtn) {
                     aiBtn.disabled = false;
-                    aiBtn.innerHTML = '<span>⚡ AI Phân tích (3s)</span>';
+                    aiBtn.innerHTML = '<span>AI Phân tích (3s)</span>';
                 }
             }
         }
@@ -9261,7 +9231,7 @@ user=None`;
             msgDiv.innerHTML = `
                 <div class="chat-bubble" style="border-left: 3px solid #76b900;">
                     <div style="font-weight: 700; color: #8ae300; font-size: 0.75rem; margin-bottom: 4px;">
-                        ⚡ AI Phân tích nhanh Sự kiện #${evObj.id || ''} (Kênh ${ch < 10 ? '0' + ch : ch}) • ${elapsedSec}s
+                        AI Phân tích nhanh Sự kiện #${evObj.id || ''} (Kênh ${ch < 10 ? '0' + ch : ch}) • ${elapsedSec}s
                     </div>
                     <div style="white-space: pre-line; font-size: 0.78rem; line-height: 1.45;">${summaryText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
                 </div>
@@ -9831,7 +9801,7 @@ user=None`;
                 if (body) {
                     body.innerHTML = `
                         <div style="padding: 24px; text-align: center; color: #ef4444; font-size: 0.8rem;">
-                            ⚠️ Không thể tải dữ liệu sự kiện của Camera Kênh ${camId}. Vui lòng thử lại.
+                            Không thể tải dữ liệu sự kiện của Camera Kênh ${camId}. Vui lòng thử lại.
                         </div>
                     `;
                 }
@@ -9916,7 +9886,7 @@ user=None`;
                     <div class="ncc-ced-card ${cardClass}">
                         <div class="ncc-ced-card-top">
                             <span class="ncc-ced-event-tag ${tagClass}">${label}</span>
-                            <span class="ncc-ced-time">🕒 ${ev.timestamp || 'Chưa rõ'}</span>
+                            <span class="ncc-ced-time">${ev.timestamp || 'Chưa rõ'}</span>
                         </div>
                         <div class="ncc-ced-desc">${ev.description || 'Sự kiện ghi nhận từ camera'}</div>
                         <div class="ncc-ced-card-actions">
@@ -10004,6 +9974,7 @@ user=None`;
 
                 window.currentAuthUsername = data.username || 'default';
                 window.isCurrentUserAdmin = Boolean(data.is_admin);
+                window.currentUserRole = String(data.role || (data.is_admin ? 'admin' : 'viewer')).toLowerCase();
                 window.userAllowedCamerasList = Array.isArray(data.cameras) ? data.cameras : [];
                 window.userAllowedChannels = window.userAllowedCamerasList.map(c => Number(c.channel));
 
@@ -10011,6 +9982,12 @@ user=None`;
                 const adminLink = document.getElementById('sidebar-admin-link');
                 if (adminLink && data.is_admin) {
                     adminLink.style.display = 'flex';
+                }
+
+                // Hiển thị nút Thư mục Báo cáo Đêm (22h-4h) cho Admin hoặc Manager
+                const nightlyBtn = document.getElementById('btn-open-nightly-reports');
+                if (nightlyBtn && (data.is_admin || window.currentUserRole === 'manager')) {
+                    nightlyBtn.style.display = 'inline-flex';
                 }
 
                 const selectEl = document.getElementById('filter-video-sources');
@@ -10856,7 +10833,7 @@ user=None`;
                     : '<span style="background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); padding: 2px 6px; border-radius: 3px; font-weight: 500; font-size: 0.65rem;">BÌNH THƯỜNG</span>';
 
                 const camName = SCHOOL_CAM_NAMES[ev.channel] || (NCC_NVR_CONFIG?.camera_names?.[String(ev.channel)]) || `Kênh ${ev.channel}`;
-                const camBadge = `<span style="background: rgba(118, 185, 0, 0.15); color: #8ae300; border: 1px solid rgba(118, 185, 0, 0.3); padding: 2px 7px; border-radius: 3px; font-weight: 600; font-size: 0.68rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="selectNccCamera(${ev.channel})" title="Bấm để xem trực tiếp ${camName}">📷 CAM ${ev.channel} • ${camName}</span>`;
+                const camBadge = `<span style="background: rgba(118, 185, 0, 0.15); color: #8ae300; border: 1px solid rgba(118, 185, 0, 0.3); padding: 2px 7px; border-radius: 3px; font-weight: 600; font-size: 0.68rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="selectNccCamera(${ev.channel})" title="Bấm để xem trực tiếp ${camName}">CAM ${ev.channel} • ${camName}</span>`;
                 
                 const eventLabel = getNccEventLabel(ev.event_code);
                 const codeBadge = `<span style="color: #67e8f9; font-weight: 600; font-size: 0.72rem;" title="${ev.event_code}">${eventLabel}</span>`;
@@ -10887,8 +10864,8 @@ user=None`;
                 } else {
                     actionBtnHtml = `
                         <div style="display: inline-flex; align-items: center; gap: 4px; justify-content: center;">
-                            <button onclick="selectNccCamera(${ev.channel})" class="win11-tb-btn" style="height: 22px; padding: 0 6px; font-size: 0.65rem; background: rgba(34, 197, 94, 0.15); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 3px; cursor: pointer;" title="Mở luồng camera trực tiếp tại ${camName}">🔴 Live</button>
-                            <button id="btn-cut-${ev.id}" onclick="requestCaptureEventClip(${ev.id}, ${ev.channel}, this)" class="win11-tb-btn" style="height: 22px; padding: 0 6px; font-size: 0.65rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 3px; cursor: pointer;" title="Trích xuất lại video bằng NVR Playback cho mốc sự kiện này">⚡ Cắt Clip</button>
+                            <button onclick="selectNccCamera(${ev.channel})" class="win11-tb-btn" style="height: 22px; padding: 0 6px; font-size: 0.65rem; background: rgba(34, 197, 94, 0.15); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 3px; cursor: pointer;" title="Mở luồng camera trực tiếp tại ${camName}">Live</button>
+                            <button id="btn-cut-${ev.id}" onclick="requestCaptureEventClip(${ev.id}, ${ev.channel}, this)" class="win11-tb-btn" style="height: 22px; padding: 0 6px; font-size: 0.65rem; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 3px; cursor: pointer;" title="Trích xuất lại video bằng NVR Playback cho mốc sự kiện này">Cắt Clip</button>
                         </div>
                     `;
                 }
@@ -10910,7 +10887,7 @@ user=None`;
             if (!btn) return;
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '⏳ Đang cắt...';
+            btn.innerHTML = 'Đang cắt...';
             try {
                 const resp = await fetch(`/api/events/${eventId}/capture-clip`, { method: 'POST' });
                 const res = await resp.json();
@@ -10961,15 +10938,6 @@ user=None`;
                         cam.isReal = false;
                     }
                 });
-
-                // Update bottom KPIs
-                const kpiTotal = document.getElementById('kpi-total-cams');
-                const kpiOnline = document.getElementById('kpi-online-cams');
-                const kpiBitrate = document.getElementById('kpi-network-bitrate');
-
-                if (kpiTotal) kpiTotal.textContent = NCC_CAMERAS.length;
-                if (kpiOnline) kpiOnline.textContent = `${activeSet.size} NVR LIVE / ${NCC_CAMERAS.length}`;
-                if (kpiBitrate) kpiBitrate.textContent = `${(activeSet.size * 3.8 + 2.1).toFixed(1)}`;
 
                 // Update search filter video sources dropdown
                 const srcEl = document.getElementById('filter-video-sources');
@@ -11060,7 +11028,7 @@ user=None`;
                             <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                         </svg>
                     </div>
-                    <div class="ncc-cam-label">${cam.isReal ? '🔴 ' : ''}CAM ${cam.id < 10 ? '0' + cam.id : cam.id}</div>
+                    <div class="ncc-cam-label">CAM ${cam.id < 10 ? '0' + cam.id : cam.id}</div>
                 `;
 
                 node.onclick = () => selectNccCamera(cam.id);
@@ -11104,7 +11072,7 @@ user=None`;
                     return `
                         <div class="ncc-item-card alert-item" onclick="selectNccCamera(${ev.channel}, '${clipUrl}')">
                             <div class="ncc-item-row">
-                                <span class="ncc-item-cam" style="color: #ef4444;">⚠️ CAM ${chStr}</span>
+                                <span class="ncc-item-cam" style="color: #ef4444;">CAM ${chStr}</span>
                                 <span class="ncc-item-time">${timeStr}</span>
                             </div>
                             <div class="ncc-item-desc"><strong>${titleStr}</strong></div>
@@ -11112,7 +11080,7 @@ user=None`;
                             <div class="ncc-item-meta">
                                 <span class="ncc-badge red">${severity}</span>
                                 <span style="color: ${clipUrl ? '#76b900' : '#71717a'}; font-size: 0.7rem;">
-                                    ${clipUrl ? '🎬 Có Clip MP4' : '🔴 Xem Live Feed'}
+                                    ${clipUrl ? 'Có Clip MP4' : 'Xem Live Feed'}
                                 </span>
                             </div>
                         </div>
@@ -11306,7 +11274,7 @@ user=None`;
                                     <span>${cam.isReal ? 'LIVE' : 'STANDBY'}</span>
                                 </span>
                             </div>
-                            <div class="ncc-slot-header-right">
+                            <div class="ncc-slot-header-right" style="position: relative;">
                                 <span class="ncc-target-tag" id="ncc-slot-target-tag-${i}" style="${isTarget ? '' : 'display: none;'}">ĐANG CHỌN ĐỔI</span>
                                 <!-- Hạng mục 2: Nút xem toàn bộ sự kiện & clip của đúng camera này -->
                                 <button type="button" class="ncc-slot-btn ncc-slot-btn-events" onclick="event.stopPropagation(); openCameraEventsDrawer(${cam.id}, '${(cam.name || '').replace(/'/g, "\\'")}')" title="Xem toàn bộ sự kiện &amp; clip của Camera này">
@@ -11316,6 +11284,14 @@ user=None`;
                                     </svg>
                                     <span>Sự kiện</span>
                                 </button>
+                                ${isMaximized ? `
+                                <button type="button" class="ncc-slot-btn" onclick="event.stopPropagation(); stepSlotCamera(${i}, -1)" title="Chuyển sang Camera trước">
+                                    <span>◀</span>
+                                </button>
+                                <button type="button" class="ncc-slot-btn" onclick="event.stopPropagation(); stepSlotCamera(${i}, 1)" title="Chuyển sang Camera kế tiếp">
+                                    <span>▶</span>
+                                </button>
+                                ` : ''}
                                 <button type="button" class="ncc-slot-btn" onclick="event.stopPropagation(); toggleMaximizeSlot(${i})" title="${isMaximized ? 'Thu nhỏ về lưới 4 ô' : 'Phóng to camera này'}">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         ${isMaximized 
@@ -11324,10 +11300,17 @@ user=None`;
                                     </svg>
                                     <span>${isMaximized ? 'Thu nhỏ' : 'Phóng to'}</span>
                                 </button>
-                                <button type="button" class="ncc-slot-btn" onclick="event.stopPropagation(); promptChangeSlotCamera(${i})" title="Chọn camera khác từ danh sách bên trái">
+                                <button type="button" class="ncc-slot-btn" onclick="event.stopPropagation(); promptChangeSlotCamera(${i}, event)" title="Đổi sang camera khác">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
-                                    <span>Đổi</span>
+                                    <span>Đổi ▾</span>
                                 </button>
+                                <div class="ncc-slot-cam-picker" id="ncc-slot-cam-picker-${i}" onclick="event.stopPropagation();" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; width: 270px; max-height: 320px; background: #14151b; border: 1px solid #2e323d; border-radius: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.75); z-index: 9999; flex-direction: column; overflow: hidden;">
+                                    <div style="padding: 8px; border-bottom: 1px solid #23252f; display: flex; align-items: center; gap: 6px; background: #181a22;">
+                                        <input type="text" id="ncc-slot-picker-search-${i}" placeholder="Tìm nhanh Camera (VD: 11, Sảnh...)" oninput="filterSlotPickerCameras(${i}, this.value)" style="flex: 1; background: #0d0e12; border: 1px solid #2e323d; border-radius: 5px; color: #f4f4f5; font-size: 0.75rem; padding: 5px 8px; outline: none;">
+                                        <button type="button" onclick="closeAllSlotCamPickers()" style="background: transparent; border: none; color: #a1a1aa; cursor: pointer; font-size: 0.85rem; padding: 2px 5px;" title="Đóng">✕</button>
+                                    </div>
+                                    <div id="ncc-slot-picker-list-${i}" style="overflow-y: auto; max-height: 260px; padding: 4px;"></div>
+                                </div>
                             </div>
                         </div>
 
@@ -11346,8 +11329,8 @@ user=None`;
                                 </svg>
                                 <div style="font-size: 0.8rem; font-weight: 600; color: #d4d4d8; margin-top: 8px;">D${cam.id} - ${cam.name}</div>
                                 <div style="font-size: 0.72rem; color: #71717a; margin-top: 4px;">Chế độ chờ hoặc chưa có luồng RTSP trực tiếp</div>
-                                <button type="button" class="ncc-cfg-btn-secondary" onclick="event.stopPropagation(); promptChangeSlotCamera(${i});" style="margin-top: 10px; font-size: 0.7rem; padding: 4px 10px;">
-                                    Chọn camera khác từ danh sách bên trái
+                                <button type="button" class="ncc-cfg-btn-secondary" onclick="event.stopPropagation(); promptChangeSlotCamera(${i}, event);" style="margin-top: 10px; font-size: 0.7rem; padding: 4px 10px;">
+                                    Chọn camera khác
                                 </button>
                             </div>
 
@@ -11383,7 +11366,7 @@ user=None`;
         }
 
         // Assign Camera to Target Slot
-        function assignCameraToTargetSlot(camId) {
+        function assignCameraToTargetSlot(camId, explicitSlotIdx = null) {
             const numId = Number(camId);
             if (Array.isArray(window.userAllowedChannels) && !window.userAllowedChannels.includes(numId)) {
                 return;
@@ -11391,71 +11374,103 @@ user=None`;
             if (typeof window.setNotificationCameraChannel === 'function') {
                 window.setNotificationCameraChannel(numId);
             }
+
+            // Always prioritize explicitSlotIdx or the currently maximized slot so switching when maximized never fails
+            const targetIdx = (explicitSlotIdx !== null && explicitSlotIdx !== undefined)
+                ? Number(explicitSlotIdx)
+                : ((nccMaximizedSlotIndex !== null) ? nccMaximizedSlotIndex : nccTargetSlotIndex);
+
             const existingSlot = nccActiveSlots.indexOf(numId);
-            
-            // If already in grid, just focus that slot!
             if (existingSlot !== -1) {
-                setNccTargetSlot(existingSlot);
-                const card = document.getElementById(`ncc-slot-card-${existingSlot}`);
-                if (card) {
-                    card.style.transform = 'scale(1.01)';
-                    setTimeout(() => { card.style.transform = ''; }, 200);
+                if (existingSlot === targetIdx) {
+                    closeAllSlotCamPickers();
+                    return;
                 }
-                return;
+                // Swap cameras between the target/maximized slot and the other slot holding numId
+                nccActiveSlots[existingSlot] = nccActiveSlots[targetIdx];
             }
 
-            const targetIdx = nccTargetSlotIndex;
             nccActiveSlots[targetIdx] = numId;
 
             try {
                 localStorage.setItem('ncc_active_slots_v4', JSON.stringify(nccActiveSlots));
             } catch (e) {}
 
-            const cam = NCC_CAMERAS.find(c => c.id === numId) || {
-                id: numId,
-                name: `Camera ${numId}`,
-                loc: `Kênh ${numId}`,
-                isReal: [11, 18, 19, 20].includes(numId),
-                fps: 25
-            };
+            closeAllSlotCamPickers();
 
-            // Update stream image in slot
-            const img = document.getElementById(`ncc-slot-img-${targetIdx}`);
-            if (img) {
-                img.style.display = 'block';
-                img.src = `/api/stream/live/${numId}?t=${Date.now()}`;
-            }
-            const fallback = document.getElementById(`ncc-slot-fallback-${targetIdx}`);
-            if (fallback) fallback.style.display = 'none';
-
-            // Update slot header text & badges
-            const card = document.getElementById(`ncc-slot-card-${targetIdx}`);
-            if (card) {
-                const camBadge = card.querySelector('.ncc-slot-cam-badge');
-                if (camBadge) camBadge.textContent = `D${cam.id}`;
-                const camName = document.getElementById(`ncc-slot-name-${targetIdx}`);
-                if (camName) {
-                    camName.textContent = cam.name;
-                    camName.title = cam.name;
-                }
-                const pill = document.getElementById(`ncc-slot-pill-${targetIdx}`);
-                if (pill) {
-                    pill.className = `ncc-slot-status-pill ${cam.isReal ? 'online' : 'standby'}`;
-                    pill.innerHTML = `<span class="ncc-slot-pulse-dot"></span><span>${cam.isReal ? 'LIVE' : 'STANDBY'}</span>`;
-                }
-                const wm = document.getElementById(`ncc-slot-watermark-${targetIdx}`);
-                if (wm) {
-                    wm.innerHTML = `<span class="watermark-dot"></span><span>CH${cam.id < 10 ? '0' + cam.id : cam.id} • ${cam.fps || 25} FPS</span>`;
-                }
+            // Keep target locked on maximized slot when maximized; otherwise advance to next slot
+            if (nccMaximizedSlotIndex !== null) {
+                nccTargetSlotIndex = nccMaximizedSlotIndex;
+            } else if (explicitSlotIdx === null || explicitSlotIdx === undefined) {
+                nccTargetSlotIndex = (targetIdx + 1) % 4;
+            } else {
+                nccTargetSlotIndex = targetIdx;
             }
 
-            // Advance target slot to next slot
-            const nextIdx = (targetIdx + 1) % 4;
-            setNccTargetSlot(nextIdx);
-
-            // Update sidebar slot pills and list
+            renderNccGrid();
+            setNccTargetSlot(nccTargetSlotIndex);
             renderVmSidebarSlotPills();
             renderVmSidebarCameraList();
+        }
+
+        // Step to Previous / Next Camera in a Slot (especially convenient when Maximized)
+        function stepSlotCamera(slotIdx, delta) {
+            const allowedList = NCC_CAMERAS.filter(c => !Array.isArray(window.userAllowedChannels) || window.userAllowedChannels.includes(Number(c.id)));
+            if (!allowedList.length) return;
+            const currentCamId = Number(nccActiveSlots[slotIdx] || allowedList[0].id);
+            const curIndex = allowedList.findIndex(c => Number(c.id) === currentCamId);
+            const nextIndex = (curIndex === -1) ? 0 : (curIndex + delta + allowedList.length) % allowedList.length;
+            assignCameraToTargetSlot(allowedList[nextIndex].id, slotIdx);
+        }
+
+        function closeAllSlotCamPickers() {
+            document.querySelectorAll('.ncc-slot-cam-picker').forEach(el => {
+                el.style.display = 'none';
+            });
+        }
+
+        function filterSlotPickerCameras(slotIdx, query) {
+            const listEl = document.getElementById(`ncc-slot-picker-list-${slotIdx}`);
+            if (!listEl) return;
+            const q = (query || '').toLowerCase().trim();
+            const currentCamId = Number(nccActiveSlots[slotIdx]);
+            const allowedList = NCC_CAMERAS.filter(c => {
+                if (Array.isArray(window.userAllowedChannels) && !window.userAllowedChannels.includes(Number(c.id))) {
+                    return false;
+                }
+                if (!q) return true;
+                return (
+                    (c.name || '').toLowerCase().includes(q) ||
+                    (c.loc || '').toLowerCase().includes(q) ||
+                    `d${c.id}`.includes(q) ||
+                    `cam ${c.id}`.includes(q) ||
+                    `${c.id}` === q
+                );
+            });
+
+            if (!allowedList.length) {
+                listEl.innerHTML = `<div style="padding: 10px; text-align: center; color: #71717a; font-size: 0.74rem;">Không tìm thấy camera phù hợp</div>`;
+                return;
+            }
+
+            listEl.innerHTML = allowedList.map(c => {
+                const isCurrent = Number(c.id) === currentCamId;
+                const slotPos = nccActiveSlots.indexOf(Number(c.id));
+                const slotBadge = slotPos !== -1 ? `<span style="font-size:0.65rem; padding:1px 5px; border-radius:4px; background:rgba(118,185,0,0.18); color:#a3e635;">Ô ${slotPos + 1}</span>` : '';
+                return `
+                    <div onclick="event.stopPropagation(); assignCameraToTargetSlot(${c.id}, ${slotIdx});"
+                         style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:0.75rem; color:${isCurrent ? '#a3e635' : '#e4e4e7'}; background:${isCurrent ? 'rgba(118,185,0,0.12)' : 'transparent'};"
+                         onmouseover="this.style.background='rgba(255,255,255,0.07)'"
+                         onmouseout="this.style.background='${isCurrent ? 'rgba(118,185,0,0.12)' : 'transparent'}'">
+                        <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
+                            <span style="width:7px; height:7px; border-radius:50%; background:${c.isReal ? '#22c55e' : '#71717a'}; flex-shrink:0;"></span>
+                            <strong style="color:#38bdf8; flex-shrink:0;">D${c.id}</strong>
+                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.name}">${c.name}</span>
+                        </div>
+                        ${slotBadge}
+                    </div>
+                `;
+            }).join('');
         }
 
         // Toggle Maximize / Restore Slot
@@ -11464,13 +11479,36 @@ user=None`;
                 nccMaximizedSlotIndex = null;
             } else {
                 nccMaximizedSlotIndex = slotIdx;
+                nccTargetSlotIndex = slotIdx;
             }
             renderNccGrid();
+            setNccTargetSlot(nccTargetSlotIndex);
+            renderVmSidebarSlotPills();
         }
 
-        // Prompt to pick camera for a slot
-        function promptChangeSlotCamera(slotIdx) {
+        // Prompt to pick camera for a slot (opens inline dropdown + focuses sidebar)
+        function promptChangeSlotCamera(slotIdx, ev) {
+            if (ev && typeof ev.stopPropagation === 'function') {
+                ev.stopPropagation();
+            }
             setNccTargetSlot(slotIdx);
+
+            const picker = document.getElementById(`ncc-slot-cam-picker-${slotIdx}`);
+            if (picker) {
+                const isOpen = picker.style.display === 'flex';
+                closeAllSlotCamPickers();
+                if (!isOpen) {
+                    picker.style.display = 'flex';
+                    filterSlotPickerCameras(slotIdx, '');
+                    const input = document.getElementById(`ncc-slot-picker-search-${slotIdx}`);
+                    if (input) {
+                        input.value = '';
+                        setTimeout(() => input.focus(), 30);
+                    }
+                    return;
+                }
+            }
+
             const sb = document.getElementById('vss-sidebar');
             if (sb && sb.classList.contains('collapsed')) {
                 sb.classList.remove('collapsed');
@@ -11606,7 +11644,7 @@ user=None`;
                             ▷ Xem Trực Tiếp
                         </button>
                         <button onclick="openCameraEventsDrawer(${cam.id}, '${(cam.name || '').replace(/'/g, "\\'")}')" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid #38bdf8; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; margin-left: 6px;" title="Xem toàn bộ sự kiện &amp; clip của camera này">
-                            📋 Sự Kiện
+                            Sự Kiện
                         </button>
                     </td>
                 </tr>
@@ -11877,7 +11915,7 @@ user=None`;
         async function testNccNvrConnection() {
             const btn = document.getElementById('ncc-cfg-btn-test');
             const banner = document.getElementById('ncc-cfg-status-banner');
-            if (btn) btn.innerHTML = '<span>⏳ Đang kiểm tra...</span>';
+            if (btn) btn.innerHTML = '<span>Đang kiểm tra...</span>';
 
             const testPort = parseInt(document.getElementById('cfg-nvr-port').value, 10) || 4443;
             const testUseHttps = document.getElementById('cfg-use-https').checked || testPort === 4443 || testPort === 443;
@@ -11907,12 +11945,12 @@ user=None`;
                         banner.style.background = 'rgba(34, 197, 94, 0.15)';
                         banner.style.border = '1px solid rgba(34, 197, 94, 0.3)';
                         banner.style.color = '#86efac';
-                        banner.innerHTML = res.message || '✅ Kết nối thành công tới đầu ghi NVR!';
+                        banner.innerHTML = res.message || 'Kết nối thành công tới đầu ghi NVR!';
                     } else {
                         banner.style.background = 'rgba(239, 68, 68, 0.15)';
                         banner.style.border = '1px solid rgba(239, 68, 68, 0.3)';
                         banner.style.color = '#fca5a5';
-                        banner.innerHTML = res.message || '❌ Lỗi kết nối tới đầu ghi NVR.';
+                        banner.innerHTML = res.message || 'Lỗi kết nối tới đầu ghi NVR.';
                     }
                 }
             } catch (err) {
@@ -11921,17 +11959,17 @@ user=None`;
                     banner.style.background = 'rgba(239, 68, 68, 0.15)';
                     banner.style.border = '1px solid rgba(239, 68, 68, 0.3)';
                     banner.style.color = '#fca5a5';
-                    banner.innerHTML = `❌ Lỗi mạng: ${err.message}`;
+                    banner.innerHTML = `Lỗi mạng: ${err.message}`;
                 }
             } finally {
-                if (btn) btn.innerHTML = '<span>🔍 Kiểm tra kết nối</span>';
+                if (btn) btn.innerHTML = '<span>Kiểm tra kết nối</span>';
             }
         }
 
         async function saveCameraConfigFromUI() {
             const btnSaveNvr = document.getElementById('ncc-cfg-btn-save-nvr');
             const banner = document.getElementById('ncc-cfg-status-banner');
-            if (btnSaveNvr) btnSaveNvr.innerHTML = '<span>⏳ Đang lưu...</span>';
+            if (btnSaveNvr) btnSaveNvr.innerHTML = '<span>Đang lưu...</span>';
 
             const activeChannels = [];
             const cameraNames = {};
@@ -11994,20 +12032,12 @@ user=None`;
                     renderNccTable();
                     renderNccConfigTableRows();
 
-                    // Update bottom KPIs
-                    const kpiTotal = document.getElementById('kpi-total-cams');
-                    const kpiOnline = document.getElementById('kpi-online-cams');
-                    const kpiBitrate = document.getElementById('kpi-network-bitrate');
-                    if (kpiTotal) kpiTotal.textContent = NCC_CAMERAS.length;
-                    if (kpiOnline) kpiOnline.textContent = `${activeSet.size} NVR LIVE / ${NCC_CAMERAS.length}`;
-                    if (kpiBitrate) kpiBitrate.textContent = `${(activeSet.size * 3.8 + 2.1).toFixed(1)}`;
-
                     if (banner) {
                         banner.style.display = 'block';
                         banner.style.background = 'rgba(34, 197, 94, 0.15)';
                         banner.style.border = '1px solid rgba(34, 197, 94, 0.3)';
                         banner.style.color = '#86efac';
-                        banner.innerHTML = `✅ Đã lưu cấu hình 32 Camera và NVR thành công! (${activeChannels.length} kênh kích hoạt)`;
+                        banner.innerHTML = `Đã lưu cấu hình 32 Camera và NVR thành công! (${activeChannels.length} kênh kích hoạt)`;
                         setTimeout(() => { banner.style.display = 'none'; }, 6000);
                     }
                 } else {
@@ -12016,7 +12046,7 @@ user=None`;
                         banner.style.background = 'rgba(239, 68, 68, 0.15)';
                         banner.style.border = '1px solid rgba(239, 68, 68, 0.3)';
                         banner.style.color = '#fca5a5';
-                        banner.innerHTML = res.error || '❌ Lưu cấu hình thất bại.';
+                        banner.innerHTML = res.error || 'Lưu cấu hình thất bại.';
                     }
                 }
             } catch (err) {
@@ -12025,10 +12055,10 @@ user=None`;
                     banner.style.background = 'rgba(239, 68, 68, 0.15)';
                     banner.style.border = '1px solid rgba(239, 68, 68, 0.3)';
                     banner.style.color = '#fca5a5';
-                    banner.innerHTML = `❌ Lỗi mạng: ${err.message}`;
+                    banner.innerHTML = `Lỗi mạng: ${err.message}`;
                 }
             } finally {
-                if (btnSaveNvr) btnSaveNvr.innerHTML = '<span>💾 Lưu thiết lập NVR &amp; Camera</span>';
+                if (btnSaveNvr) btnSaveNvr.innerHTML = '<span>Lưu thiết lập NVR &amp; Camera</span>';
             }
         }
 
@@ -12256,7 +12286,7 @@ user=None`;
 
             if (submitBtn) {
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = '<span>⏳ Đang xác thực...</span>';
+                submitBtn.innerHTML = '<span>Đang xác thực...</span>';
             }
 
             try {
@@ -12295,7 +12325,7 @@ user=None`;
             } finally {
                 if (submitBtn) {
                     submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<span>🔓 Đăng nhập &amp; Mở Cấu hình</span>';
+                    submitBtn.innerHTML = '<span>Đăng nhập &amp; Mở Cấu hình</span>';
                 }
             }
         }
@@ -12381,7 +12411,404 @@ user=None`;
                     toggleDashboardVisibility();
                 }, 350);
             }
+
+            // Close inline camera switcher dropdowns when clicking outside
+            document.addEventListener('click', function() {
+                if (typeof closeAllSlotCamPickers === 'function') {
+                    closeAllSlotCamPickers();
+                }
+            });
         });
+
+        // ==========================================================================
+        // HẠNG MỤC 5: HỆ THỐNG BÁO CÁO PHÂN TÍCH ĐÊM TỰ ĐỘNG (22:00 -> 04:00)
+        // ==========================================================================
+        let currentNightlyReportDate = '';
+        let currentNightlyCameraList = [];
+        let currentNightlySelectedChannel = null;
+        let nightlyPollTimer = null;
+
+        async function openNightlyReportsModal() {
+            const modal = document.getElementById('nightly-reports-modal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            await loadNightlyReportDates();
+        }
+
+        function closeNightlyReportsModal() {
+            const modal = document.getElementById('nightly-reports-modal');
+            if (modal) modal.style.display = 'none';
+            if (nightlyPollTimer) {
+                clearInterval(nightlyPollTimer);
+                nightlyPollTimer = null;
+            }
+        }
+
+        async function loadNightlyReportDates(preferredDate = '') {
+            const selectEl = document.getElementById('nightly-date-select');
+            const statusBanner = document.getElementById('nightly-job-status-banner');
+            try {
+                const res = await fetch('/api/nightly-reports/dates');
+                if (!res.ok) {
+                    if (res.status === 403) {
+                        alert('Chỉ tài khoản cấp Admin hoặc Manager mới có quyền truy cập Thư mục Báo cáo Đêm (22h-4h).');
+                        closeNightlyReportsModal();
+                    }
+                    return;
+                }
+                const data = await res.json();
+                const dates = data.dates || [];
+                const activeJob = data.active_job;
+
+                if (statusBanner) {
+                    if (activeJob && activeJob.status === 'running') {
+                        statusBanner.style.display = 'flex';
+                        statusBanner.innerHTML = `
+                            <span><strong>Đang chạy phân tích kỳ ${activeJob.report_date}</strong> (${activeJob.window_start} → ${activeJob.window_end}) — Đã xử lý ${activeJob.processed_cameras || 0}/${activeJob.total_cameras || 32} Camera...</span>
+                        `;
+                        if (!nightlyPollTimer) {
+                            nightlyPollTimer = setInterval(() => loadNightlyReportDates(currentNightlyReportDate), 3000);
+                        }
+                    } else {
+                        statusBanner.style.display = 'none';
+                        if (nightlyPollTimer) {
+                            clearInterval(nightlyPollTimer);
+                            nightlyPollTimer = null;
+                        }
+                    }
+                }
+
+                const todayStr = new Date().toISOString().slice(0, 10);
+                if (selectEl) {
+                    if (dates.length === 0) {
+                        selectEl.innerHTML = `<option value="${todayStr}">${todayStr} (Chưa tạo báo cáo - Bấm Chạy tổng hợp ngay)</option>`;
+                        currentNightlyReportDate = todayStr;
+                    } else {
+                        selectEl.innerHTML = dates.map(d => `
+                            <option value="${d.report_date}">
+                                ${d.report_date} (${d.total_events} sự kiện • ${d.total_anomalies} cảnh báo • ${d.active_cameras}/${d.total_cameras} cam)
+                            </option>
+                        `).join('');
+                        if (preferredDate && dates.some(d => d.report_date === preferredDate)) {
+                            selectEl.value = preferredDate;
+                            currentNightlyReportDate = preferredDate;
+                        } else {
+                            currentNightlyReportDate = dates[0].report_date;
+                            selectEl.value = currentNightlyReportDate;
+                        }
+                    }
+                }
+
+                const customDateInput = document.getElementById('nightly-custom-date-input');
+                if (customDateInput && !customDateInput.value) {
+                    customDateInput.value = currentNightlyReportDate || todayStr;
+                }
+
+                if (currentNightlyReportDate) {
+                    await loadNightlyReportForDate(currentNightlyReportDate);
+                }
+            } catch (err) {
+                console.warn('[Nightly Report] Error loading dates:', err);
+            }
+        }
+
+        async function loadNightlyReportForDate(reportDate) {
+            currentNightlyReportDate = reportDate;
+            const customDateInput = document.getElementById('nightly-custom-date-input');
+            if (customDateInput) customDateInput.value = reportDate;
+
+            const camListEl = document.getElementById('nightly-camera-list');
+            const detailEl = document.getElementById('nightly-camera-detail');
+            const metaBar = document.getElementById('nightly-window-meta');
+
+            if (camListEl) {
+                camListEl.innerHTML = `<div style="padding: 18px; text-align: center; color: #a1a1aa; font-size: 0.78rem;">Đang tải danh sách báo cáo camera...</div>`;
+            }
+
+            try {
+                const res = await fetch(`/api/nightly-reports/${encodeURIComponent(reportDate)}`);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                if (!data.exists || !Array.isArray(data.cameras) || data.cameras.length === 0) {
+                    if (metaBar) {
+                        metaBar.textContent = `Kỳ báo cáo ${reportDate}: Chưa có dữ liệu tổng hợp. Hãy bấm "Chạy tổng hợp ngay" ở góc phải để tạo báo cáo.`;
+                    }
+                    if (camListEl) {
+                        camListEl.innerHTML = `<div style="padding: 20px; text-align: center; color: #71717a; font-size: 0.78rem;">Chưa có file báo cáo trong thư mục ngày ${reportDate}.</div>`;
+                    }
+                    if (detailEl) {
+                        detailEl.innerHTML = `
+                            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#a1a1aa; gap:12px; padding:24px; text-align:center;">
+                                <div style="font-size:0.95rem; font-weight:600; color:#f4f4f5;">Chưa có Báo cáo Đêm cho ngày ${reportDate}</div>
+                                <div style="font-size:0.8rem; max-width:460px; color:#71717a;">Hệ thống tự động chạy từ <strong>22:00 đến 04:00 sáng</strong> mỗi ngày (gom toàn bộ video từ 22:00 hôm trước đến 21:59:59 hôm nay). Bạn cũng có thể bấm nút bên dưới để chạy tổng hợp ngay lập tức.</div>
+                                <button type="button" onclick="triggerNightlyReportGeneration()" style="background:#76b900; color:#000; font-weight:700; border:none; border-radius:6px; padding:8px 16px; font-size:0.8rem; cursor:pointer;">
+                                    Chạy phân tích &amp; Xuất báo cáo ngay
+                                </button>
+                            </div>
+                        `;
+                    }
+                    return;
+                }
+
+                currentNightlyCameraList = data.cameras;
+                if (metaBar) {
+                    metaBar.innerHTML = `Thư mục: <strong>storage/nightly_reports/${data.report_date}/</strong> • Cửa sổ cuốn chiếu: <strong>${data.window_start} → ${data.window_end}</strong> • Tổng: <strong>${data.total_events} sự kiện</strong> (${data.total_anomalies} bất thường)`;
+                }
+
+                renderNightlyCameraSidebar();
+
+                // Auto-select first camera with events or first camera in list
+                const firstActive = currentNightlyCameraList.find(c => c.total_events > 0) || currentNightlyCameraList[0];
+                if (firstActive) {
+                    await selectNightlyCameraReport(firstActive.channel);
+                }
+            } catch (err) {
+                console.warn('[Nightly Report] Error loading date report:', err);
+            }
+        }
+
+        function renderNightlyCameraSidebar(filterQuery = '') {
+            const camListEl = document.getElementById('nightly-camera-list');
+            if (!camListEl) return;
+            const q = (filterQuery || '').toLowerCase().trim();
+            const filtered = currentNightlyCameraList.filter(c => {
+                if (!q) return true;
+                return (
+                    String(c.camera_name || '').toLowerCase().includes(q) ||
+                    String(c.camera_code || '').toLowerCase().includes(q) ||
+                    String(c.channel) === q
+                );
+            });
+
+            if (filtered.length === 0) {
+                camListEl.innerHTML = `<div style="padding: 14px; text-align: center; color: #71717a; font-size: 0.76rem;">Không tìm thấy camera phù hợp.</div>`;
+                return;
+            }
+
+            camListEl.innerHTML = filtered.map(c => {
+                const isSelected = Number(c.channel) === Number(currentNightlySelectedChannel);
+                const riskColor = c.risk_level === 'high' ? '#ef4444' : (c.risk_level === 'medium' ? '#f59e0b' : (c.total_events > 0 ? '#22c55e' : '#52525b'));
+                return `
+                    <div onclick="selectNightlyCameraReport(${c.channel})"
+                         style="padding: 9px 10px; border-radius: 7px; margin-bottom: 5px; cursor: pointer; border: 1px solid ${isSelected ? '#76b900' : '#232530'}; background: ${isSelected ? 'rgba(118,185,0,0.12)' : '#14151c'}; transition: all 0.12s;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                            <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: ${riskColor}; flex-shrink: 0;"></span>
+                                <strong style="color: #38bdf8; font-size: 0.76rem; flex-shrink: 0;">D${c.channel < 10 ? '0' + c.channel : c.channel}</strong>
+                                <span style="font-size: 0.76rem; color: #f4f4f5; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${c.camera_name}">${c.camera_name}</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 5px; font-size: 0.69rem; color: #a1a1aa;">
+                            <span>${c.total_events} sự kiện • ${c.clip_count || 0} clip</span>
+                            ${c.anomaly_count > 0 ? `<span style="color:#f87171; font-weight:700;">${c.anomaly_count} bất thường</span>` : `<span style="color:#71717a;">An toàn</span>`}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function selectNightlyCameraReport(channelId) {
+            currentNightlySelectedChannel = Number(channelId);
+            const searchInput = document.getElementById('nightly-cam-search');
+            renderNightlyCameraSidebar(searchInput ? searchInput.value : '');
+
+            const detailEl = document.getElementById('nightly-camera-detail');
+            if (!detailEl) return;
+            detailEl.innerHTML = `<div style="padding: 28px; text-align: center; color: #a1a1aa;">Đang tải báo cáo Camera D${channelId}...</div>`;
+
+            try {
+                const res = await fetch(`/api/nightly-reports/${encodeURIComponent(currentNightlyReportDate)}/camera/${channelId}`);
+                if (!res.ok) {
+                    detailEl.innerHTML = `<div style="padding: 28px; text-align: center; color: #ef4444;">Không thể tải báo cáo của Camera D${channelId}.</div>`;
+                    return;
+                }
+                const rep = await res.json();
+                const riskBg = rep.risk_level === 'high' ? 'rgba(239,68,68,0.15)' : (rep.risk_level === 'medium' ? 'rgba(245,158,11,0.15)' : 'rgba(34,197,94,0.14)');
+                const riskBorder = rep.risk_level === 'high' ? '#ef4444' : (rep.risk_level === 'medium' ? '#f59e0b' : '#22c55e');
+
+                const shiftsHtml = (rep.shifts || []).map(s => `
+                    <div style="background: #14161e; border: 1px solid #252836; border-radius: 8px; padding: 10px 12px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+                            <div style="font-size: 0.8rem; font-weight: 700; color: #e4e4e7;">${s.title}</div>
+                            <span style="font-size: 0.7rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.06); color: #a1a1aa;">
+                                ${s.event_count} sự kiện • ${s.anomaly_count} cảnh báo
+                            </span>
+                        </div>
+                        <div style="font-size: 0.78rem; color: #d4d4d8; line-height: 1.5;">
+                            ${String(s.summary_text || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/`(.*?)`/g, '<code style="background:#090a0f;padding:1px 5px;border-radius:4px;color:#38bdf8;">$1</code>')}
+                        </div>
+                    </div>
+                `).join('');
+
+                const notableHtml = (rep.notable_events && rep.notable_events.length > 0)
+                    ? rep.notable_events.map(ev => `
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; background: #14161e; border: 1px solid #252836; border-radius: 7px;">
+                            <div style="min-width: 0; flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.76rem;">
+                                    <span style="color: #38bdf8; font-family: monospace; font-weight: 700;">${ev.timestamp}</span>
+                                    <span style="color: #a3e635; font-weight: 700;">#${ev.id}</span>
+                                    <span style="padding: 1px 6px; border-radius: 4px; background: rgba(239,68,68,0.16); color: #fca5a5; font-size: 0.68rem; font-weight: 600;">${ev.event_label}</span>
+                                </div>
+                                <div style="font-size: 0.75rem; color: #d4d4d8; margin-top: 3px;">
+                                    ${ev.ai_summary || ev.description || 'Đã ghi nhận metadata sự kiện.'}
+                                </div>
+                            </div>
+                            ${ev.clip_url ? `
+                                <button type="button" onclick="openVideoModal('D${rep.channel < 10 ? '0' + rep.channel : rep.channel} - Sự kiện #${ev.id} (${ev.timestamp})', '${ev.clip_url}', ${ev.id || 'null'})" style="flex-shrink: 0; background: rgba(118,185,0,0.18); border: 1px solid #76b900; color: #a3e635; border-radius: 6px; padding: 5px 10px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">
+                                    Xem Clip
+                                </button>
+                            ` : ''}
+                        </div>
+                    `).join('')
+                    : `<div style="padding: 12px; color: #71717a; font-size: 0.78rem; font-style: italic;">Không có sự kiện nổi bật nào trong kỳ báo cáo này.</div>`;
+
+                detailEl.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid #252836; padding-bottom: 12px;">
+                            <div>
+                                <div style="font-size: 1.02rem; font-weight: 700; color: #ffffff;">
+                                    Báo cáo Ngày ${rep.report_date} — D${rep.channel < 10 ? '0' + rep.channel : rep.channel}: ${rep.camera_name}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #a1a1aa; margin-top: 4px;">
+                                    Cửa sổ dữ liệu cuốn chiếu: <strong style="color:#38bdf8;">${rep.window_start} → ${rep.window_end}</strong> <em>(Video từ 22:00 tối đẩy sang ngày hôm sau)</em>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                                <a href="/api/nightly-reports/${encodeURIComponent(rep.report_date)}/camera/${rep.channel}/download" target="_blank" style="text-decoration: none; background: #1e293b; border: 1px solid #334155; color: #38bdf8; padding: 6px 11px; border-radius: 6px; font-size: 0.74rem; font-weight: 600;">
+                                    Tải file .MD
+                                </a>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px;">
+                            <div style="background: ${riskBg}; border: 1px solid ${riskBorder}; border-radius: 7px; padding: 8px 10px;">
+                                <div style="font-size: 0.68rem; color: #d4d4d8;">Đánh giá An ninh</div>
+                                <div style="font-size: 0.78rem; font-weight: 700; color: #fff; margin-top: 2px;">${rep.risk_badge}</div>
+                            </div>
+                            <div style="background: #14161e; border: 1px solid #252836; border-radius: 7px; padding: 8px 10px;">
+                                <div style="font-size: 0.68rem; color: #a1a1aa;">Tổng sự kiện (24h)</div>
+                                <div style="font-size: 0.95rem; font-weight: 700; color: #38bdf8; margin-top: 2px;">${rep.total_events}</div>
+                            </div>
+                            <div style="background: #14161e; border: 1px solid #252836; border-radius: 7px; padding: 8px 10px;">
+                                <div style="font-size: 0.68rem; color: #a1a1aa;">Cảnh báo Bất thường</div>
+                                <div style="font-size: 0.95rem; font-weight: 700; color: #f87171; margin-top: 2px;">${rep.anomaly_count}</div>
+                            </div>
+                            <div style="background: #14161e; border: 1px solid #252836; border-radius: 7px; padding: 8px 10px;">
+                                <div style="font-size: 0.68rem; color: #a1a1aa;">Người / Phương tiện</div>
+                                <div style="font-size: 0.9rem; font-weight: 700; color: #a3e635; margin-top: 2px;">${rep.human_count} người • ${rep.vehicle_count} xe</div>
+                            </div>
+                            <div style="background: #14161e; border: 1px solid #252836; border-radius: 7px; padding: 8px 10px;">
+                                <div style="font-size: 0.68rem; color: #a1a1aa;">Giờ cao điểm</div>
+                                <div style="font-size: 0.78rem; font-weight: 700; color: #f4f4f5; margin-top: 2px;">${rep.peak_hour_label}</div>
+                            </div>
+                        </div>
+
+                        <div style="background: rgba(56, 189, 248, 0.07); border-left: 3px solid #38bdf8; padding: 10px 12px; border-radius: 6px; font-size: 0.8rem; color: #e4e4e7; line-height: 1.55;">
+                            <strong>1. Tóm tắt Tổng quan trong Ngày:</strong><br>
+                            ${String(rep.executive_summary || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
+                        </div>
+
+                        <div>
+                            <div style="font-size: 0.82rem; font-weight: 700; color: #a3e635; margin-bottom: 8px;">
+                                2. Dòng thời gian Nối tiếp theo 4 Ca (22:00 hôm trước → 22:00 hôm nay)
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                ${shiftsHtml}
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="font-size: 0.82rem; font-weight: 700; color: #38bdf8; margin-bottom: 8px;">
+                                3. Danh sách Video Sự kiện Đáng chú ý trong Kỳ
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                ${notableHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                console.warn('[Nightly Report] Error loading camera report:', err);
+            }
+        }
+
+        async function triggerNightlyReportGeneration() {
+            const customDateInput = document.getElementById('nightly-custom-date-input');
+            const targetDate = (customDateInput && customDateInput.value) ? customDateInput.value.trim() : currentNightlyReportDate;
+            const btn = document.getElementById('btn-trigger-nightly-now');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Đang khởi chạy...';
+            }
+            try {
+                const res = await fetch('/api/nightly-reports/trigger', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        report_date: targetDate || null,
+                        max_vlm_clips: 4
+                    })
+                });
+                const data = await res.json();
+                if (res.ok && data.job) {
+                    currentNightlyReportDate = data.job.report_date;
+                    await loadNightlyReportDates(currentNightlyReportDate);
+                } else {
+                    alert(data.detail || 'Không thể kích hoạt chạy báo cáo đêm.');
+                }
+            } catch (err) {
+                alert('Lỗi kết nối khi kích hoạt báo cáo đêm: ' + err.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Chạy tổng hợp ngay';
+                }
+            }
+        }
     </script>
+
+    <!-- MODAL THƯ MỤC BÁO CÁO PHÂN TÍCH VIDEO BAN ĐÊM (22:00 -> 04:00) DÀNH CHO ADMIN & MANAGER -->
+    <div id="nightly-reports-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.78); backdrop-filter: blur(4px); z-index: 10050; align-items: center; justify-content: center; padding: 18px;">
+        <div style="width: 1180px; max-width: 96vw; height: 86vh; background: #0d0e13; border: 1px solid #272a36; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.85);">
+            <!-- Modal Header -->
+            <div style="padding: 12px 18px; background: #14161f; border-bottom: 1px solid #252836; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a3e635" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    <div>
+                        <div style="font-size: 0.95rem; font-weight: 700; color: #ffffff;">Thư mục Báo cáo Phân tích Video Hàng ngày (Chạy tự động 22:00 → 04:00 sáng)</div>
+                        <div style="font-size: 0.72rem; color: #a1a1aa;" id="nightly-window-meta">
+                            Quy tắc cuốn chiếu: Gom video từ 22:00 tối hôm trước đến 21:59:59 tối hôm nay (Video từ 22:00 đẩy sang ngày mai)
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <select id="nightly-date-select" onchange="loadNightlyReportForDate(this.value)" style="background: #090a0f; color: #f4f4f5; border: 1px solid #334155; border-radius: 6px; padding: 6px 10px; font-size: 0.76rem; font-weight: 600; outline: none; cursor: pointer;"></select>
+                    <input type="date" id="nightly-custom-date-input" style="background: #090a0f; color: #f4f4f5; border: 1px solid #334155; border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; outline: none;" title="Chọn ngày muốn tổng hợp báo cáo">
+                    <button type="button" id="btn-trigger-nightly-now" onclick="triggerNightlyReportGeneration()" style="background: #76b900; color: #000000; font-weight: 700; border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.76rem; cursor: pointer;" title="Chạy tổng hợp báo cáo ngay cho ngày đã chọn">
+                        Chạy tổng hợp ngay
+                    </button>
+                    <button type="button" onclick="closeNightlyReportsModal()" style="background: rgba(255,255,255,0.08); color: #e4e4e7; border: none; border-radius: 6px; width: 30px; height: 30px; font-size: 1rem; cursor: pointer;" title="Đóng">✕</button>
+                </div>
+            </div>
+
+            <!-- Job Progress Banner -->
+            <div id="nightly-job-status-banner" style="display: none; padding: 8px 18px; background: rgba(56, 189, 248, 0.14); border-bottom: 1px solid rgba(56, 189, 248, 0.35); color: #7dd3fc; font-size: 0.78rem; align-items: center; justify-content: space-between;"></div>
+
+            <!-- Modal Body: Left Camera List + Right Concise Report -->
+            <div style="flex: 1; display: flex; min-height: 0; overflow: hidden;">
+                <!-- Left Sidebar: Cameras in Date Folder -->
+                <div style="width: 295px; border-right: 1px solid #232530; background: #101218; display: flex; flex-direction: column; min-height: 0;">
+                    <div style="padding: 10px; border-bottom: 1px solid #232530;">
+                        <input type="text" id="nightly-cam-search" placeholder="Tìm Camera trong thư mục ngày..." oninput="renderNightlyCameraSidebar(this.value)" style="width: 100%; background: #090a0f; border: 1px solid #272a36; border-radius: 6px; color: #f4f4f5; padding: 6px 10px; font-size: 0.75rem; outline: none;">
+                    </div>
+                    <div id="nightly-camera-list" style="flex: 1; overflow-y: auto; padding: 8px;"></div>
+                </div>
+
+                <!-- Right Content: Concise 1-Page Camera Report -->
+                <div id="nightly-camera-detail" style="flex: 1; overflow-y: auto; padding: 18px 22px; background: #0d0e13;"></div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

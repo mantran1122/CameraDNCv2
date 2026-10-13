@@ -61,7 +61,7 @@ def generate_daily_summary(target_date_str: str = None) -> Dict[str, Any]:
         ai_narrative = f"Trạng thái ngày {target_date_str}: Không ghi nhận dữ liệu metadata hoặc sự kiện bất thường nào từ đầu ghi Dahua DHI-NVR5832-EI2."
     else:
         ai_narrative = (
-            f"📌 **TÓM TẮT BÁO CÁO HOẠT ĐỘNG NGÀY {target_date_str} (HỆ THỐNG DAHUA AI NVR5832-EI2)**\n\n"
+            f"**TÓM TẮT BÁO CÁO HOẠT ĐỘNG NGÀY {target_date_str} (HỆ THỐNG DAHUA AI NVR5832-EI2)**\n\n"
             f"1. **Tổng quan Hoạt động:**\n"
             f"   - Tổng số lượt phát hiện Metadata: **{total_events} lượt**.\n"
             f"   - Ghi nhận **{len(human_events)}** lượt diện mạo con người và **{len(vehicle_events)}** phương tiện giao thông di chuyển trong khu vực quan sát.\n"

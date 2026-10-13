@@ -946,6 +946,57 @@ def get_login_audit_logs(limit: int = 50, ip_filter: Optional[str] = None, usern
         return []
 
 
+def get_events_in_rolling_window(
+    start_ts: str,
+    end_ts: str,
+    channel: Optional[int] = None,
+    allowed_channels: Optional[List[int]] = None,
+) -> List[Dict[str, Any]]:
+    """Query all events in a rolling cutoff window (e.g. '2026-10-11 22:00:00' -> '2026-10-12 21:59:59')
+    enriched with video_analyses and audio_analyses results, ordered chronologically.
+    """
+    if allowed_channels is not None:
+        if len(allowed_channels) == 0:
+            return []
+        if channel is not None and channel not in allowed_channels:
+            return []
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    query = """
+        SELECT
+            e.*,
+            v.status AS video_analysis_status,
+            v.summary AS video_analysis_summary,
+            v.risk_level AS video_analysis_risk,
+            v.video_model AS video_analysis_model,
+            v.analyzed_at AS video_analyzed_at,
+            a.status AS audio_analysis_status,
+            a.transcript AS audio_transcript
+        FROM events e
+        LEFT JOIN video_analyses v ON v.event_id = e.id
+        LEFT JOIN audio_analyses a ON a.event_id = e.id
+        WHERE e.timestamp >= ? AND e.timestamp <= ?
+    """
+    params: List[Any] = [start_ts, end_ts]
+
+    if channel is not None:
+        query += " AND e.channel = ?"
+        params.append(int(channel))
+    elif allowed_channels is not None:
+        placeholders = ",".join("?" for _ in allowed_channels)
+        query += f" AND e.channel IN ({placeholders})"
+        params.extend(int(c) for c in allowed_channels)
+
+    query += " ORDER BY e.timestamp ASC, e.id ASC"
+    cur.execute(query, tuple(params))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
 # Initialize DB on module import
 init_db()
+
 

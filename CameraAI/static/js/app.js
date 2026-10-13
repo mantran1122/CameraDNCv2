@@ -190,10 +190,10 @@ function createEventCard(ev) {
         </div>
         <div class="event-desc">${ev.description}</div>
         <div class="event-bottom">
-            <span>Camera Ch ${String(ev.channel).padStart(2, '0')} ${ev.audio_level_db ? `| 🔊 ${ev.audio_level_db} dB` : ''}</span>
+            <span>Camera Ch ${String(ev.channel).padStart(2, '0')} ${ev.audio_level_db ? `| ${ev.audio_level_db} dB` : ''}</span>
             ${audioStatus ? `<span class="audio-status">${audioStatus}</span>` : ''}
             <button class="btn-clip-play vss-view-cam-btn" onclick="openCameraVss(${ev.channel}); event.stopPropagation();" title="Xem trực tiếp trên giao diện NVIDIA VSS Blueprint">
-                📹 Xem Camera VSS
+                Xem Camera VSS
             </button>
             ${hasClip ? `<button class="btn-clip-play" onclick="openClipModal(${ev.id}, '${ev.clip_filename}', '${ev.description}'); event.stopPropagation();">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Xem 10s Clip
@@ -314,7 +314,7 @@ function renderAudioAnalysisAction(ev) {
     button.dataset.eventId = ev?.id || '';
     button.hidden = !isAnomaly;
     button.disabled = !canAnalyse || ['processing', 'extracting_audio', 'transcribing', 'analyzing', 'completed', 'no_audio_track', 'audio_too_quiet', 'no_speech_detected'].includes(status);
-    button.textContent = ['video_missing', 'stt_failed', 'transcribed'].includes(status) ? '↻ Phân tích lại âm thanh' : '🎙 Phân tích âm thanh';
+    button.textContent = ['video_missing', 'stt_failed', 'transcribed'].includes(status) ? 'Phân tích lại âm thanh' : 'Phân tích âm thanh';
 }
 
 function formatVideoAnalysisStatus(analysis) {
@@ -349,7 +349,7 @@ function renderVideoAnalysisAction(ev) {
     button.dataset.eventId = ev?.id || '';
     button.hidden = !isAnomaly;
     button.disabled = !ev?.clip_filename || ['processing', 'extracting_frames', 'analyzing_frames', 'completed'].includes(status);
-    button.textContent = ['video_missing', 'failed'].includes(status) ? '↻ Thử lại video' : '🎬 Phân tích video';
+    button.textContent = ['video_missing', 'failed'].includes(status) ? 'Thử lại video' : 'Phân tích video';
 }
 
 async function requestVideoAnalysis() {
@@ -357,7 +357,7 @@ async function requestVideoAnalysis() {
     const eventId = button?.dataset.eventId;
     if (!eventId || button.disabled) return;
     button.disabled = true;
-    button.textContent = '⏳ Đang xếp hàng...';
+    button.textContent = 'Đang xếp hàng...';
     try {
         const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/video-analysis`, {method: 'POST'});
         const data = await response.json();
@@ -366,7 +366,7 @@ async function requestVideoAnalysis() {
         startVideoAnalysisPolling(eventId);
     } catch (error) {
         button.disabled = false;
-        button.textContent = '🎬 Phân tích video';
+        button.textContent = 'Phân tích video';
         setText('clip-video-analysis-error', error.message);
     }
 }
@@ -404,7 +404,7 @@ async function requestAudioAnalysis() {
     const eventId = button?.dataset.eventId;
     if (!eventId || button.disabled) return;
     button.disabled = true;
-    button.textContent = '⏳ Đang xếp hàng...';
+    button.textContent = 'Đang xếp hàng...';
     try {
         const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/audio-analysis`, {method: 'POST'});
         const data = await response.json();
@@ -414,7 +414,7 @@ async function requestAudioAnalysis() {
         startAudioAnalysisPolling(eventId);
     } catch (error) {
         button.disabled = false;
-        button.textContent = '🎙 Phân tích âm thanh';
+        button.textContent = 'Phân tích âm thanh';
         setText('clip-audio-error', error.message);
     }
 }
@@ -505,7 +505,7 @@ async function testNVRConnectionUI() {
     banner.style.background = 'rgba(99, 102, 241, 0.2)';
     banner.style.color = '#a5b4fc';
     banner.style.border = '1px solid rgba(99, 102, 241, 0.4)';
-    banner.innerText = '⏳ Đang thử kết nối tới đầu ghi Dahua qua Internet... Vui lòng chờ vài giây.';
+    banner.innerText = 'Đang thử kết nối tới đầu ghi Dahua qua Internet... Vui lòng chờ vài giây.';
 
     const payload = getFormPayload();
 
@@ -531,7 +531,7 @@ async function testNVRConnectionUI() {
     } catch(err) {
         banner.style.background = 'rgba(239, 68, 68, 0.2)';
         banner.style.color = '#fca5a5';
-        banner.innerText = '❌ Lỗi kết nối tới Web Server!';
+        banner.innerText = 'Lỗi kết nối tới Web Server!';
     }
 }
 
@@ -761,7 +761,7 @@ function initVssVisionSearch() {
         for (let i = 1; i <= 32; i++) {
             const opt = document.createElement("option");
             opt.value = i;
-            opt.innerText = formatDncCamLabel(i) + ([3, 11, 18, 19, 20].includes(i) ? ' (🟢 Online)' : '');
+            opt.innerText = formatDncCamLabel(i) + ([3, 11, 18, 19, 20].includes(i) ? ' (Online)' : '');
             channelSelect.appendChild(opt);
         }
     }
@@ -1175,7 +1175,7 @@ function addVssCardToChat(ev, btn) {
         notice.className = "vss-chat-bubble agent thinking";
         notice.style.fontSize = "0.76rem";
         notice.style.borderColor = "#76b900";
-        notice.innerHTML = `📎 <strong>Đã gắn ngữ cảnh:</strong> ${ev.video_name} · [#${ev.id}] ${ev.description} (${ev.timestamp})`;
+        notice.innerHTML = `<strong>Đã gắn ngữ cảnh:</strong> ${ev.video_name} · [#${ev.id}] ${ev.description} (${ev.timestamp})`;
         chatContainer.appendChild(notice);
 
         const conv = document.getElementById("vss-agent-conversation");

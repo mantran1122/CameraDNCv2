@@ -14,8 +14,12 @@ def enabled() -> bool:
 
 
 def _connect():
+    from pathlib import Path
     import psycopg
-    return psycopg.connect(os.environ["CAMERAAI_POSTGRES_URL"])
+    pg_url = os.environ["CAMERAAI_POSTGRES_URL"].strip()
+    if Path("/.dockerenv").exists():
+        pg_url = pg_url.replace("@localhost:5432/", "@postgres:5432/").replace("@127.0.0.1:5432/", "@postgres:5432/")
+    return psycopg.connect(pg_url)
 
 
 def _upsert_event(target, event_id: int, backend: str) -> None:

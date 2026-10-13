@@ -192,7 +192,7 @@ def call_qwen_chat(
     Configured with frequency/presence/repetition penalties to prevent token degeneration loops.
     """
     try:
-        load_dotenv(config.BASE_DIR / ".env", override=True)
+        config._load_env_files_safely()
     except Exception:
         pass
     active_key = (os.getenv("QWEN_API_KEY") or "").strip() or config.QWEN_API_KEY

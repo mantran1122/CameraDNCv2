@@ -1,4 +1,4 @@
-# 🧠 KẾ HOẠCH TRIỂN KHAI 1: TỐI ƯU HÓA AI AGENT & SEARCH INTELLIGENCE
+# KẾ HOẠCH TRIỂN KHAI 1: TỐI ƯU HÓA AI AGENT & SEARCH INTELLIGENCE
 
 > **Liên kết Checklist:** Hạng mục 3 (Chat AI Admin nhận đủ 32 camera) & Hạng mục 7 (Sửa AI bị "ngơ", phân định đúng sự kiện Nguy hiểm)  
 > **Dự án:** CameraDNCv2  
@@ -6,7 +6,7 @@
 
 ---
 
-## 🎯 1. MỤC TIÊU
+## 1. MỤC TIÊU
 1. **Khắc phục lỗi bó hẹp kênh:** Tài khoản Admin có quyền xem tất cả camera (kênh 1 đến 32), AI phải tự động nhận diện đầy đủ toàn bộ camera thực tế thay vì bị giới hạn ở 5 kênh (`3, 11, 18, 19, 20`).
 2. **Loại bỏ hiện tượng AI "ngơ":**
    - Phân biệt tuyệt đối giữa **Nguy hiểm / Cảnh báo an ninh thực sự** (Đột nhập, Đánh nhau, Vượt rào, Âm thanh lớn bất thường) với **Hoạt động bình thường** (Chuyển động gió/lá cây, người/xe đi lại thông thường).
@@ -14,7 +14,7 @@
 
 ---
 
-## 🔍 2. NGUYÊN NHÂN KỸ THUẬT & GIẢI PHÁP
+## 2. NGUYÊN NHÂN KỸ THUẬT & GIẢI PHÁP
 
 ### 2.1. Lỗi bó hẹp 5 kênh (Admin bị ép kênh)
 * **Nguyên nhân:**
@@ -37,7 +37,7 @@
 
 ---
 
-## 🛠️ 3. CÁC BƯỚC THỰC HIỆN CHI TIẾT
+## 3. CÁC BƯỚC THỰC HIỆN CHI TIẾT
 
 ```mermaid
 flowchart TD
@@ -95,7 +95,7 @@ if only_anomalies:
 
 ---
 
-## 🏁 4. TIÊU CHÍ NGHIỆM THU
+## 4. TIÊU CHÍ NGHIỆM THU
 1. Đăng nhập tài khoản Admin -> Hỏi AI: *"Hệ thống đang có những camera nào?"* -> AI liệt kê đầy đủ từ Kênh 01 đến Kênh 32 (không chỉ còn 5 kênh như trước).
 2. Hỏi AI: *"Hôm nay có sự kiện nguy hiểm nào không?"*:
    - Nếu có Đột nhập / Đánh nhau / Âm thanh lớn: AI trả lời chính xác mã sự kiện và camera vi phạm.
