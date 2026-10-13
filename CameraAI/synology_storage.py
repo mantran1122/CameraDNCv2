@@ -260,6 +260,66 @@ def delete_clip(reference: str) -> bool:
     return True
 
 
+def remote_report_path(reference: str = ".") -> str:
+    """Return remote path on Synology NAS for Nightly Reports (e.g. /Ai-Camera/CameraAI/nightly_reports/...)."""
+    share = config.SYNOLOGY_SHARE.rstrip("/")
+    root_parent = str(PurePosixPath(config.SYNOLOGY_ROOT or "CameraAI/clips").parent)
+    base_reports = "nightly_reports" if root_parent in ("", ".") else f"{root_parent.strip('/')}/nightly_reports"
+    parts = [share, base_reports]
+    if reference and reference not in ("", "."):
+        relative = _safe_reference(reference)
+        parts.append(relative.as_posix())
+    return "/" + "/".join(part.strip("/") for part in parts if part)
+
+
+def upload_nightly_report_dir(report_date: str, local_dir: Path) -> dict:
+    """Upload all .json and .md files in a daily nightly_reports/{report_date} directory to Synology NAS."""
+    if not enabled() or not local_dir.is_dir():
+        return {"uploaded": 0, "enabled": enabled(), "remote_dir": ""}
+    uploaded = 0
+    remote_dir = remote_report_path(report_date)
+    with client() as api:
+        for file_path in sorted(local_dir.iterdir()):
+            if not file_path.is_file() or file_path.name.startswith("_job_status"):
+                continue
+            if file_path.suffix.lower() not in (".json", ".md"):
+                continue
+            dest = remote_report_path(f"{report_date}/{file_path.name}")
+            api.upload(file_path, dest)
+            uploaded += 1
+    return {"uploaded": uploaded, "enabled": True, "remote_dir": remote_dir}
+
+
+def download_nightly_report_file(report_date: str, filename: str, local_target: Path) -> bool:
+    """Download a single nightly report file (.json or .md) from Synology NAS on demand."""
+    if not enabled():
+        return False
+    try:
+        with client() as api:
+            api.download(remote_report_path(f"{report_date}/{filename}"), local_target)
+        return local_target.is_file()
+    except Exception:
+        return False
+
+
+def list_remote_report_dates() -> list[str]:
+    """List YYYY-MM-DD report folders stored on Synology NAS."""
+    if not enabled():
+        return []
+    try:
+        base_dir = remote_report_path(".")
+        with client() as api:
+            page = api.list_folder(base_dir, limit=200)
+            dates = []
+            for item in page.get("files", []):
+                name = str(item.get("name", ""))
+                if item.get("isdir") and len(name) == 10 and name[4] == "-" and name[7] == "-":
+                    dates.append(name)
+            return sorted(dates, reverse=True)
+    except Exception:
+        return []
+
+
 def inventory() -> dict:
     """Return a recursive, read-only inventory of the configured remote root."""
     if not enabled():

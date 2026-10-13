@@ -5760,10 +5760,9 @@
         </div>
 
         <div class="header-right" style="display: flex; align-items: center; gap: 10px;">
-            <!-- Hạng mục 5: Nút mở Thư mục Báo cáo Đêm (22h - 4h sáng) dành cho Admin / Manager -->
-            <button type="button" id="btn-open-nightly-reports" onclick="openNightlyReportsModal()" style="display: none; align-items: center; gap: 6px; background: rgba(118, 185, 0, 0.14); border: 1px solid rgba(118, 185, 0, 0.45); color: #a3e635; padding: 5px 11px; border-radius: 6px; font-size: 0.76rem; font-weight: 600; cursor: pointer; transition: all 0.15s;" title="Xem Thư mục Báo cáo Phân tích Video tự động Ban đêm (22:00 -> 04:00)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                <span>Báo cáo Đêm (22h-4h)</span>
+            <!-- Hạng mục 5: Nút mở Báo cáo Ngày (22h - 4h sáng) dạng Icon tối giản -->
+            <button type="button" class="notif-bell-btn" id="btn-open-nightly-reports" onclick="openNightlyReportsModal()" style="display: none;" title="Báo cáo ngày (22:00 - 04:00)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
             </button>
 
             <!-- Hạng mục 1: Thay nút Sáng/Tối thành Icon Chuông Thông báo Cảnh báo Realtime -->
@@ -12216,7 +12215,7 @@ user=None`;
                 const res = await fetch('/api/nightly-reports/dates');
                 if (!res.ok) {
                     if (res.status === 403) {
-                        alert('Chỉ tài khoản cấp Admin hoặc Manager mới có quyền truy cập Thư mục Báo cáo Đêm (22h-4h).');
+                        alert('Chỉ tài khoản Admin hoặc Manager mới có quyền xem Báo cáo ngày.');
                         closeNightlyReportsModal();
                     }
                     return;
@@ -12229,7 +12228,7 @@ user=None`;
                     if (activeJob && activeJob.status === 'running') {
                         statusBanner.style.display = 'flex';
                         statusBanner.innerHTML = `
-                            <span><strong>Đang chạy phân tích kỳ ${activeJob.report_date}</strong> (${activeJob.window_start} → ${activeJob.window_end}) — Đã xử lý ${activeJob.processed_cameras || 0}/${activeJob.total_cameras || 32} Camera...</span>
+                            <span><strong>Đang tổng hợp ${activeJob.report_date}:</strong> ${activeJob.processed_cameras || 0}/${activeJob.total_cameras || 32} camera...</span>
                         `;
                         if (!nightlyPollTimer) {
                             nightlyPollTimer = setInterval(() => loadNightlyReportDates(currentNightlyReportDate), 3000);
@@ -12246,12 +12245,12 @@ user=None`;
                 const todayStr = new Date().toISOString().slice(0, 10);
                 if (selectEl) {
                     if (dates.length === 0) {
-                        selectEl.innerHTML = `<option value="${todayStr}">${todayStr} (Chưa tạo báo cáo - Bấm Chạy tổng hợp ngay)</option>`;
+                        selectEl.innerHTML = `<option value="${todayStr}">${todayStr} (Chưa có dữ liệu)</option>`;
                         currentNightlyReportDate = todayStr;
                     } else {
                         selectEl.innerHTML = dates.map(d => `
                             <option value="${d.report_date}">
-                                ${d.report_date} (${d.total_events} sự kiện • ${d.total_anomalies} cảnh báo • ${d.active_cameras}/${d.total_cameras} cam)
+                                ${d.report_date} (${d.total_events} SK • ${d.total_anomalies} CB${d.nas_synced ? ' • NAS' : ''})
                             </option>
                         `).join('');
                         if (preferredDate && dates.some(d => d.report_date === preferredDate)) {
@@ -12287,7 +12286,7 @@ user=None`;
             const metaBar = document.getElementById('nightly-window-meta');
 
             if (camListEl) {
-                camListEl.innerHTML = `<div style="padding: 18px; text-align: center; color: #a1a1aa; font-size: 0.78rem;">Đang tải danh sách báo cáo camera...</div>`;
+                camListEl.innerHTML = `<div style="padding: 18px; text-align: center; color: #a1a1aa; font-size: 0.78rem;">Đang tải...</div>`;
             }
 
             try {
@@ -12297,18 +12296,18 @@ user=None`;
 
                 if (!data.exists || !Array.isArray(data.cameras) || data.cameras.length === 0) {
                     if (metaBar) {
-                        metaBar.textContent = `Kỳ báo cáo ${reportDate}: Chưa có dữ liệu tổng hợp. Hãy bấm "Chạy tổng hợp ngay" ở góc phải để tạo báo cáo.`;
+                        metaBar.textContent = `${reportDate} • Chưa có dữ liệu`;
                     }
                     if (camListEl) {
-                        camListEl.innerHTML = `<div style="padding: 20px; text-align: center; color: #71717a; font-size: 0.78rem;">Chưa có file báo cáo trong thư mục ngày ${reportDate}.</div>`;
+                        camListEl.innerHTML = `<div style="padding: 20px; text-align: center; color: #71717a; font-size: 0.78rem;">Chưa có dữ liệu</div>`;
                     }
                     if (detailEl) {
                         detailEl.innerHTML = `
-                            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#a1a1aa; gap:12px; padding:24px; text-align:center;">
-                                <div style="font-size:0.95rem; font-weight:600; color:#f4f4f5;">Chưa có Báo cáo Đêm cho ngày ${reportDate}</div>
-                                <div style="font-size:0.8rem; max-width:460px; color:#71717a;">Hệ thống tự động chạy từ <strong>22:00 đến 04:00 sáng</strong> mỗi ngày (gom toàn bộ video từ 22:00 hôm trước đến 21:59:59 hôm nay). Bạn cũng có thể bấm nút bên dưới để chạy tổng hợp ngay lập tức.</div>
-                                <button type="button" onclick="triggerNightlyReportGeneration()" style="background:#76b900; color:#000; font-weight:700; border:none; border-radius:6px; padding:8px 16px; font-size:0.8rem; cursor:pointer;">
-                                    Chạy phân tích &amp; Xuất báo cáo ngay
+                            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#a1a1aa; gap:10px; padding:24px; text-align:center;">
+                                <div style="font-size:0.92rem; font-weight:600; color:#f4f4f5;">Chưa có báo cáo ngày ${reportDate}</div>
+                                <div style="font-size:0.78rem; color:#71717a;">Tự động tổng hợp lúc 22:00 – 04:00 và đồng bộ NAS.</div>
+                                <button type="button" onclick="triggerNightlyReportGeneration()" style="background:#76b900; color:#000; font-weight:700; border:none; border-radius:6px; padding:7px 14px; font-size:0.78rem; cursor:pointer;">
+                                    Tạo báo cáo
                                 </button>
                             </div>
                         `;
@@ -12318,7 +12317,10 @@ user=None`;
 
                 currentNightlyCameraList = data.cameras;
                 if (metaBar) {
-                    metaBar.innerHTML = `Thư mục: <strong>storage/nightly_reports/${data.report_date}/</strong> • Cửa sổ cuốn chiếu: <strong>${data.window_start} → ${data.window_end}</strong> • Tổng: <strong>${data.total_events} sự kiện</strong> (${data.total_anomalies} bất thường)`;
+                    const nasBadge = data.nas_synced
+                        ? `<span style="padding:1px 6px; border-radius:4px; background:rgba(34,197,94,0.16); color:#86efac; font-weight:700; font-size:0.68rem;" title="${data.nas_path || 'Synology NAS'}">NAS</span>`
+                        : `<span style="padding:1px 6px; border-radius:4px; background:rgba(255,255,255,0.06); color:#a1a1aa; font-size:0.68rem;">Local</span>`;
+                    metaBar.innerHTML = `${data.window_start} → ${data.window_end} • <strong>${data.total_events} SK</strong> (${data.total_anomalies} bất thường) • ${nasBadge}`;
                 }
 
                 renderNightlyCameraSidebar();
@@ -12347,7 +12349,7 @@ user=None`;
             });
 
             if (filtered.length === 0) {
-                camListEl.innerHTML = `<div style="padding: 14px; text-align: center; color: #71717a; font-size: 0.76rem;">Không tìm thấy camera phù hợp.</div>`;
+                camListEl.innerHTML = `<div style="padding: 14px; text-align: center; color: #71717a; font-size: 0.76rem;">Không tìm thấy camera.</div>`;
                 return;
             }
 
@@ -12365,8 +12367,8 @@ user=None`;
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 5px; font-size: 0.69rem; color: #a1a1aa;">
-                            <span>${c.total_events} sự kiện • ${c.clip_count || 0} clip</span>
-                            ${c.anomaly_count > 0 ? `<span style="color:#f87171; font-weight:700;">${c.anomaly_count} bất thường</span>` : `<span style="color:#71717a;">An toàn</span>`}
+                            <span>${c.total_events} SK • ${c.clip_count || 0} clip</span>
+                            ${c.anomaly_count > 0 ? `<span style="color:#f87171; font-weight:700;">${c.anomaly_count} CB</span>` : `<span style="color:#71717a;">An toàn</span>`}
                         </div>
                     </div>
                 `;
@@ -12380,12 +12382,12 @@ user=None`;
 
             const detailEl = document.getElementById('nightly-camera-detail');
             if (!detailEl) return;
-            detailEl.innerHTML = `<div style="padding: 28px; text-align: center; color: #a1a1aa;">Đang tải báo cáo Camera D${channelId}...</div>`;
+            detailEl.innerHTML = `<div style="padding: 28px; text-align: center; color: #a1a1aa;">Đang tải...</div>`;
 
             try {
                 const res = await fetch(`/api/nightly-reports/${encodeURIComponent(currentNightlyReportDate)}/camera/${channelId}`);
                 if (!res.ok) {
-                    detailEl.innerHTML = `<div style="padding: 28px; text-align: center; color: #ef4444;">Không thể tải báo cáo của Camera D${channelId}.</div>`;
+                    detailEl.innerHTML = `<div style="padding: 28px; text-align: center; color: #ef4444;">Không tải được báo cáo D${channelId}.</div>`;
                     return;
                 }
                 const rep = await res.json();
@@ -12397,7 +12399,7 @@ user=None`;
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
                             <div style="font-size: 0.8rem; font-weight: 700; color: #e4e4e7;">${s.title}</div>
                             <span style="font-size: 0.7rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.06); color: #a1a1aa;">
-                                ${s.event_count} sự kiện • ${s.anomaly_count} cảnh báo
+                                ${s.event_count} SK • ${s.anomaly_count} CB
                             </span>
                         </div>
                         <div style="font-size: 0.78rem; color: #d4d4d8; line-height: 1.5;">
@@ -12416,67 +12418,66 @@ user=None`;
                                     <span style="padding: 1px 6px; border-radius: 4px; background: rgba(239,68,68,0.16); color: #fca5a5; font-size: 0.68rem; font-weight: 600;">${ev.event_label}</span>
                                 </div>
                                 <div style="font-size: 0.75rem; color: #d4d4d8; margin-top: 3px;">
-                                    ${ev.ai_summary || ev.description || 'Đã ghi nhận metadata sự kiện.'}
+                                    ${ev.ai_summary || ev.description || 'Đã ghi nhận.'}
                                 </div>
                             </div>
                             ${ev.clip_url ? `
-                                <button type="button" onclick="openVideoModal('D${rep.channel < 10 ? '0' + rep.channel : rep.channel} - Sự kiện #${ev.id} (${ev.timestamp})', '${ev.clip_url}', ${ev.id || 'null'})" style="flex-shrink: 0; background: rgba(118,185,0,0.18); border: 1px solid #76b900; color: #a3e635; border-radius: 6px; padding: 5px 10px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">
+                                <button type="button" onclick="openVideoModal('D${rep.channel < 10 ? '0' + rep.channel : rep.channel} - #${ev.id} (${ev.timestamp})', '${ev.clip_url}', ${ev.id || 'null'})" style="flex-shrink: 0; background: rgba(118,185,0,0.18); border: 1px solid #76b900; color: #a3e635; border-radius: 6px; padding: 5px 10px; font-size: 0.73rem; font-weight: 600; cursor: pointer;">
                                     Xem Clip
                                 </button>
                             ` : ''}
                         </div>
                     `).join('')
-                    : `<div style="padding: 12px; color: #71717a; font-size: 0.78rem; font-style: italic;">Không có sự kiện nổi bật nào trong kỳ báo cáo này.</div>`;
+                    : `<div style="padding: 10px; color: #71717a; font-size: 0.76rem; font-style: italic;">Không có sự kiện nổi bật.</div>`;
 
                 detailEl.innerHTML = `
                     <div style="display: flex; flex-direction: column; gap: 14px;">
-                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid #252836; padding-bottom: 12px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #252836; padding-bottom: 10px;">
                             <div>
-                                <div style="font-size: 1.02rem; font-weight: 700; color: #ffffff;">
-                                    Báo cáo Ngày ${rep.report_date} — D${rep.channel < 10 ? '0' + rep.channel : rep.channel}: ${rep.camera_name}
+                                <div style="font-size: 0.98rem; font-weight: 700; color: #ffffff;">
+                                    D${rep.channel < 10 ? '0' + rep.channel : rep.channel}: ${rep.camera_name}
                                 </div>
-                                <div style="font-size: 0.75rem; color: #a1a1aa; margin-top: 4px;">
-                                    Cửa sổ dữ liệu cuốn chiếu: <strong style="color:#38bdf8;">${rep.window_start} → ${rep.window_end}</strong> <em>(Video từ 22:00 tối đẩy sang ngày hôm sau)</em>
+                                <div style="font-size: 0.73rem; color: #a1a1aa; margin-top: 2px;">
+                                    ${rep.window_start} → ${rep.window_end}
                                 </div>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                                <a href="/api/nightly-reports/${encodeURIComponent(rep.report_date)}/camera/${rep.channel}/download" target="_blank" style="text-decoration: none; background: #1e293b; border: 1px solid #334155; color: #38bdf8; padding: 6px 11px; border-radius: 6px; font-size: 0.74rem; font-weight: 600;">
-                                    Tải file .MD
+                                <a href="/api/nightly-reports/${encodeURIComponent(rep.report_date)}/camera/${rep.channel}/download" target="_blank" style="text-decoration: none; background: #1e293b; border: 1px solid #334155; color: #38bdf8; padding: 5px 10px; border-radius: 6px; font-size: 0.73rem; font-weight: 600;">
+                                    Tải .MD
                                 </a>
                             </div>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 8px;">
                             <div style="background: ${riskBg}; border: 1px solid ${riskBorder}; border-radius: 7px; padding: 8px 10px;">
-                                <div style="font-size: 0.68rem; color: #d4d4d8;">Đánh giá An ninh</div>
+                                <div style="font-size: 0.68rem; color: #d4d4d8;">Mức độ</div>
                                 <div style="font-size: 0.78rem; font-weight: 700; color: #fff; margin-top: 2px;">${rep.risk_badge}</div>
                             </div>
                             <div style="background: #14161e; border: 1px solid #252836; border-radius: 7px; padding: 8px 10px;">
-                                <div style="font-size: 0.68rem; color: #a1a1aa;">Tổng sự kiện (24h)</div>
+                                <div style="font-size: 0.68rem; color: #a1a1aa;">Sự kiện (24h)</div>
                                 <div style="font-size: 0.95rem; font-weight: 700; color: #38bdf8; margin-top: 2px;">${rep.total_events}</div>
                             </div>
                             <div style="background: #14161e; border: 1px solid #252836; border-radius: 7px; padding: 8px 10px;">
-                                <div style="font-size: 0.68rem; color: #a1a1aa;">Cảnh báo Bất thường</div>
+                                <div style="font-size: 0.68rem; color: #a1a1aa;">Bất thường</div>
                                 <div style="font-size: 0.95rem; font-weight: 700; color: #f87171; margin-top: 2px;">${rep.anomaly_count}</div>
                             </div>
                             <div style="background: #14161e; border: 1px solid #252836; border-radius: 7px; padding: 8px 10px;">
-                                <div style="font-size: 0.68rem; color: #a1a1aa;">Người / Phương tiện</div>
-                                <div style="font-size: 0.9rem; font-weight: 700; color: #a3e635; margin-top: 2px;">${rep.human_count} người • ${rep.vehicle_count} xe</div>
+                                <div style="font-size: 0.68rem; color: #a1a1aa;">Đối tượng</div>
+                                <div style="font-size: 0.88rem; font-weight: 700; color: #a3e635; margin-top: 2px;">${rep.human_count} người • ${rep.vehicle_count} xe</div>
                             </div>
                             <div style="background: #14161e; border: 1px solid #252836; border-radius: 7px; padding: 8px 10px;">
-                                <div style="font-size: 0.68rem; color: #a1a1aa;">Giờ cao điểm</div>
+                                <div style="font-size: 0.68rem; color: #a1a1aa;">Cao điểm</div>
                                 <div style="font-size: 0.78rem; font-weight: 700; color: #f4f4f5; margin-top: 2px;">${rep.peak_hour_label}</div>
                             </div>
                         </div>
 
                         <div style="background: rgba(56, 189, 248, 0.07); border-left: 3px solid #38bdf8; padding: 10px 12px; border-radius: 6px; font-size: 0.8rem; color: #e4e4e7; line-height: 1.55;">
-                            <strong>1. Tóm tắt Tổng quan trong Ngày:</strong><br>
-                            ${String(rep.executive_summary || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
+                            <strong>Tóm tắt:</strong> ${String(rep.executive_summary || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
                         </div>
 
                         <div>
-                            <div style="font-size: 0.82rem; font-weight: 700; color: #a3e635; margin-bottom: 8px;">
-                                2. Dòng thời gian Nối tiếp theo 4 Ca (22:00 hôm trước → 22:00 hôm nay)
+                            <div style="font-size: 0.8rem; font-weight: 700; color: #a3e635; margin-bottom: 8px;">
+                                Theo ca (22:00 → 22:00)
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 8px;">
                                 ${shiftsHtml}
@@ -12484,8 +12485,8 @@ user=None`;
                         </div>
 
                         <div>
-                            <div style="font-size: 0.82rem; font-weight: 700; color: #38bdf8; margin-bottom: 8px;">
-                                3. Danh sách Video Sự kiện Đáng chú ý trong Kỳ
+                            <div style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; margin-bottom: 8px;">
+                                Sự kiện tiêu biểu
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 6px;">
                                 ${notableHtml}
@@ -12504,7 +12505,7 @@ user=None`;
             const btn = document.getElementById('btn-trigger-nightly-now');
             if (btn) {
                 btn.disabled = true;
-                btn.textContent = 'Đang khởi chạy...';
+                btn.textContent = 'Đang chạy...';
             }
             try {
                 const res = await fetch('/api/nightly-reports/trigger', {
@@ -12520,58 +12521,58 @@ user=None`;
                     currentNightlyReportDate = data.job.report_date;
                     await loadNightlyReportDates(currentNightlyReportDate);
                 } else {
-                    alert(data.detail || 'Không thể kích hoạt chạy báo cáo đêm.');
+                    alert(data.detail || 'Không thể chạy báo cáo.');
                 }
             } catch (err) {
-                alert('Lỗi kết nối khi kích hoạt báo cáo đêm: ' + err.message);
+                alert('Lỗi kết nối: ' + err.message);
             } finally {
                 if (btn) {
                     btn.disabled = false;
-                    btn.textContent = 'Chạy tổng hợp ngay';
+                    btn.textContent = 'Tổng hợp';
                 }
             }
         }
     </script>
 
-    <!-- MODAL THƯ MỤC BÁO CÁO PHÂN TÍCH VIDEO BAN ĐÊM (22:00 -> 04:00) DÀNH CHO ADMIN & MANAGER -->
+    <!-- MODAL BÁO CÁO NGÀY (22:00 -> 04:00) DÀNH CHO ADMIN & MANAGER -->
     <div id="nightly-reports-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.78); backdrop-filter: blur(4px); z-index: 10050; align-items: center; justify-content: center; padding: 18px;">
-        <div style="width: 1180px; max-width: 96vw; height: 86vh; background: #0d0e13; border: 1px solid #272a36; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.85);">
+        <div style="width: 1140px; max-width: 96vw; height: 85vh; background: #0d0e13; border: 1px solid #272a36; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.85);">
             <!-- Modal Header -->
-            <div style="padding: 12px 18px; background: #14161f; border-bottom: 1px solid #252836; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="padding: 10px 16px; background: #14161f; border-bottom: 1px solid #252836; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a3e635" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                     <div>
-                        <div style="font-size: 0.95rem; font-weight: 700; color: #ffffff;">Thư mục Báo cáo Phân tích Video Hàng ngày (Chạy tự động 22:00 → 04:00 sáng)</div>
+                        <div style="font-size: 0.92rem; font-weight: 700; color: #ffffff;">Báo cáo Ngày (22:00 – 04:00)</div>
                         <div style="font-size: 0.72rem; color: #a1a1aa;" id="nightly-window-meta">
-                            Quy tắc cuốn chiếu: Gom video từ 22:00 tối hôm trước đến 21:59:59 tối hôm nay (Video từ 22:00 đẩy sang ngày mai)
+                            22:00 hôm trước → 22:00 hôm nay
                         </div>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <select id="nightly-date-select" onchange="loadNightlyReportForDate(this.value)" style="background: #090a0f; color: #f4f4f5; border: 1px solid #334155; border-radius: 6px; padding: 6px 10px; font-size: 0.76rem; font-weight: 600; outline: none; cursor: pointer;"></select>
-                    <input type="date" id="nightly-custom-date-input" style="background: #090a0f; color: #f4f4f5; border: 1px solid #334155; border-radius: 6px; padding: 5px 8px; font-size: 0.75rem; outline: none;" title="Chọn ngày muốn tổng hợp báo cáo">
-                    <button type="button" id="btn-trigger-nightly-now" onclick="triggerNightlyReportGeneration()" style="background: #76b900; color: #000000; font-weight: 700; border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.76rem; cursor: pointer;" title="Chạy tổng hợp báo cáo ngay cho ngày đã chọn">
-                        Chạy tổng hợp ngay
+                    <select id="nightly-date-select" onchange="loadNightlyReportForDate(this.value)" style="background: #090a0f; color: #f4f4f5; border: 1px solid #334155; border-radius: 6px; padding: 5px 9px; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer;"></select>
+                    <input type="date" id="nightly-custom-date-input" style="background: #090a0f; color: #f4f4f5; border: 1px solid #334155; border-radius: 6px; padding: 4px 8px; font-size: 0.75rem; outline: none;" title="Chọn ngày">
+                    <button type="button" id="btn-trigger-nightly-now" onclick="triggerNightlyReportGeneration()" style="background: #76b900; color: #000000; font-weight: 700; border: none; border-radius: 6px; padding: 5px 11px; font-size: 0.75rem; cursor: pointer;" title="Tổng hợp báo cáo cho ngày đã chọn">
+                        Tổng hợp
                     </button>
-                    <button type="button" onclick="closeNightlyReportsModal()" style="background: rgba(255,255,255,0.08); color: #e4e4e7; border: none; border-radius: 6px; width: 30px; height: 30px; font-size: 1rem; cursor: pointer;" title="Đóng">✕</button>
+                    <button type="button" onclick="closeNightlyReportsModal()" style="background: rgba(255,255,255,0.08); color: #e4e4e7; border: none; border-radius: 6px; width: 28px; height: 28px; font-size: 0.95rem; cursor: pointer;" title="Đóng">✕</button>
                 </div>
             </div>
 
             <!-- Job Progress Banner -->
-            <div id="nightly-job-status-banner" style="display: none; padding: 8px 18px; background: rgba(56, 189, 248, 0.14); border-bottom: 1px solid rgba(56, 189, 248, 0.35); color: #7dd3fc; font-size: 0.78rem; align-items: center; justify-content: space-between;"></div>
+            <div id="nightly-job-status-banner" style="display: none; padding: 7px 16px; background: rgba(56, 189, 248, 0.14); border-bottom: 1px solid rgba(56, 189, 248, 0.35); color: #7dd3fc; font-size: 0.76rem; align-items: center; justify-content: space-between;"></div>
 
             <!-- Modal Body: Left Camera List + Right Concise Report -->
             <div style="flex: 1; display: flex; min-height: 0; overflow: hidden;">
                 <!-- Left Sidebar: Cameras in Date Folder -->
-                <div style="width: 295px; border-right: 1px solid #232530; background: #101218; display: flex; flex-direction: column; min-height: 0;">
-                    <div style="padding: 10px; border-bottom: 1px solid #232530;">
-                        <input type="text" id="nightly-cam-search" placeholder="Tìm Camera trong thư mục ngày..." oninput="renderNightlyCameraSidebar(this.value)" style="width: 100%; background: #090a0f; border: 1px solid #272a36; border-radius: 6px; color: #f4f4f5; padding: 6px 10px; font-size: 0.75rem; outline: none;">
+                <div style="width: 270px; border-right: 1px solid #232530; background: #101218; display: flex; flex-direction: column; min-height: 0;">
+                    <div style="padding: 8px; border-bottom: 1px solid #232530;">
+                        <input type="text" id="nightly-cam-search" placeholder="Tìm camera..." oninput="renderNightlyCameraSidebar(this.value)" style="width: 100%; background: #090a0f; border: 1px solid #272a36; border-radius: 6px; color: #f4f4f5; padding: 5px 9px; font-size: 0.74rem; outline: none;">
                     </div>
                     <div id="nightly-camera-list" style="flex: 1; overflow-y: auto; padding: 8px;"></div>
                 </div>
 
                 <!-- Right Content: Concise 1-Page Camera Report -->
-                <div id="nightly-camera-detail" style="flex: 1; overflow-y: auto; padding: 18px 22px; background: #0d0e13;"></div>
+                <div id="nightly-camera-detail" style="flex: 1; overflow-y: auto; padding: 16px 20px; background: #0d0e13;"></div>
             </div>
         </div>
     </div>

@@ -402,6 +402,14 @@ class NightlyReportWorker:
                 current_channel=ch,
             )
 
+        nas_path_str = ""
+        try:
+            import synology_storage
+            if synology_storage.enabled():
+                nas_path_str = synology_storage.remote_report_path(norm_date)
+        except Exception:
+            pass
+
         master_summary = {
             "report_date": norm_date,
             "window_start": start_ts,
@@ -415,11 +423,30 @@ class NightlyReportWorker:
             "total_anomalies": total_anomalies_all,
             "vlm_analyzed_clips": vlm_count,
             "high_risk_channels": high_risk_cameras,
+            "nas_synced": False,
+            "nas_path": nas_path_str,
             "cameras": camera_summaries_index,
         }
 
         master_file = report_dir / "_daily_master_summary.json"
         master_file.write_text(json.dumps(master_summary, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        # Mirror daily report folder (.json and .md files) to Synology NAS if enabled
+        nas_synced = False
+        try:
+            import synology_storage
+            if synology_storage.enabled():
+                self._update_job_status(report_dir, phase="syncing_to_nas")
+                sync_res = synology_storage.upload_nightly_report_dir(norm_date, report_dir)
+                if sync_res.get("uploaded", 0) > 0:
+                    nas_synced = True
+                    master_summary["nas_synced"] = True
+                    master_summary["nas_path"] = sync_res.get("remote_dir") or nas_path_str
+                    master_file.write_text(json.dumps(master_summary, ensure_ascii=False, indent=2), encoding="utf-8")
+                    synology_storage.upload_nightly_report_dir(norm_date, report_dir)
+                    print(f"[NIGHTLY REPORT] Mirrored {sync_res.get('uploaded')} report files to Synology NAS: {master_summary['nas_path']}")
+        except Exception as exc:
+            print(f"[NIGHTLY REPORT] Synology NAS sync warning for {norm_date}: {exc}")
 
         self._update_job_status(
             report_dir,
@@ -429,11 +456,13 @@ class NightlyReportWorker:
             total_events_in_window=len(events),
             total_anomalies=total_anomalies_all,
             active_cameras=active_cameras_count,
+            nas_synced=nas_synced,
+            nas_path=master_summary["nas_path"],
             completed_at=datetime.now().astimezone().isoformat(timespec="seconds"),
         )
         print(
             f"[NIGHTLY REPORT] Completed report {norm_date} ({start_ts} -> {end_ts}): "
-            f"{len(events)} events across {active_cameras_count}/{len(all_channels)} active cameras."
+            f"{len(events)} events across {active_cameras_count}/{len(all_channels)} active cameras (NAS synced={nas_synced})."
         )
 
     def _enrich_unanalyzed_clips(

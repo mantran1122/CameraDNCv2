@@ -3342,9 +3342,26 @@ def require_session_manager_or_admin(request: Request) -> dict:
 
 @app.get("/api/nightly-reports/dates")
 async def api_list_nightly_report_dates(user_ctx: dict = Depends(require_session_manager_or_admin)):
-    """List available nightly report date folders in storage/nightly_reports/."""
+    """List available nightly report date folders in storage/nightly_reports/ and Synology NAS."""
     base_dir = config.NIGHTLY_REPORT_DIR
     base_dir.mkdir(parents=True, exist_ok=True)
+
+    # Merge any remote report folders from Synology NAS if missing locally
+    try:
+        if synology_storage.enabled():
+            remote_dates = await asyncio.to_thread(synology_storage.list_remote_report_dates)
+            for r_date in remote_dates:
+                local_master = base_dir / r_date / "_daily_master_summary.json"
+                if not local_master.is_file():
+                    await asyncio.to_thread(
+                        synology_storage.download_nightly_report_file,
+                        r_date,
+                        "_daily_master_summary.json",
+                        local_master,
+                    )
+    except Exception:
+        pass
+
     items = []
     for folder in sorted(base_dir.iterdir(), key=lambda p: p.name, reverse=True):
         if not folder.is_dir() or not re.match(r"^\d{4}-\d{2}-\d{2}$", folder.name):
@@ -3374,14 +3391,17 @@ async def api_list_nightly_report_dates(user_ctx: dict = Depends(require_session
             "total_anomalies": master_data.get("total_anomalies", st_data.get("total_anomalies", 0)),
             "active_cameras": master_data.get("active_cameras", st_data.get("active_cameras", 0)),
             "total_cameras": master_data.get("total_cameras", 32),
+            "nas_synced": bool(master_data.get("nas_synced") or st_data.get("nas_synced")),
+            "nas_path": master_data.get("nas_path") or st_data.get("nas_path") or "",
             "generated_at": master_data.get("generated_at") or st_data.get("completed_at") or st_data.get("updated_at"),
         })
 
     return {
         "dates": items,
         "active_job": nightly_report_worker.get_active_job(),
-        "schedule_window": "22:00 -> 04:00 (Cuốn chiếu: 22:00 hôm trước -> 21:59:59 hôm nay)",
+        "schedule_window": "22:00 -> 04:00",
         "storage_folder": str(base_dir),
+        "nas_enabled": synology_storage.enabled(),
         "user_role": user_ctx["role"],
     }
 
@@ -3395,9 +3415,18 @@ async def api_get_nightly_report_by_date(
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", report_date.strip()):
         raise HTTPException(status_code=400, detail="Định dạng ngày không hợp lệ (YYYY-MM-DD).")
 
-    folder = config.NIGHTLY_REPORT_DIR / report_date.strip()
+    r_date = report_date.strip()
+    folder = config.NIGHTLY_REPORT_DIR / r_date
     master_file = folder / "_daily_master_summary.json"
     status_file = folder / "_job_status.json"
+
+    if not master_file.is_file() and synology_storage.enabled():
+        await asyncio.to_thread(
+            synology_storage.download_nightly_report_file,
+            r_date,
+            "_daily_master_summary.json",
+            master_file,
+        )
 
     if not folder.is_dir() or not master_file.is_file():
         st_data = {}
@@ -3408,7 +3437,7 @@ async def api_get_nightly_report_by_date(
                 pass
         return {
             "exists": False,
-            "report_date": report_date,
+            "report_date": r_date,
             "job_status": st_data or nightly_report_worker.get_active_job(),
             "cameras": [],
         }
@@ -3421,11 +3450,13 @@ async def api_get_nightly_report_by_date(
 
     return {
         "exists": True,
-        "report_date": master_data.get("report_date", report_date),
+        "report_date": master_data.get("report_date", r_date),
         "window_start": master_data.get("window_start"),
         "window_end": master_data.get("window_end"),
         "cutoff_rule": master_data.get("cutoff_rule"),
         "generated_at": master_data.get("generated_at"),
+        "nas_synced": bool(master_data.get("nas_synced")),
+        "nas_path": master_data.get("nas_path") or "",
         "total_events": sum(int(c.get("total_events") or 0) for c in cameras),
         "total_anomalies": sum(int(c.get("anomaly_count") or 0) for c in cameras),
         "active_cameras": sum(1 for c in cameras if int(c.get("total_events") or 0) > 0),
@@ -3449,10 +3480,19 @@ async def api_get_nightly_camera_report(
     if allowed is not None and int(channel_id) not in allowed:
         raise HTTPException(status_code=403, detail="Bạn không có quyền xem báo cáo của Camera này.")
 
-    folder = config.NIGHTLY_REPORT_DIR / report_date.strip()
-    cam_file = folder / f"cam_{int(channel_id):02d}.json"
+    r_date = report_date.strip()
+    folder = config.NIGHTLY_REPORT_DIR / r_date
+    cam_filename = f"cam_{int(channel_id):02d}.json"
+    cam_file = folder / cam_filename
+    if not cam_file.is_file() and synology_storage.enabled():
+        await asyncio.to_thread(
+            synology_storage.download_nightly_report_file,
+            r_date,
+            cam_filename,
+            cam_file,
+        )
     if not cam_file.is_file():
-        raise HTTPException(status_code=404, detail=f"Chưa có báo cáo ngày {report_date} cho Camera D{channel_id:02d}.")
+        raise HTTPException(status_code=404, detail=f"Chưa có báo cáo ngày {r_date} cho Camera D{channel_id:02d}.")
 
     return json.loads(cam_file.read_text(encoding="utf-8"))
 
@@ -3471,15 +3511,24 @@ async def api_download_nightly_camera_markdown(
     if allowed is not None and int(channel_id) not in allowed:
         raise HTTPException(status_code=403, detail="Bạn không có quyền tải báo cáo của Camera này.")
 
-    folder = config.NIGHTLY_REPORT_DIR / report_date.strip()
-    md_file = folder / f"cam_{int(channel_id):02d}.md"
+    r_date = report_date.strip()
+    folder = config.NIGHTLY_REPORT_DIR / r_date
+    md_filename = f"cam_{int(channel_id):02d}.md"
+    md_file = folder / md_filename
+    if not md_file.is_file() and synology_storage.enabled():
+        await asyncio.to_thread(
+            synology_storage.download_nightly_report_file,
+            r_date,
+            md_filename,
+            md_file,
+        )
     if not md_file.is_file():
         raise HTTPException(status_code=404, detail="Không tìm thấy file báo cáo Markdown.")
 
     return FileResponse(
         md_file,
         media_type="text/markdown; charset=utf-8",
-        filename=f"BaoCaoDem_{report_date}_Cam_{int(channel_id):02d}.md",
+        filename=f"BaoCao_{r_date}_Cam_{int(channel_id):02d}.md",
     )
 
 
