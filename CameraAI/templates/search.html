@@ -6277,13 +6277,6 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
                         <span>Danh sách (List)</span>
                     </button>
-                    <button class="ncc-mode-btn" id="ncc-btn-config" onclick="switchNccView('config')" title="Cấu hình Quản lý Camera &amp; NVR" style="display: none;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                        <span>Cấu hình Quản lý Camera</span>
-                    </button>
-                    <button class="ncc-mode-btn" id="ncc-btn-lock-config" onclick="lockAndHideConfig()" title="Khóa &amp; Ẩn tab Cấu hình" style="display: none; color: #f87171; border-color: rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.1);">
-                        <span>Khóa &amp; Ẩn</span>
-                    </button>
                 </div>
 
                 <!-- Right Filter & Status -->
@@ -6341,196 +6334,6 @@
                             <!-- Populated dynamically -->
                         </tbody>
                     </table>
-                </div>
-
-                <!-- 2d. Center Stage: Camera & NVR Configuration View (Thay thế phần Mặt bằng) -->
-                <div class="ncc-config-view" id="ncc-stage-config">
-                    <!-- Top Card: NVR Connection Parameters -->
-                    <div class="ncc-cfg-card">
-                        <div class="ncc-cfg-header">
-                            <div class="ncc-cfg-title">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#76b900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
-                                <span>Cấu hình Kết nối Đầu ghi Dahua NVR (WAN / Internet)</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <button class="ncc-cfg-btn-secondary" onclick="testNccNvrConnection()" id="ncc-cfg-btn-test">
-                                    <span>Kiểm tra kết nối</span>
-                                </button>
-                                <button class="ncc-cfg-btn" onclick="saveCameraConfigFromUI()" id="ncc-cfg-btn-save-nvr">
-                                    <span>Lưu thiết lập NVR &amp; Camera</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Status Notice Banner -->
-                        <div id="ncc-cfg-status-banner" style="display: none; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 500;"></div>
-
-                        <div class="ncc-config-connection-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: end;">
-                            <div>
-                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Địa chỉ IP / Host WAN</label>
-                                <input type="text" class="ncc-cfg-input" id="cfg-nvr-host" value="14.241.182.94" placeholder="14.241.182.94">
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Cổng HTTPS / Web</label>
-                                <input type="number" class="ncc-cfg-input" id="cfg-nvr-port" value="4443" placeholder="4443">
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Cổng RTSP</label>
-                                <input type="number" class="ncc-cfg-input" id="cfg-rtsp-port" value="33554" placeholder="33554">
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Tài khoản (Username)</label>
-                                <input type="text" class="ncc-cfg-input" id="cfg-nvr-user" value="user2" placeholder="user2">
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Mật khẩu (Password)</label>
-                                <div style="position: relative;">
-                                    <input type="password" class="ncc-cfg-input" id="cfg-nvr-pass" value="User#$168" placeholder="Password" style="padding-right: 32px;">
-                                    <button type="button" onclick="toggleCfgPasswordVisibility()" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #71717a; cursor: pointer; display: inline-flex; align-items: center;" title="Hiện/Ẩn mật khẩu">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: #71717a; padding-top: 4px;">
-                            <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: #d4d4d8;">
-                                <input type="checkbox" id="cfg-use-https" checked style="accent-color: #76b900;">
-                                <span>Sử dụng giao thức bảo mật HTTPS (SSL)</span>
-                            </label>
-                            <span>Dahua CGI Protocol &bull; RTSP Realmonitor &bull; Giám sát 32 Kênh</span>
-                        </div>
-                    </div>
-
-                    <!-- Middle Card: Cấu hình Mức Cảnh báo (3 Màu: Đỏ, Vàng, Xanh) -->
-                    <div class="ncc-cfg-card" style="padding: 12px 18px; gap: 8px;">
-                        <div class="ncc-cfg-header" style="padding-bottom: 8px;">
-                            <div class="ncc-cfg-title">
-                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                                <span>Cảnh báo Hành vi Bất thường (Nguy hiểm &bull; Trung bình &bull; Bình thường)</span>
-                                <span class="ncc-badge red" id="ncc-abnormal-count-badge">9 / 9</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <button type="button" class="ncc-cfg-btn-secondary" onclick="toggleAllAbnormalBehaviors(true)" style="padding: 3px 8px; font-size: 0.72rem;">
-                                    <span>Chọn tất cả</span>
-                                </button>
-                                <button type="button" class="ncc-cfg-btn-secondary" onclick="toggleAllAbnormalBehaviors(false)" style="padding: 3px 8px; font-size: 0.72rem;">
-                                    <span>Bỏ chọn</span>
-                                </button>
-                                <button type="button" class="ncc-cfg-btn" onclick="saveCameraConfigFromUI()" style="padding: 3px 10px; font-size: 0.72rem;">
-                                    <span>Lưu Cấu hình</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- 9 Abnormal Behavior Options Grid (Clean 3 Colors: Đỏ, Vàng, Xanh) -->
-                        <div class="ncc-abnormal-grid" id="ncc-abnormal-behavior-grid">
-                            <!-- Populated dynamically via JS -->
-                        </div>
-                    </div>
-
-                    <!-- Bottom Card: 32 Camera Channels Configuration Table -->
-                    <div class="ncc-cfg-card" style="flex: 1; min-height: 0;">
-                        <div class="ncc-cfg-header">
-                            <div class="ncc-cfg-title">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#76b900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-                                <span>Quản lý Tên &amp; Kích hoạt 32 Kênh Camera (D1 - D32)</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <button class="ncc-cfg-btn-secondary" onclick="toggleSelectAllCameras(true)">
-                                    <span>Chọn tất cả (32)</span>
-                                </button>
-                                <button class="ncc-cfg-btn-secondary" onclick="toggleSelectAllCameras(false)">
-                                    <span>Bỏ chọn</span>
-                                </button>
-                                <button class="ncc-cfg-btn" onclick="saveCameraConfigFromUI()">
-                                    <span>Lưu Danh sách Tên Camera</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Camera Table -->
-                        <div style="flex: 1; overflow-y: auto; border: 1px solid #272832; border-radius: 6px; max-height: 520px;">
-                            <table class="ncc-table" style="margin: 0; border: none; border-radius: 0;">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 70px; text-align: center;">Kênh</th>
-                                        <th style="width: 380px;">Tên Camera (Theo danh mục trường)</th>
-                                        <th style="width: 130px; text-align: center;">Kích hoạt</th>
-                                        <th style="width: 140px; text-align: center;">Trạng thái</th>
-                                        <th>Đường dẫn Luồng RTSP Subtype</th>
-                                        <th style="width: 120px; text-align: center;">Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ncc-cfg-table-body">
-                                    <!-- Populated dynamically -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Card 3: User Management & Sub-accounts (RBAC) -->
-                    <div class="ncc-cfg-card" id="ncc-card-user-management" style="margin-top: 14px;">
-                        <div class="ncc-cfg-header">
-                            <div class="ncc-cfg-title">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#76b900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="9" cy="7" r="4"></circle>
-                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                </svg>
-                                <span>Quản lý Tài khoản &amp; Cấp quyền Tài khoản con (RBAC)</span>
-                            </div>
-                            <span style="font-size: 0.75rem; color: #a1a1aa;">Chỉ Quản trị viên cấp cao có quyền phân cấp</span>
-                        </div>
-
-                        <!-- Form thêm tài khoản con -->
-                        <div class="ncc-user-create-grid" style="display: grid; grid-template-columns: 1.2fr 1.2fr 1.5fr 1.2fr auto; gap: 10px; align-items: end; margin-bottom: 14px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid #272832;">
-                            <div>
-                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Tên đăng nhập (Username)</label>
-                                <input type="text" class="ncc-cfg-input" id="new-user-name" placeholder="vd: baove_khuA">
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Mật khẩu</label>
-                                <input type="password" class="ncc-cfg-input" id="new-user-pass" placeholder="Nhập mật khẩu...">
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Họ tên / Đơn vị phụ trách</label>
-                                <input type="text" class="ncc-cfg-input" id="new-user-fullname" placeholder="vd: Tổ Trực Bảo Vệ Khu A">
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 0.72rem; color: #a1a1aa; margin-bottom: 4px; font-weight: 600;">Vai trò phân quyền</label>
-                                <select class="ncc-cfg-input" id="new-user-role" style="height: 34px;">
-                                    <option value="viewer">Người xem (Viewer - Chỉ xem, ẩn cấu hình)</option>
-                                    <option value="operator">Điều hành viên (Operator - Tra cứu AI)</option>
-                                    <option value="admin">Quản trị viên (Admin - Toàn quyền)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <button class="ncc-cfg-btn" onclick="addNewSubAccount()" style="height: 34px; padding: 0 14px;">
-                                    <span>+ Cấp tài khoản</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Bảng danh sách tài khoản -->
-                        <div style="border: 1px solid #272832; border-radius: 6px; overflow: hidden;">
-                            <table class="ncc-table" style="margin: 0;">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 150px;">Tài khoản</th>
-                                        <th>Họ tên / Đơn vị</th>
-                                        <th style="width: 180px; text-align: center;">Vai trò</th>
-                                        <th style="width: 180px; text-align: center;">Quyền Cấu hình NVR</th>
-                                        <th style="width: 100px; text-align: center;">Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ncc-users-table-body">
-                                    <!-- Dynamic -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- 3. Right Floating Widget: Hidden in Video Manager -->
@@ -10961,36 +10764,26 @@ user=None`;
             }
         }
 
-        // Switch View Modes inside Video Manager (Grid, List, Config)
+        // Switch View Modes inside Video Manager (Grid, List)
         function switchNccView(mode) {
             if (mode === 'config') {
-                const isAuth = sessionStorage.getItem('ncc_config_auth') === 'true';
-                if (!isAuth) {
-                    openNccLoginModal();
-                    return;
-                }
+                window.location.href = '/admin';
+                return;
             }
 
-            const modes = ['grid', 'list', 'config'];
+            const modes = ['grid', 'list'];
             modes.forEach(m => {
                 const btn = document.getElementById(`ncc-btn-${m}`);
                 const stage = document.getElementById(`ncc-stage-${m}`);
                 if (btn) btn.classList.toggle('active', m === mode);
                 if (stage) {
                     if (m === mode) {
-                        stage.style.display = m === 'grid' ? 'grid' : (m === 'config' ? 'flex' : 'block');
+                        stage.style.display = m === 'grid' ? 'grid' : 'block';
                     } else {
                         stage.style.display = 'none';
                     }
                 }
             });
-
-            // Update lock button visibility
-            const lockBtn = document.getElementById('ncc-btn-lock-config');
-            const isAuth = sessionStorage.getItem('ncc_config_auth') === 'true';
-            if (lockBtn) {
-                lockBtn.style.display = (isAuth && mode === 'config') ? 'inline-flex' : 'none';
-            }
 
             // Ensure floorplan is hidden
             const fp = document.getElementById('ncc-stage-floorplan');
@@ -11000,9 +10793,6 @@ user=None`;
                 renderNccGrid();
             } else if (mode === 'list') {
                 renderNccTable();
-            } else if (mode === 'config') {
-                renderNccConfigTable();
-                fetchAndRenderSystemUsers();
             }
         }
 
@@ -12301,16 +12091,7 @@ user=None`;
                     sessionStorage.setItem('ncc_config_auth', 'true');
                     sessionStorage.setItem('ncc_config_user', user);
                     closeNccLoginModal();
-
-                    // Unhide config button & lock button
-                    const cfgBtn = document.getElementById('ncc-btn-config');
-                    if (cfgBtn) cfgBtn.style.display = 'inline-flex';
-                    const lockBtn = document.getElementById('ncc-btn-lock-config');
-                    if (lockBtn) lockBtn.style.display = 'inline-flex';
-
-                    // Switch tab to videomanager and view to config
-                    switchSidebarTab('videomanager');
-                    switchNccView('config');
+                    window.location.href = '/admin';
                 } else {
                     if (errorMsg) {
                         errorMsg.textContent = res.detail || 'Sai tên đăng nhập hoặc mật khẩu quản trị viên.';
@@ -12333,10 +12114,6 @@ user=None`;
         function lockAndHideConfig() {
             sessionStorage.removeItem('ncc_config_auth');
             sessionStorage.removeItem('ncc_config_user');
-            const cfgBtn = document.getElementById('ncc-btn-config');
-            if (cfgBtn) cfgBtn.style.display = 'none';
-            const lockBtn = document.getElementById('ncc-btn-lock-config');
-            if (lockBtn) lockBtn.style.display = 'none';
             switchNccView('grid');
         }
 
@@ -12347,7 +12124,6 @@ user=None`;
             }
         }
 
-        // Secret Shortcut: Ctrl + Shift + C
         // Toggle Dashboard Visibility (Secret Ctrl + Shift + D)
         function toggleDashboardVisibility() {
             const dashBtn = document.getElementById('sidebar-tab-dashboard');
@@ -12370,18 +12146,13 @@ user=None`;
         }
 
         // Secret Shortcuts:
-        // - Ctrl + Shift + C: Quản lý & Cấu hình Camera NVR
+        // - Ctrl + Shift + C: Mở trang Quản trị Hệ thống (/admin)
         // - Ctrl + Shift + D: Bật/Tắt Dashboard Thống kê
         window.addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.shiftKey && (e.key === 'c' || e.key === 'C' || e.keyCode === 67)) {
                 e.preventDefault();
                 if (isNccConfigAuthorized()) {
-                    const cfgBtn = document.getElementById('ncc-btn-config');
-                    if (cfgBtn) cfgBtn.style.display = 'inline-flex';
-                    const lockBtn = document.getElementById('ncc-btn-lock-config');
-                    if (lockBtn) lockBtn.style.display = 'inline-flex';
-                    switchSidebarTab('videomanager');
-                    switchNccView('config');
+                    window.location.href = '/admin';
                 } else {
                     openNccLoginModal();
                 }
@@ -12399,12 +12170,6 @@ user=None`;
             // Manager remains available from the sidebar when explicitly chosen.
             sessionStorage.removeItem('ncc_auto_open_config');
             switchSidebarTab('search');
-            if (isNccConfigAuthorized()) {
-                const cfgBtn = document.getElementById('ncc-btn-config');
-                if (cfgBtn) cfgBtn.style.display = 'inline-flex';
-                const lockBtn = document.getElementById('ncc-btn-lock-config');
-                if (lockBtn) lockBtn.style.display = 'inline-flex';
-            }
             if (sessionStorage.getItem('dnc_shortcut_dashboard') === 'true') {
                 sessionStorage.removeItem('dnc_shortcut_dashboard');
                 setTimeout(() => {
