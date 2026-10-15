@@ -52,6 +52,7 @@ from nightly_report_worker import (
     nightly_report_worker,
     compute_rolling_window,
     default_report_date_for_now,
+    get_nightly_report_for_ai,
 )
 from postgres_sync import enabled as postgres_dual_write_enabled
 from dahua_client import DahuaNVRListener
@@ -1874,6 +1875,70 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
     else:
         context_lines.append(f"CSDL Camera ({ch_label}): Hiện chưa ghi nhận sự kiện nào trong mốc thời gian {vn_target_date or 'được chọn'}.")
 
+    # 4. Check and inject Official Nightly Report / Shift Summary (RAG Grounding)
+    is_report_query = plan.get("is_report_query", False) or any(
+        k in lowered for k in [
+            "báo cáo", "bao cao", "ca trực", "ca truc", "đêm qua", "dem qua", "tối qua", "toi qua",
+            "tổng kết", "tong ket", "an ninh", "ca đêm", "ca dem", "trực đêm", "truc dem", "diễn biến ca"
+        ]
+    )
+    report_data = None
+    if is_report_query or target_date:
+        try:
+            report_data = get_nightly_report_for_ai(
+                report_date=target_date,
+                channel=ch,
+                allowed_channels=allowed_channels,
+            )
+        except Exception as e:
+            logger.warning("[NightlyReport AI Helper Error]: %s", e)
+
+    if report_data:
+        r_type = report_data.get("type")
+        r_date = report_data.get("report_date", "")
+        w_start = report_data.get("window_start", "")
+        w_end = report_data.get("window_end", "")
+
+        if r_type == "single_camera":
+            shift_lines = []
+            for s in report_data.get("shifts", []):
+                shift_lines.append(f"  + {s.get('title')}: {s.get('summary_text')} ({s.get('event_count', 0)} sự kiện, {s.get('anomaly_count', 0)} cảnh báo)")
+
+            context_lines.append(
+                f"THÔNG TIN BÁO CÁO CA TRỰC & AN NINH ĐÊM CHÍNH THỨC CỦA HỆ THỐNG ({report_data.get('camera_name')}):\n"
+                f"- Ngày báo cáo: {r_date} (Chu kỳ giám sát cuốn chiếu: Từ {w_start} đến {w_end}).\n"
+                f"- Đánh giá an ninh: {report_data.get('risk_label', 'Bình thường')}.\n"
+                f"- Thống kê chu kỳ: Tổng {report_data.get('total_events', 0)} sự kiện | {report_data.get('anomaly_count', 0)} Bất thường | {report_data.get('human_count', 0)} Người | {report_data.get('vehicle_count', 0)} Phương tiện | {report_data.get('clip_count', 0)} Video Clip.\n"
+                f"- Khung giờ cao điểm: {report_data.get('peak_hour_label', 'Không có')}.\n"
+                f"- Tóm tắt điều hành: {report_data.get('executive_summary', '')}\n"
+                f"- Diễn biến chi tiết theo 4 ca trực nối tiếp (từ 22:00 hôm trước đến 22:00 hôm nay):\n" + "\n".join(shift_lines)
+            )
+
+            notable = report_data.get("notable_events") or []
+            if notable:
+                for ne in notable:
+                    ne_id = ne.get("id")
+                    if ne_id and not any(m.get("id") == ne_id for m in matched_events):
+                        db_ev = database.get_event_by_id(ne_id)
+                        if db_ev and _has_physical_clip(db_ev):
+                            matched_events.insert(0, db_ev)
+
+        elif r_type == "master_summary":
+            active_lines = []
+            for ac in report_data.get("active_cameras_detail", []):
+                active_lines.append(f"  + Kênh {ac['channel']:02d} ({ac['camera_name']}): {ac['risk_label']} ({ac['anomaly_count']} bất thường, {ac['total_events']} sự kiện). Chi tiết: {ac['summary']}")
+
+            all_summary_brief = "\n".join(report_data.get("all_cameras_summary", [])[:16])
+
+            context_lines.append(
+                f"THÔNG TIN BÁO CÁO AN NINH CA TRỰC ĐÊM TỔNG HỢP TOÀN HỆ THỐNG (NIGHTLY MASTER REPORT):\n"
+                f"- Ngày báo cáo: {r_date} (Cửa sổ giám sát cuốn chiếu 22h hôm trước -> 22h hôm nay: Từ {w_start} đến {w_end}).\n"
+                f"- Tổng số camera trong báo cáo: {report_data.get('total_cameras', 0)} camera (Số camera có phát sinh hoạt động: {report_data.get('active_cameras', 0)}).\n"
+                f"- Tổng sự kiện toàn trường: {report_data.get('total_events', 0)} sự kiện | Tổng cảnh báo nguy cơ: {report_data.get('total_anomalies', 0)} sự cố.\n"
+                f"- Các camera có phát sinh hoạt động/cảnh báo:\n" + ("\n".join(active_lines) if active_lines else "  + Toàn bộ hệ thống camera an toàn tuyệt đối, không ghi nhận bất thường.") + "\n"
+                f"- Trạng thái nhanh các camera:\n{all_summary_brief}"
+            )
+
     if matched_events:
         context_lines.append(f"DANH SÁCH CÁC SỰ KIỆN CÓ VIDEO CLIP MP4 THỰC TẾ (Người dùng sẽ click vào mã #ID để phát video):")
         for ev in matched_events[:15]:
@@ -1929,7 +1994,15 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
         else:
             reply = f"Chưa ghi nhận sự kiện bất thường nào đáng chú ý trên {ch_label}. Trạng thái giám sát an toàn."
     elif any(k in lowered for k in ["tóm tắt", "tổng quan", "summary", "báo cáo", "tình hình"]):
-        reply = f"{ch_label} đang hoạt động ổn định. Tổng cộng ghi nhận {len(matched_events)} sự kiện liên quan. {_vn_dt(daily_summary.get('summary_text', ''))}"
+        if report_data:
+            if report_data.get("type") == "single_camera":
+                reply = f"Báo cáo đêm {report_data.get('report_date')} ({report_data.get('camera_name')}): Đánh giá {report_data.get('risk_label')} ({report_data.get('total_events', 0)} sự kiện, {report_data.get('anomaly_count', 0)} cảnh báo). {report_data.get('executive_summary', '')}"
+            elif report_data.get("type") == "master_summary":
+                reply = f"Báo cáo đêm tổng hợp toàn trường ({report_data.get('report_date')}): Giám sát {report_data.get('total_cameras', 0)} camera, ghi nhận {report_data.get('total_events', 0)} sự kiện, {report_data.get('total_anomalies', 0)} cảnh báo nguy cơ."
+            else:
+                reply = f"{ch_label} đang hoạt động ổn định. Tổng cộng ghi nhận {len(matched_events)} sự kiện liên quan. {_vn_dt(daily_summary.get('summary_text', ''))}"
+        else:
+            reply = f"{ch_label} đang hoạt động ổn định. Tổng cộng ghi nhận {len(matched_events)} sự kiện liên quan. {_vn_dt(daily_summary.get('summary_text', ''))}"
     elif any(k in lowered for k in ["người", "nhân viên", "khách", "human", "ai"]):
         human_events = [e for e in matched_events if "người" in (e.get("description") or "").lower() or "human" in (e.get("event_code") or "").lower()]
         if human_events:

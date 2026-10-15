@@ -340,6 +340,19 @@ def update_global_config(new_cfg: dict):
         # Retain existing password in both file and memory
         new_cfg["nvr_password"] = existing_cfg.get("nvr_password") or NVR_PASSWORD
 
+    # Preserve camera_names and camera_alert_rules if not explicitly provided
+    if new_cfg.get("camera_names") is not None:
+        CAMERA_NAMES = new_cfg["camera_names"]
+    else:
+        CAMERA_NAMES = existing_cfg.get("camera_names") or DEFAULT_CONFIG.get("camera_names") or {}
+        new_cfg["camera_names"] = CAMERA_NAMES
+
+    if new_cfg.get("camera_alert_rules") is not None:
+        CAMERA_ALERT_RULES = new_cfg["camera_alert_rules"]
+    else:
+        CAMERA_ALERT_RULES = existing_cfg.get("camera_alert_rules") or {}
+        new_cfg["camera_alert_rules"] = CAMERA_ALERT_RULES
+
     existing_cfg.update(new_cfg)
     save_config(existing_cfg)
 
@@ -351,10 +364,8 @@ def update_global_config(new_cfg: dict):
     ACTIVE_CHANNELS = existing_cfg.get("active_channels", ACTIVE_CHANNELS)
     DEMO_MODE = existing_cfg.get("demo_mode", DEMO_MODE)
     ABNORMAL_EVENT_CODES = existing_cfg.get("abnormal_event_codes", ABNORMAL_EVENT_CODES)
-    if "camera_names" in existing_cfg:
-        CAMERA_NAMES = existing_cfg["camera_names"]
-    if "camera_alert_rules" in existing_cfg:
-        CAMERA_ALERT_RULES = existing_cfg["camera_alert_rules"]
+    CAMERA_NAMES = existing_cfg.get("camera_names") or DEFAULT_CONFIG.get("camera_names") or {}
+    CAMERA_ALERT_RULES = existing_cfg.get("camera_alert_rules") or {}
 
 def set_cosmos_prompt_profile(profile: str):
     global COSMOS_PROMPT_PROFILE

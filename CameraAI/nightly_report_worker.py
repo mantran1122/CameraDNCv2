@@ -9,6 +9,7 @@ Implements the Rolling 22:00 Cutoff Window:
 """
 
 import json
+import re
 import threading
 import time
 from datetime import date, datetime, timedelta
@@ -919,4 +920,132 @@ class NightlyReportWorker:
 
 
 nightly_report_worker = NightlyReportWorker()
+
+
+def get_nightly_report_for_ai(
+    report_date: Optional[str] = None,
+    channel: Optional[int] = None,
+    allowed_channels: Optional[List[int]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Retrieve structured nightly report data for Vision Agent RAG context injection.
+    Supports single camera or all permitted cameras on report_date (or latest available).
+    Respects RBAC allowed_channels and formats DD/MM/YYYY.
+    """
+    base_dir = getattr(config, "NIGHTLY_REPORT_DIR", config.STORAGE_DIR / "nightly_reports")
+    if not base_dir.is_dir():
+        return None
+
+    # 1. Resolve date
+    target_date = (report_date or "").strip()
+    if target_date and not re.match(r"^\d{4}-\d{2}-\d{2}$", target_date):
+        target_date = ""
+
+    avail_dirs = sorted([d.name for d in base_dir.iterdir() if d.is_dir() and re.match(r"^\d{4}-\d{2}-\d{2}$", d.name)], reverse=True)
+    if not avail_dirs:
+        return None
+
+    if target_date and target_date in avail_dirs:
+        chosen_date = target_date
+    elif target_date:
+        chosen_date = target_date
+    else:
+        chosen_date = avail_dirs[0]
+
+    report_folder = base_dir / chosen_date
+    master_file = report_folder / "_daily_master_summary.json"
+
+    # Try downloading from Synology NAS if not found locally
+    if not master_file.is_file():
+        try:
+            import synology_storage
+            if synology_storage.enabled():
+                synology_storage.download_nightly_report_file(chosen_date, "_daily_master_summary.json", master_file)
+        except Exception:
+            pass
+
+    def _fmt_vn(val: Any) -> str:
+        return re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", r"\3/\2/\1", str(val or ""))
+
+    # 2. Channel-specific report
+    if channel is not None:
+        if allowed_channels is not None and channel not in allowed_channels:
+            return {
+                "type": "unauthorized",
+                "message": f"Tài khoản không có quyền truy cập dữ liệu Camera Kênh {channel:02d}."
+            }
+
+        cam_file = report_folder / f"cam_{channel:02d}.json"
+        if not cam_file.is_file():
+            try:
+                import synology_storage
+                if synology_storage.enabled():
+                    synology_storage.download_nightly_report_file(chosen_date, f"cam_{channel:02d}.json", cam_file)
+            except Exception:
+                pass
+
+        if cam_file.is_file():
+            try:
+                cam_data = json.loads(cam_file.read_text(encoding="utf-8"))
+                return {
+                    "type": "single_camera",
+                    "report_date": _fmt_vn(cam_data.get("report_date", chosen_date)),
+                    "channel": channel,
+                    "camera_name": cam_data.get("camera_name", f"Kênh {channel:02d}"),
+                    "window_start": _fmt_vn(cam_data.get("window_start")),
+                    "window_end": _fmt_vn(cam_data.get("window_end")),
+                    "risk_label": cam_data.get("risk_label", "Bình thường"),
+                    "total_events": cam_data.get("total_events", 0),
+                    "anomaly_count": cam_data.get("anomaly_count", 0),
+                    "human_count": cam_data.get("human_count", 0),
+                    "vehicle_count": cam_data.get("vehicle_count", 0),
+                    "clip_count": cam_data.get("clip_count", 0),
+                    "peak_hour_label": cam_data.get("peak_hour_label", "Không có"),
+                    "executive_summary": _fmt_vn(cam_data.get("executive_summary", "")),
+                    "shifts": cam_data.get("shifts", []),
+                    "notable_events": cam_data.get("notable_events", []),
+                }
+            except Exception as e:
+                print(f"[NightlyReport AI Helper] Error reading cam_{channel:02d}.json: {e}")
+
+    # 3. Master / system-wide report across channels
+    if master_file.is_file():
+        try:
+            m_data = json.loads(master_file.read_text(encoding="utf-8"))
+            cams = m_data.get("cameras", [])
+            if allowed_channels is not None:
+                allowed_set = set(allowed_channels)
+                cams = [c for c in cams if int(c.get("channel") or 0) in allowed_set]
+
+            active_cams = []
+            for c in cams:
+                if c.get("total_events", 0) > 0 or c.get("anomaly_count", 0) > 0 or c.get("risk_level") != "none":
+                    active_cams.append({
+                        "channel": c.get("channel"),
+                        "camera_name": c.get("camera_name"),
+                        "risk_label": c.get("risk_label"),
+                        "total_events": c.get("total_events", 0),
+                        "anomaly_count": c.get("anomaly_count", 0),
+                        "summary": _fmt_vn(c.get("executive_summary", "")),
+                    })
+
+            return {
+                "type": "master_summary",
+                "report_date": _fmt_vn(m_data.get("report_date", chosen_date)),
+                "window_start": _fmt_vn(m_data.get("window_start")),
+                "window_end": _fmt_vn(m_data.get("window_end")),
+                "total_cameras": len(cams),
+                "active_cameras": len(active_cams),
+                "total_events": sum(c.get("total_events", 0) for c in cams),
+                "total_anomalies": sum(c.get("anomaly_count", 0) for c in cams),
+                "high_risk_channels": [c.get("channel") for c in active_cams if c.get("anomaly_count", 0) > 0],
+                "active_cameras_detail": active_cams,
+                "all_cameras_summary": [
+                    f"- Cam {c.get('channel'):02d} ({c.get('camera_name')}): {c.get('risk_label')} ({c.get('total_events', 0)} sự kiện, {c.get('anomaly_count', 0)} bất thường)"
+                    for c in cams[:32]
+                ]
+            }
+        except Exception as e:
+            print(f"[NightlyReport AI Helper] Error reading master report: {e}")
+
+    return None
 

@@ -104,6 +104,18 @@ def plan_search_intent(
         ]
     )
 
+    # 5. Nightly Report & Shift Query Intent Detection
+    report_keywords = [
+        "báo cáo", "bao cao", "báo cáo đêm", "bao cao dem", "báo cáo ngày", "bao cao ngay",
+        "ca trực", "ca truc", "ca đêm", "ca dem", "trực đêm", "truc dem",
+        "tổng kết", "tong ket", "tổng hợp", "tong hop", "tình hình an ninh", "tinh hinh an ninh",
+        "tình hình đêm", "tinh hinh dem", "tình hình ca", "tinh hinh ca", "nightly report", "daily report",
+        "đêm qua thế nào", "dem qua the nao", "tối qua thế nào", "toi qua the nao",
+        "hôm qua thế nào", "hom qua the nao", "hôm nay thế nào", "hom nay the nao",
+        "diễn biến ca", "dien bien ca"
+    ]
+    is_report_query = any(k in lowered for k in report_keywords)
+
     return {
         "channel": resolved_channel,
         "is_all_channels": is_all_channels,
@@ -117,4 +129,5 @@ def plan_search_intent(
         "search_kw": temporal.get("search_kw"),
         "target_event_id": temporal.get("target_event_id"),
         "require_clips": require_clips,
+        "is_report_query": is_report_query,
     }
