@@ -68,8 +68,15 @@ class DahuaNVRListener(threading.Thread):
 
         self.is_running = True
         self._start_watchdog()
+        auth_failure_count = 0
 
         while self.is_running:
+            # Prevent accidental spamming if password is empty or blank
+            if not (config.NVR_PASSWORD and str(config.NVR_PASSWORD).strip()):
+                print("[DahuaClient] Mật khẩu NVR chưa được cấu hình. Tạm dừng kết nối để tránh khóa tài khoản...")
+                time.sleep(15)
+                continue
+
             # Auto-detect HTTPS: Port 4443, 443, 8443 or config.USE_HTTPS
             use_https = bool(config.USE_HTTPS or config.NVR_PORT in (443, 4443, 8443))
             protocol = "https" if use_https else "http"
@@ -86,11 +93,18 @@ class DahuaNVRListener(threading.Thread):
                 with requests.Session() as session:
                     response = session.get(url, auth=auth, stream=True, timeout=(15, 60), verify=False)
                     if response.status_code == 200:
+                        auth_failure_count = 0
                         print(f"[DahuaClient] Connected successfully to Dahua NVR ({config.NVR_HOST}:{config.NVR_PORT}).")
                         self.is_connected = True
                         self.last_packet_time = time.time()
                         self.current_response = response
                         self.parse_multipart_stream(response)
+                    elif response.status_code in (401, 403):
+                        self.is_connected = False
+                        auth_failure_count += 1
+                        backoff = min(120, 30 * auth_failure_count)
+                        print(f"[DahuaClient] LỖI XÁC THỰC HTTP {response.status_code} từ NVR ({config.NVR_HOST})! Sai user/password hoặc tài khoản tạm bị khóa. Tạm dừng {backoff}s để tránh khóa tài khoản...")
+                        time.sleep(backoff)
                     else:
                         self.is_connected = False
                         print(f"[DahuaClient] HTTP Error {response.status_code} from NVR ({config.NVR_HOST}). Retrying in 10s...")
@@ -104,6 +118,7 @@ class DahuaNVRListener(threading.Thread):
                         print(f"[DahuaClient] Trying HTTPS fallback to {fallback_url}...")
                         fb_resp = requests.get(fallback_url, auth=auth, stream=True, timeout=(15, 60), verify=False)
                         if fb_resp.status_code == 200:
+                            auth_failure_count = 0
                             print(f"[DahuaClient] Connected successfully via HTTPS fallback ({config.NVR_HOST}).")
                             self.is_connected = True
                             self.last_packet_time = time.time()

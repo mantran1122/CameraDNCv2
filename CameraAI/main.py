@@ -2165,7 +2165,7 @@ class NVRConfigModel(BaseModel):
     nvr_port: int = 80
     rtsp_port: int = 554
     nvr_user: str = "admin"
-    nvr_password: str
+    nvr_password: Optional[str] = None
     active_channels: List[int] = list(range(1, 33))
     demo_mode: bool = False
     abnormal_event_codes: List[str] = []
@@ -3257,9 +3257,16 @@ async def test_nvr_connection(cfg: NVRConfigModel):
             "message": "Chế độ Giả lập (Demo Mode) đang hoạt động hoàn hảo!"
         }
 
+    resolved_password = (cfg.nvr_password or "").strip() or config.NVR_PASSWORD
+    if not resolved_password:
+        return {
+            "success": False,
+            "message": "Chưa có mật khẩu NVR. Vui lòng nhập mật khẩu để kiểm tra kết nối."
+        }
+
     protocol = "https" if (cfg.use_https or cfg.nvr_port in (443, 4443, 8443)) else "http"
     url = f"{protocol}://{cfg.nvr_host}:{cfg.nvr_port}/cgi-bin/devInfo.cgi?action=getDeviceInfo"
-    auth = HTTPDigestAuth(cfg.nvr_user, cfg.nvr_password)
+    auth = HTTPDigestAuth(cfg.nvr_user, resolved_password)
 
     try:
         res = requests.get(url, auth=auth, timeout=8, verify=False)
@@ -3307,6 +3314,9 @@ async def test_nvr_connection(cfg: NVRConfigModel):
 @app.post("/api/config/nvr")
 async def update_nvr_config(cfg: NVRConfigModel):
     allowed_codes = {item["code"] for item in config.ABNORMAL_BEHAVIOR_OPTIONS}
+    allowed_codes.update(config.CRITICAL_ANOMALY_CODES)
+    allowed_codes.update(config.ROUTINE_EVENT_CODES)
+    allowed_codes.update(config.EVENT_CODES)
     unsupported_codes = sorted(set(cfg.abnormal_event_codes) - allowed_codes)
     if unsupported_codes:
         return JSONResponse(
@@ -3321,6 +3331,14 @@ async def update_nvr_config(cfg: NVRConfigModel):
     cfg_dict["abnormal_event_codes"] = list(dict.fromkeys(cfg.abnormal_event_codes))
     if cfg.camera_alert_rules is not None:
         cfg_dict["camera_alert_rules"] = cfg.camera_alert_rules
+
+    # CRITICAL FIX: If no new password was provided (empty/whitespace), preserve existing password!
+    clean_password = (cfg.nvr_password or "").strip()
+    if clean_password:
+        cfg_dict["nvr_password"] = clean_password
+    else:
+        cfg_dict.pop("nvr_password", None)
+
     config.update_global_config(cfg_dict)
     restart_listener_service()
     return {"status": "success", "message": f"Cấu hình kết nối NVR ({cfg.nvr_host}) đã được cập nhật thành công!"}

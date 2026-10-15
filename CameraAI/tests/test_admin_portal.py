@@ -153,6 +153,41 @@ class AdminPortalTests(unittest.TestCase):
         google_user = main.upsert_google_system_user("new_google_user@nctu.edu.vn", "Google Staff", "", False)
         self.assertEqual(sorted(google_user["allowed_channels"]), [18, 19])
 
+    def test_update_nvr_config_preserves_password_and_accepts_all_event_codes(self):
+        """Updating NVR settings without password preserves existing password, and AudioMutation doesn't trigger 422."""
+        self.login(self.admin_user, self.admin_pass)
+        initial_pw = config.NVR_PASSWORD
+
+        # 1. Update config without password and with AudioMutation + RtspSessionDisconnect
+        payload = {
+            "nvr_host": "14.241.182.94",
+            "nvr_port": 4443,
+            "rtsp_port": 33554,
+            "nvr_user": "user2",
+            "use_https": True,
+            "demo_mode": False,
+            "abnormal_event_codes": [
+                "Intrusion",
+                "Fight",
+                "AudioMutation",
+                "CrossLine",
+                "SoundDetection",
+                "RtspSessionDisconnect"
+            ],
+            "camera_alert_rules": {
+                "1": ["Fight", "Intrusion", "AudioMutation"]
+            }
+        }
+        res = self.client.post("/api/config/nvr", json=payload)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(config.NVR_PASSWORD, initial_pw)
+
+        # 2. Update config with empty string password
+        payload["nvr_password"] = ""
+        res2 = self.client.post("/api/config/nvr", json=payload)
+        self.assertEqual(res2.status_code, 200)
+        self.assertEqual(config.NVR_PASSWORD, initial_pw)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -312,33 +312,49 @@ ABNORMAL_BEHAVIOR_OPTIONS = [
     {"code": "CrossLine", "label": "Vượt hàng rào / đường cảnh báo"},
     {"code": "Fight", "label": "Đánh nhau"},
     {"code": "VideoMotion", "label": "Chuyển động"},
+    {"code": "AudioMutation", "label": "Âm thanh đột biến / La hét"},
     {"code": "AudioAnomaly", "label": "Âm thanh bất thường"},
     {"code": "SoundDetection", "label": "Phát hiện tiếng động"},
     {"code": "FaceDetection", "label": "Phát hiện khuôn mặt"},
     {"code": "HumanTrait", "label": "Phát hiện người"},
     {"code": "VehicleTrait", "label": "Phát hiện phương tiện"},
+    {"code": "RtspSessionDisconnect", "label": "Mất kết nối luồng RTSP"},
 ]
-AUDIO_EVENT_CODES = {"AudioAnomaly", "SoundDetection", "FightSound"}
+AUDIO_EVENT_CODES = {"AudioAnomaly", "SoundDetection", "FightSound", "AudioMutation"}
 
 def update_global_config(new_cfg: dict):
     global NVR_HOST, USE_HTTPS, NVR_PORT, RTSP_PORT, NVR_USER, NVR_PASSWORD, ACTIVE_CHANNELS, DEMO_MODE, ABNORMAL_EVENT_CODES, CAMERA_NAMES, CAMERA_ALERT_RULES
     raw_rtsp = int(new_cfg.get("rtsp_port", RTSP_PORT) or 33554)
     if raw_rtsp in (36677, 37777, 8080, 4443):
         new_cfg["rtsp_port"] = 33554
-    save_config(new_cfg)
-    NVR_HOST = new_cfg.get("nvr_host", NVR_HOST)
-    USE_HTTPS = new_cfg.get("use_https", USE_HTTPS)
-    NVR_PORT = new_cfg.get("nvr_port", NVR_PORT)
-    RTSP_PORT = new_cfg.get("rtsp_port", RTSP_PORT)
-    NVR_USER = new_cfg.get("nvr_user", NVR_USER)
-    NVR_PASSWORD = new_cfg.get("nvr_password", NVR_PASSWORD)
-    ACTIVE_CHANNELS = new_cfg.get("active_channels", ACTIVE_CHANNELS)
-    DEMO_MODE = new_cfg.get("demo_mode", DEMO_MODE)
-    ABNORMAL_EVENT_CODES = new_cfg.get("abnormal_event_codes", ABNORMAL_EVENT_CODES)
-    if "camera_names" in new_cfg:
-        CAMERA_NAMES = new_cfg["camera_names"]
-    if "camera_alert_rules" in new_cfg:
-        CAMERA_ALERT_RULES = new_cfg["camera_alert_rules"]
+
+    # Load existing config to merge safely without dropping other settings or password
+    existing_cfg = load_config()
+
+    # Password preservation: only overwrite if a non-empty password was explicitly provided
+    candidate_pw = str(new_cfg.get("nvr_password") or "").strip()
+    if candidate_pw:
+        NVR_PASSWORD = candidate_pw
+        new_cfg["nvr_password"] = candidate_pw
+    else:
+        # Retain existing password in both file and memory
+        new_cfg["nvr_password"] = existing_cfg.get("nvr_password") or NVR_PASSWORD
+
+    existing_cfg.update(new_cfg)
+    save_config(existing_cfg)
+
+    NVR_HOST = existing_cfg.get("nvr_host", NVR_HOST)
+    USE_HTTPS = existing_cfg.get("use_https", USE_HTTPS)
+    NVR_PORT = existing_cfg.get("nvr_port", NVR_PORT)
+    RTSP_PORT = existing_cfg.get("rtsp_port", RTSP_PORT)
+    NVR_USER = existing_cfg.get("nvr_user", NVR_USER)
+    ACTIVE_CHANNELS = existing_cfg.get("active_channels", ACTIVE_CHANNELS)
+    DEMO_MODE = existing_cfg.get("demo_mode", DEMO_MODE)
+    ABNORMAL_EVENT_CODES = existing_cfg.get("abnormal_event_codes", ABNORMAL_EVENT_CODES)
+    if "camera_names" in existing_cfg:
+        CAMERA_NAMES = existing_cfg["camera_names"]
+    if "camera_alert_rules" in existing_cfg:
+        CAMERA_ALERT_RULES = existing_cfg["camera_alert_rules"]
 
 def set_cosmos_prompt_profile(profile: str):
     global COSMOS_PROMPT_PROFILE
