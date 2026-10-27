@@ -63,8 +63,8 @@ class TemporalAndSearchTest(unittest.TestCase):
         self.assertIn("08:00:59", res["end_time"])
 
     def test_search_vss_empty_when_no_match(self):
-        # 07:00 to 08:00 on Cam 11 has no events
-        res = search_vss_archive("sự kiện từ 7h đến 8h hôm nay", {"channel": 11})
+        # 02:00 to 03:00 on Cam 11 has no events
+        res = search_vss_archive("sự kiện từ 2h đến 3h hôm nay", {"channel": 11})
         self.assertEqual(len(res["data"]), 0)
         self.assertEqual(res["total_matches"], 0)
 

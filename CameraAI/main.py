@@ -2129,6 +2129,7 @@ class VSSSearchRequest(BaseModel):
     event_ids: Optional[List[int]] = None
     from_time: Optional[str] = None
     to_time: Optional[str] = None
+    event_codes: Optional[List[str]] = None
     min_cosine_similarity: Optional[float] = 0.0
     top_k: Optional[int] = 10
 
@@ -2145,6 +2146,7 @@ async def vss_search_api(req: VSSSearchRequest, request: Request):
         "event_ids": req.event_ids,
         "from_time": req.from_time,
         "to_time": req.to_time,
+        "event_codes": req.event_codes,
         "min_cosine_similarity": req.min_cosine_similarity,
         "top_k": req.top_k or 10,
         "allowed_channels": allowed_channels,

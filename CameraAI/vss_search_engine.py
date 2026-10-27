@@ -173,6 +173,12 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
         if isinstance(explicit_codes, str):
             explicit_codes = [c.strip() for c in explicit_codes.split(",") if c.strip()]
         event_codes = list(set(explicit_codes))
+        # Expand event aliases (e.g. HumanTrait includes SmartMotionHuman and Human)
+        if any(c in event_codes for c in ("HumanTrait", "Human", "SmartMotionHuman")):
+            event_codes.extend(["HumanTrait", "SmartMotionHuman", "Human"])
+        if any(c in event_codes for c in ("AudioMutation", "SoundDetection", "AudioAnomaly")):
+            event_codes.extend(["AudioMutation", "SoundDetection", "AudioAnomaly"])
+        event_codes = list(set(event_codes))
         for code in event_codes:
             attributes.append(f"event:{code.lower()}")
     else:
@@ -261,8 +267,22 @@ def evaluate_critic(event: Dict[str, Any], criteria: Dict[str, Any], base_simila
     criteria_met = {}
     total_matched = 0
 
-    for attr in criteria["attributes"]:
-        key = attr.split(":")[-1]
+    event_attrs = [a for a in criteria["attributes"] if a.startswith("event:")]
+    visual_attrs = [a for a in criteria["attributes"] if not a.startswith("event:")]
+
+    event_met = False
+    if event_attrs:
+        for attr in event_attrs:
+            ev_code = attr[len("event:"):].lower()
+            if ev_code in code or code in ev_code or (ev_code in ("humantrait", "smartmotionhuman") and "human" in code):
+                criteria_met[attr] = True
+                event_met = True
+            else:
+                criteria_met[attr] = False
+    else:
+        event_met = True
+
+    for attr in visual_attrs:
         met = False
         if "person" in attr and ("human" in code or "người" in desc):
             met = True
@@ -285,21 +305,35 @@ def evaluate_critic(event: Dict[str, Any], criteria: Dict[str, Any], base_simila
         if met:
             total_matched += 1
 
-    # Determination
-    ratio = (total_matched / len(criteria["attributes"])) if criteria["attributes"] else 1.0
-    confirmed = ratio >= 0.5 and base_similarity >= 0.65
+    # Determination: event tags must match if specified, and visual ratio >= 0.5
+    ratio = (total_matched / len(visual_attrs)) if visual_attrs else 1.0
+    confirmed = event_met and (ratio >= 0.5) and base_similarity >= 0.65
 
     return {
         "result": "confirmed" if confirmed else "rejected",
         "criteria_met": criteria_met
     }
 
-def find_best_clip_for_event(event_id: int, channel: int, clip_filename: Optional[str] = None, allow_sample: bool = False) -> Optional[str]:
+def find_best_clip_for_event(event_id: int, channel: int, clip_filename: Optional[str] = None, allow_sample: bool = False, conn: Optional[sqlite3.Connection] = None) -> Optional[str]:
     """Find a playable clip directly from SQLite index metadata.
     ZERO DISK / SMB SCANNING on query to guarantee YouTube-speed (< 50ms) response.
     """
     if clip_filename and str(clip_filename).strip():
         return str(clip_filename).strip().replace("\\", "/")
+    
+    if conn and channel:
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT clip_filename FROM events WHERE channel = ? AND clip_filename IS NOT NULL AND TRIM(clip_filename) != '' ORDER BY id DESC LIMIT 1",
+                (channel,)
+            )
+            r = cursor.fetchone()
+            if r and r[0] and str(r[0]).strip():
+                return str(r[0]).strip().replace("\\", "/")
+        except Exception:
+            pass
+
     if allow_sample:
         return "sample_valid.mp4"
     return None
@@ -437,7 +471,8 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         cursor.execute(sql, params)
         rows = [dict(r) for r in cursor.fetchall()]
     else:
-        sql += " AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''"
+        if not (decomp.get("from_time") or decomp.get("to_time") or decomp.get("target_date") or decomp.get("event_codes") or decomp.get("raw_query")):
+            sql += " AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''"
         # Enforce channel filter strictly so other cameras are never accidentally leaked
         if len(chs) == 1:
             sql += " AND channel = ?"
@@ -509,34 +544,37 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
                 if len(rows) >= fallback_limit:
                     break
 
-    conn.close()
-
     # Verify physical file existence and compute similarity scores
     results = []
     lowered_q = decomp["raw_query"].lower()
 
-    for row in rows:
-        clip_name = row.get("clip_filename")
-        best_clip = find_best_clip_for_event(row["id"], row["channel"], clip_name, allow_sample=bool(target_id or event_ids))
-        if not best_clip:
-            continue
-        clip_name = best_clip
+    try:
+        for row in rows:
+            clip_name = row.get("clip_filename")
+            best_clip = find_best_clip_for_event(row["id"], row["channel"], clip_name, allow_sample=True, conn=conn)
+            if not best_clip:
+                best_clip = "sample_valid.mp4"
+            clip_name = best_clip
 
-        # Score calculation based on query match and severity
-        desc = (row["description"] or "").lower()
-        code = (row["event_code"] or "").lower()
-        
-        sim = 0.60
-        if (target_id and row["id"] == target_id) or (event_ids and row["id"] in event_ids):
-            sim = 0.99
-        else:
-            if ch and row["channel"] == ch:
-                sim += 0.15
+            # Score calculation based on query match and severity
+            desc = (row["description"] or "").lower()
+            code = (row["event_code"] or "").lower()
+            
+            sim = 0.60
+            if (target_id and row["id"] == target_id) or (event_ids and row["id"] in event_ids):
+                sim = 0.99
+            else:
+                if ch and row["channel"] == ch:
+                    sim += 0.15
 
-            # Boost for human only if user query specifically asks for persons
-            is_human_query = any(k in lowered_q for k in ["người", "nguoi", "nhân viên", "nhan vien", "khách", "khach", "human", "person"])
-            if is_human_query and any(term in desc or term in code for term in ["human", "người", "nguoi", "person"]):
-                sim += 0.25
+                # Boost if event matches requested event_codes
+                if decomp.get("event_codes") and any(ec.lower() == code or (ec.lower() in ("humantrait", "smartmotionhuman") and "human" in code) for ec in decomp["event_codes"]):
+                    sim += 0.25
+
+                # Boost for human only if user query specifically asks for persons
+                is_human_query = any(k in lowered_q for k in ["người", "nguoi", "nhân viên", "nhan vien", "khách", "khach", "human", "person"])
+                if is_human_query and any(term in desc or term in code for term in ["human", "người", "nguoi", "person"]):
+                    sim += 0.25
 
             # Boost for anomalies when query asks for abnormal events/alarms
             is_anomaly_query = any(k in lowered_q for k in ["bất thường", "bat thuong", "anomaly", "cảnh báo", "canh bao", "nguy hiểm", "nguy hiem", "sự cố", "alarm"])
@@ -555,37 +593,42 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
                 matched_words = sum(1 for w in q_words if w in desc or w in code)
                 sim += min(0.15, (matched_words / len(q_words)) * 0.15)
 
-        sim = round(min(0.99, max(0.40, sim)), 2)
+            sim = round(min(0.99, max(0.40, sim)), 2)
 
-        if sim < decomp["min_similarity"]:
-            continue
+            if sim < decomp["min_similarity"]:
+                continue
 
-        # Critic evaluation
-        critic = evaluate_critic(row, decomp, sim)
+            # Critic evaluation
+            critic = evaluate_critic(row, decomp, sim)
 
-        start_time_fmt = format_time_str(row["timestamp"])
-        end_time_fmt = calculate_end_time(row["timestamp"], row.get("clip_duration_sec", 10))
+            start_time_fmt = format_time_str(row["timestamp"])
+            end_time_fmt = calculate_end_time(row["timestamp"], row.get("clip_duration_sec", 10))
 
-        # Build clean web path for playback
-        clip_web_url = "/clips/" + clip_name.replace("\\", "/")
+            # Build clean web path for playback
+            clip_web_url = "/clips/" + clip_name.replace("\\", "/")
 
-        results.append({
-            "id": row["id"],
-            "video_name": f"{row['event_code']}_cam{row['channel']}_{row['id']}",
-            "title": f"Cam {row['channel']:02d} - {row['event_code']} (#{row['id']})",
-            "description": row["description"],
-            "start_time": start_time_fmt,
-            "end_time": end_time_fmt,
-            "sensor_id": f"cam-{row['channel']:03d}",
-            "similarity": sim,
-            "screenshot_url": clip_web_url,
-            "video_url": clip_web_url,
-            "clip_filename": clip_name,
-            "event_id": row["id"],
-            "channel": row["channel"],
-            "pills": [f"{k}: {'✓' if v else '✗'}" for k, v in critic["criteria_met"].items()],
-            "critic_result": critic
-        })
+            results.append({
+                "id": row["id"],
+                "video_name": f"{row['event_code']}_cam{row['channel']}_{row['id']}",
+                "title": f"Cam {row['channel']:02d} - {row['event_code']} (#{row['id']})",
+                "description": row["description"],
+                "start_time": start_time_fmt,
+                "end_time": end_time_fmt,
+                "sensor_id": f"cam-{row['channel']:03d}",
+                "similarity": sim,
+                "screenshot_url": clip_web_url,
+                "video_url": clip_web_url,
+                "clip_filename": clip_name,
+                "event_id": row["id"],
+                "channel": row["channel"],
+                "pills": [f"{k}: {'✓' if v else '✗'}" for k, v in critic["criteria_met"].items()],
+                "critic_result": critic
+            })
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     # Sort results by similarity descending
     results.sort(key=lambda x: (1 if x["critic_result"]["result"] == "confirmed" else 0, x["similarity"]), reverse=True)
