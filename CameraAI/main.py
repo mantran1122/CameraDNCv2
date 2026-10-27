@@ -753,12 +753,16 @@ def postgres_sync_loop() -> None:
 # --- ROUTES & APIS ---
 
 @app.get("/")
-async def read_index():
+async def read_index(request: Request):
+    if request.session.get("username"):
+        return RedirectResponse(url="/search", status_code=status.HTTP_302_FOUND)
     return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
+    if request.session.get("username"):
+        return RedirectResponse(url="/search", status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse(request=request, name="login.html")
 
 
@@ -1152,6 +1156,13 @@ async def get_events_api(
     )
     return {"events": events, "count": len(events)}
 
+def _resolve_playable_clip_for_event_standalone(ev: Dict[str, Any]) -> Optional[str]:
+    conn = database.get_db_connection()
+    try:
+        return _resolve_playable_clip_for_event(conn, ev)
+    finally:
+        conn.close()
+
 @app.get("/api/events/{event_id}")
 async def get_event_detail(event_id: int, request: Request):
     ev = await asyncio.to_thread(database.get_event_by_id, event_id)
@@ -1160,14 +1171,10 @@ async def get_event_detail(event_id: int, request: Request):
     allowed_channels = get_current_user_allowed_channels(request)
     if allowed_channels is not None and ev.get("channel") not in allowed_channels:
         return JSONResponse(status_code=403, content={"error": "Bạn không có quyền truy cập sự kiện của camera này."})
-    conn = await asyncio.to_thread(database.get_db_connection)
-    try:
-        resolved_clip = await asyncio.to_thread(_resolve_playable_clip_for_event, conn, ev)
-        if resolved_clip:
-            ev["clip_filename"] = resolved_clip
-            ev["clip_url"] = f"/clips/{resolved_clip}"
-    finally:
-        conn.close()
+    resolved_clip = await asyncio.to_thread(_resolve_playable_clip_for_event_standalone, ev)
+    if resolved_clip:
+        ev["clip_filename"] = resolved_clip
+        ev["clip_url"] = f"/clips/{resolved_clip}"
     ev["audio_analysis"] = await asyncio.to_thread(database.get_audio_analysis, event_id)
     ev["video_analysis"] = await asyncio.to_thread(database.get_video_analysis, event_id)
     return ev
@@ -2145,7 +2152,7 @@ async def vss_search_api(req: VSSSearchRequest, request: Request):
     return await asyncio.to_thread(search_vss_archive, req.query, filters)
 
 
-async def generate_frames(channel: int, request: Request):
+async def generate_frames(channel: int, request: Optional[Request] = None):
     consecutive_failures = 0
     cap = None
     if not config.DEMO_MODE:

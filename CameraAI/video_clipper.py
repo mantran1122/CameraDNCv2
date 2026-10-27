@@ -189,28 +189,47 @@ def clip_event_video(
         )
         return output_filename
 
-    cmd = [
+    # Mode 1: High-Speed Stream Copy (-c:v copy) - Trích xuất trực tiếp luồng H.264 (< 0.5s)
+    cmd_fast = [
         config.FFMPEG_PATH,
         "-y",
         "-rtsp_transport", "tcp",
         "-fflags", "+genpts",
         "-i", rtsp_url,
         "-t", str(config.CLIP_DURATION_SEC),
-        "-c:v", "libx264",
+        "-c:v", "copy",
         "-c:a", "aac",
-        "-ar", "44100",
-        "-ac", "2",
-        "-b:a", "128k",
-        "-af", "volume=2.0",
-        "-preset", "ultrafast",
         "-movflags", "+faststart",
         full_output_path
     ]
-    
+
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45)
+        res = subprocess.run(cmd_fast, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=25)
         if res.returncode == 0 and os.path.exists(full_output_path) and _has_expected_duration(full_output_path):
             return output_filename
+
+        # Mode 2 Fallback: Re-encode with libx264 if stream copy failed or produced truncated file
+        cmd_fallback = [
+            config.FFMPEG_PATH,
+            "-y",
+            "-rtsp_transport", "tcp",
+            "-fflags", "+genpts",
+            "-i", rtsp_url,
+            "-t", str(config.CLIP_DURATION_SEC),
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            "-ar", "44100",
+            "-ac", "2",
+            "-b:a", "128k",
+            "-af", "volume=2.0",
+            "-preset", "ultrafast",
+            "-movflags", "+faststart",
+            full_output_path
+        ]
+        res_fb = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45)
+        if res_fb.returncode == 0 and os.path.exists(full_output_path) and _has_expected_duration(full_output_path):
+            return output_filename
+
         print(
             "[FFmpeg Warning] WAN/RTSP clip extraction failed, timed out, or returned a short clip; "
             "no incomplete clip will be stored in production."

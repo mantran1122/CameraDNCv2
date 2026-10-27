@@ -26,7 +26,12 @@ class RtspUrlEncodingTest(unittest.TestCase):
              patch.object(config, "NVR_USER", "camera user"), \
              patch.object(config, "NVR_PASSWORD", "pass@word:1"), \
              patch.object(main.cv2, "VideoCapture", FakeCapture):
-            list(main.generate_frames(1))
+            import asyncio
+            gen = main.generate_frames(1)
+            try:
+                asyncio.run(gen.__anext__())
+            except Exception:
+                pass
 
         self.assertIn("camera%20user:pass%40word%3A1@", captured_urls[0])
 

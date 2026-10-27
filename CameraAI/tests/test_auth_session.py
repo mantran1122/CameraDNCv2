@@ -96,5 +96,34 @@ class AuthenticationSessionTests(unittest.TestCase):
             ws.send_text("test_ping")
 
 
+    def test_root_and_login_redirect_behavior(self):
+        # 1. Unauthenticated -> / redirects to /login
+        res_root_unauth = self.client.get("/", follow_redirects=False)
+        self.assertEqual(res_root_unauth.status_code, 302)
+        self.assertEqual(res_root_unauth.headers["location"], "/login")
+
+        # Unauthenticated -> /login returns 200
+        res_login_unauth = self.client.get("/login")
+        self.assertEqual(res_login_unauth.status_code, 200)
+
+        # Authenticate
+        username, password = main.get_admin_credentials()
+        login_res = self.client.post(
+            "/api/admin/verify-login",
+            json={"username": username, "password": password},
+        )
+        self.assertEqual(login_res.status_code, 200)
+
+        # 2. Authenticated -> / redirects to /search
+        res_root_auth = self.client.get("/", follow_redirects=False)
+        self.assertEqual(res_root_auth.status_code, 302)
+        self.assertEqual(res_root_auth.headers["location"], "/search")
+
+        # 3. Authenticated -> /login redirects to /search
+        res_login_auth = self.client.get("/login", follow_redirects=False)
+        self.assertEqual(res_login_auth.status_code, 302)
+        self.assertEqual(res_login_auth.headers["location"], "/search")
+
+
 if __name__ == "__main__":
     unittest.main()

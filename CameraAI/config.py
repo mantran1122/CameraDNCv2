@@ -156,6 +156,10 @@ DEFAULT_CONFIG = {
         "30": "30",
         "31": "31",
         "32": "32"
+    },
+    "camera_alert_rules": {
+        "1": ["Fight", "Intrusion", "AudioMutation"],
+        **{str(ch): ["Fight", "Intrusion", "CrossLine", "AudioMutation"] for ch in range(11, 25)}
     }
 }
 
@@ -208,7 +212,7 @@ ROUTINE_EVENT_CODES = [
     "FaceDetection",
     "VehicleTrait",
 ]
-CAMERA_ALERT_RULES = _current_cfg.get("camera_alert_rules", {})
+CAMERA_ALERT_RULES = _current_cfg.get("camera_alert_rules") or DEFAULT_CONFIG["camera_alert_rules"]
 
 def is_channel_anomaly(channel: int, event_code: str) -> bool:
     """Determine if an event is considered a high/medium anomaly for a specific channel.

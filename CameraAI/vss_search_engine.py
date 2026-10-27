@@ -17,6 +17,66 @@ from clip_storage import resolve_clip_path
 from gemini_video_report import get_gemini_settings
 from temporal_parser import parse_query_temporal
 
+def normalize_search_time(val: Any, is_end: bool = False) -> str:
+    """Normalize user or frontend time strings to SQLite ISO standard: YYYY-MM-DD HH:MM:SS.
+    Handles:
+      - 'DD/MM/YYYY HH:MM:SS', 'DD/MM/YYYY HH:MM', 'DD/MM/YYYY'
+      - 'DD-MM-YYYY HH:MM:SS', 'DD-MM-YYYY HH:MM', 'DD-MM-YYYY'
+      - 'YYYY-MM-DD HH:MM:SS', 'YYYY-MM-DD HH:MM', 'YYYY-MM-DD'
+      - 'YYYY-MM-DDTHH:MM:SS'
+    """
+    if not val:
+        return ""
+    val_str = str(val).strip()
+    if not val_str:
+        return ""
+
+    val_str = val_str.replace("T", " ")
+
+    # Case 1: DD/MM/YYYY or DD-MM-YYYY with optional time
+    m_dmy = re.match(r"^(\d{1,2})[/\.-](\d{1,2})[/\.-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$", val_str)
+    if m_dmy:
+        day, month, year, h, m, s = m_dmy.groups()
+        day = int(day)
+        month = int(month)
+        year = int(year)
+        if h is not None and m is not None:
+            hour = int(h)
+            minute = int(m)
+            second = int(s) if s is not None else (59 if is_end else 0)
+        else:
+            hour = 23 if is_end else 0
+            minute = 59 if is_end else 0
+            second = 59 if is_end else 0
+        return f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}"
+
+    # Case 2: YYYY-MM-DD or YYYY/MM/DD with optional time
+    m_ymd = re.match(r"^(\d{4})[/\.-](\d{1,2})[/\.-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$", val_str)
+    if m_ymd:
+        year, month, day, h, m, s = m_ymd.groups()
+        year = int(year)
+        month = int(month)
+        day = int(day)
+        if h is not None and m is not None:
+            hour = int(h)
+            minute = int(m)
+            second = int(s) if s is not None else (59 if is_end else 0)
+        else:
+            hour = 23 if is_end else 0
+            minute = 59 if is_end else 0
+            second = 59 if is_end else 0
+        return f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}"
+
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
+        try:
+            dt = datetime.strptime(val_str, fmt)
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            pass
+
+    return val_str
+
+
 def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Query Decomposition stage of NVIDIA Vision Agent:
@@ -131,13 +191,13 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
     if target_event_id is None and temp_info.get("target_event_id"):
         target_event_id = temp_info["target_event_id"]
 
-    # Time range filtering
-    from_time = filters.get("from_time") or filters.get("from") or ""
-    to_time = filters.get("to_time") or filters.get("to") or ""
-    from_time = filters.get("from_time") or filters.get("from") or temp_info.get("start_time") or ""
-    to_time = filters.get("to_time") or filters.get("to") or temp_info.get("end_time") or ""
+    # Time range filtering with normalization
+    raw_from = filters.get("from_time") or filters.get("from") or temp_info.get("start_time") or ""
+    raw_to = filters.get("to_time") or filters.get("to") or temp_info.get("end_time") or ""
+    from_time = normalize_search_time(raw_from, is_end=False)
+    to_time = normalize_search_time(raw_to, is_end=True)
     target_date = temp_info.get("date") if temp_info.get("is_date_filtered") else ""
-    is_time_filtered = bool(temp_info.get("is_time_filtered") or filters.get("from_time") or filters.get("to_time"))
+    is_time_filtered = bool(temp_info.get("is_time_filtered") or from_time or to_time)
 
     return {
         "raw_query": query,

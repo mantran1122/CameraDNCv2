@@ -21,6 +21,7 @@ class DahuaNVRListener(threading.Thread):
         self.total_events_received = 0
         self.current_response = None
         self._watchdog_thread = None
+        self._last_clip_queued = {}  # channel -> timestamp float
 
     def stop(self):
         self.is_running = False
@@ -236,9 +237,20 @@ class DahuaNVRListener(threading.Thread):
             self.total_events_received += 1
 
             if event_type in {"audio_anomaly", "video_anomaly"}:
-                database.create_audio_analysis(event_id, status="not_analyzed")
-                if self.audio_job_callback:
-                    self.audio_job_callback(event_id)
+                now_ts = time.time()
+                last_queued_ts = self._last_clip_queued.get(channel, 0.0)
+                # Debounce / Cooldown 30s per camera to prevent queue flooding
+                if now_ts - last_queued_ts >= 30.0:
+                    self._last_clip_queued[channel] = now_ts
+                    database.create_audio_analysis(event_id, status="not_analyzed")
+                    if self.audio_job_callback:
+                        self.audio_job_callback(event_id)
+                else:
+                    database.create_audio_analysis(
+                        event_id,
+                        status="video_cooldown",
+                        error_message="Bỏ qua cắt clip do camera đang trong thời gian giãn cách 30s.",
+                    )
 
             event_obj = database.get_event_by_id(event_id)
             print(f"[DahuaClient] Stored event id={event_id} code={code} channel={channel}")

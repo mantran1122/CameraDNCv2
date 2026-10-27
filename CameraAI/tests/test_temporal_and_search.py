@@ -3,14 +3,57 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import database
 from temporal_parser import parse_query_temporal
-from vss_search_engine import search_vss_archive
-
-
+from vss_search_engine import search_vss_archive, normalize_search_time
 from ai_search_planner import plan_search_intent
 
 
 class TemporalAndSearchTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        conn = database.get_db_connection()
+        c = conn.cursor()
+        c.execute("""
+            INSERT OR REPLACE INTO events (id, event_code, event_type, channel, timestamp, description, severity, clip_filename)
+            VALUES 
+            (23916, 'Intrusion', 'Intrusion', 11, '2026-10-20 10:00:00', 'Xâm nhập Cam 11', 'high', 'clips/cam11.mp4'),
+            (24231, 'Fight', 'Fight', 18, '2026-10-20 10:05:00', 'Đánh nhau Cam 18', 'high', 'clips/cam18.mp4')
+        """)
+        conn.commit()
+        conn.close()
+
+    def test_normalize_search_time(self):
+        # DD/MM/YYYY formats
+        self.assertEqual(normalize_search_time("20/10/2026 12:30:45"), "2026-10-20 12:30:45")
+        self.assertEqual(normalize_search_time("20/10/2026 12:30"), "2026-10-20 12:30:00")
+        self.assertEqual(normalize_search_time("20/10/2026", is_end=False), "2026-10-20 00:00:00")
+        self.assertEqual(normalize_search_time("20/10/2026", is_end=True), "2026-10-20 23:59:59")
+        
+        # DD-MM-YYYY formats
+        self.assertEqual(normalize_search_time("20-10-2026 08:15"), "2026-10-20 08:15:00")
+        self.assertEqual(normalize_search_time("05-02-2026"), "2026-02-05 00:00:00")
+        
+        # ISO formats
+        self.assertEqual(normalize_search_time("2026-10-20T12:00:00"), "2026-10-20 12:00:00")
+        self.assertEqual(normalize_search_time("2026-10-20 12:00:00"), "2026-10-20 12:00:00")
+        self.assertEqual(normalize_search_time("2026-10-20", is_end=True), "2026-10-20 23:59:59")
+        self.assertEqual(normalize_search_time(""), "")
+
+    def test_search_vss_with_dmy_time_filters(self):
+        # Search using DD/MM/YYYY string in filters should normalize and find event 23916
+        res = search_vss_archive(
+            "xâm nhập",
+            {
+                "channel": 11,
+                "from_time": "20/10/2026 09:00",
+                "to_time": "20/10/2026 11:00"
+            }
+        )
+        self.assertGreaterEqual(res["total_matches"], 1)
+        returned_ids = [item["id"] for item in res["data"]]
+        self.assertIn(23916, returned_ids)
+
     def test_parse_hour_range(self):
         res = parse_query_temporal("sự kiện bất thường từ 7h đến 8h hôm nay")
         self.assertTrue(res["is_time_filtered"])
@@ -55,5 +98,3 @@ class TemporalAndSearchTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

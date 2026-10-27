@@ -7778,8 +7778,19 @@ user=None`;
                 }
             }
 
-            const fromVal = document.getElementById('filter-from')?.value || '';
-            const toVal = document.getElementById('filter-to')?.value || '';
+            let fromVal = '';
+            if (flatpickrFromInstance && flatpickrFromInstance.selectedDates && flatpickrFromInstance.selectedDates.length > 0) {
+                fromVal = flatpickrFromInstance.input.value || formatDateTimeLocal(flatpickrFromInstance.selectedDates[0]);
+            } else {
+                fromVal = document.getElementById('filter-from')?.value || '';
+            }
+
+            let toVal = '';
+            if (flatpickrToInstance && flatpickrToInstance.selectedDates && flatpickrToInstance.selectedDates.length > 0) {
+                toVal = flatpickrToInstance.input.value || formatDateTimeLocal(flatpickrToInstance.selectedDates[0]);
+            } else {
+                toVal = document.getElementById('filter-to')?.value || '';
+            }
             let videoSrc = (specificEventIds && specificEventIds.length > 0) ? '' : (document.getElementById('filter-video-sources')?.value || '');
             if (!videoSrc && typeof selectedPlaybackChannels !== 'undefined' && selectedPlaybackChannels.size > 0) {
                 videoSrc = Array.from(selectedPlaybackChannels).join(',');

@@ -17,7 +17,12 @@ class AudioAnalysisStorageTest(unittest.TestCase):
 
     def tearDown(self):
         database.DB_PATH = self.original_db_path
-        self.temp_dir.cleanup()
+        import gc
+        gc.collect()
+        try:
+            self.temp_dir.cleanup()
+        except Exception:
+            pass
 
     def test_create_update_and_read_audio_analysis(self):
         event_id = database.save_event(

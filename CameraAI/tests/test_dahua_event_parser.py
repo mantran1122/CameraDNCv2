@@ -34,6 +34,7 @@ class DahuaEventParserTest(unittest.TestCase):
         audio_job_callback = Mock()
         listener = dahua_client.DahuaNVRListener(audio_job_callback=audio_job_callback)
         with patch.object(dahua_client.config, "ACTIVE_CHANNELS", [1]), \
+             patch.object(dahua_client.config, "CAMERA_ALERT_RULES", {}), \
              patch.object(dahua_client.config, "ABNORMAL_EVENT_CODES", ["HumanTrait"]), \
              patch.object(dahua_client.database, "save_event", return_value=42) as save_event, \
              patch.object(dahua_client.database, "get_event_by_id", return_value=None), \
