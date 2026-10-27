@@ -7804,10 +7804,15 @@ user=None`;
                     ? Array.from(selectedPlaybackEventTags) 
                     : []);
 
+            // Strict 2.5s AbortController timeout to guarantee instant UI response
+            const abortCtrl = new AbortController();
+            const timeoutTimer = setTimeout(() => abortCtrl.abort('timeout'), 2500);
+
             try {
                 const res = await fetch('/api/vss/search', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    signal: abortCtrl.signal,
                     body: JSON.stringify({
                         query: queryText,
                         channel: targetChannel,
@@ -7821,6 +7826,7 @@ user=None`;
                         top_k: topK
                     })
                 });
+                clearTimeout(timeoutTimer);
 
                 if (!res.ok) throw new Error(`Search error HTTP ${res.status}`);
                 const vssData = await res.json();
@@ -7837,22 +7843,32 @@ user=None`;
                             const outChLabel = targetChannel ? `CAM ${String(targetChannel).padStart(2, '0')}` : 'ĐA KÊNH';
                             syncWorkflowStage('output', `BƯỚC: XUẤT ${count} VIDEO (${outChLabel})`);
                         }
-                    }, 600);
+                    }, 400);
                 }
 
                 // Render kết quả video thực tế tìm được (nếu không có thì hiển thị empty state, không giữ video cũ)
                 renderVideoCards(items || []);
             } catch (err) {
+                clearTimeout(timeoutTimer);
                 console.error('[Search Error]:', err);
                 if (!isInitial && !window.isChatActive) {
                     syncWorkflowStage('error', 'LỖI TRUY VẤN CSDL VIDEO');
                 }
-                if (empty && (!window.latestSearchResults || window.latestSearchResults.length === 0)) {
+                const isTimeout = err.name === 'AbortError' || err === 'timeout';
+                const errorMsg = isTimeout 
+                    ? 'Không tìm thấy video nào phù hợp (Phản hồi quá 2.5s).' 
+                    : `Lỗi tìm kiếm: ${escapeHtml(err.message || err)}`;
+                if (empty) {
                     empty.style.display = 'flex';
                     empty.innerHTML = `
-                        <p class="empty-state-text" style="color: #ef4444;">Lỗi tìm kiếm: ${escapeHtml(err.message || err)}</p>
+                        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 52px; height: 52px; color: var(--text-sub);">
+                            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
+                            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+                        </svg>
+                        <p class="empty-state-text" style="color: ${isTimeout ? 'var(--text-sub)' : '#ef4444'};">${errorMsg}</p>
                     `;
                 }
+                if (grid) grid.style.display = 'none';
             }
         }
 

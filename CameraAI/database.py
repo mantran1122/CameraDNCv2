@@ -158,6 +158,8 @@ def init_db():
 
     # High-Performance Indexes for YouTube-Speed Search (< 150ms)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_search ON events(channel, timestamp, event_code, severity);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_ch_time ON events(channel, timestamp DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_ts ON events(timestamp);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_time_desc ON events(timestamp DESC);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_code ON events(event_code, timestamp DESC);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_type_sev ON events(event_type, severity, timestamp DESC);")
