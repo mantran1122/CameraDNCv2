@@ -6950,8 +6950,8 @@
                 <span class="video-modal-title" id="modal-video-title">warehouse_20250101_000000_3805c.mp4</span>
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <!-- Fast 3s AI Analysis Button -->
-                    <button type="button" id="modal-fast-ai-btn" onclick="triggerModalFastAiAnalysis()" style="height: 26px; padding: 0 10px; font-size: 0.725rem; font-weight: 600; border-radius: 4px; border: 1px solid rgba(118, 185, 0, 0.55); background: rgba(118, 185, 0, 0.16); color: #9be62b; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;" title="Gửi AI phân tích nhanh sự kiện này (< 3 giây)">
-                        <span>AI Phân tích (3s)</span>
+                    <button type="button" id="modal-fast-ai-btn" onclick="triggerModalFastAiAnalysis()" style="height: 26px; padding: 0 10px; font-size: 0.725rem; font-weight: 600; border-radius: 4px; border: 1px solid rgba(118, 185, 0, 0.55); background: rgba(118, 185, 0, 0.16); color: #9be62b; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.15s;" title="Phân tích nhanh sự kiện này">
+                        <span>Phân tích</span>
                     </button>
                     <!-- Speed buttons -->
                     <div style="display: flex; gap: 3px; background: rgba(255,255,255,0.06); padding: 2px 4px; border-radius: 4px;">
@@ -9415,7 +9415,7 @@ user=None`;
             } finally {
                 if (aiBtn) {
                     aiBtn.disabled = false;
-                    aiBtn.innerHTML = '<span>AI Phân tích (3s)</span>';
+                    aiBtn.innerHTML = '<span>Phân tích</span>';
                 }
             }
         }
