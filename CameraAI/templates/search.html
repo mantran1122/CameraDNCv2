@@ -614,6 +614,165 @@
 
         .flatpickr-calendar {
             z-index: 100005 !important;
+            background: var(--popover-bg) !important;
+            border: 1px solid var(--border-main) !important;
+            border-radius: 10px !important;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+            color: var(--text-main) !important;
+            font-family: inherit !important;
+            padding: 6px !important;
+            width: 316px !important;
+        }
+        .flatpickr-calendar.arrowTop:before,
+        .flatpickr-calendar.arrowTop:after,
+        .flatpickr-calendar.arrowBottom:before,
+        .flatpickr-calendar.arrowBottom:after {
+            display: none !important;
+        }
+        .flatpickr-months {
+            padding: 4px 2px 6px !important;
+            align-items: center !important;
+        }
+        .flatpickr-months .flatpickr-month,
+        .flatpickr-current-month,
+        .flatpickr-weekdays,
+        span.flatpickr-weekday {
+            background: transparent !important;
+            color: var(--text-main) !important;
+        }
+        .flatpickr-months .flatpickr-prev-month,
+        .flatpickr-months .flatpickr-next-month {
+            color: var(--text-sub) !important;
+            fill: var(--text-sub) !important;
+            border-radius: 6px !important;
+            padding: 6px !important;
+            top: 6px !important;
+        }
+        .flatpickr-months .flatpickr-prev-month:hover,
+        .flatpickr-months .flatpickr-next-month:hover {
+            background: rgba(118, 185, 0, 0.14) !important;
+            color: var(--nv-green) !important;
+        }
+        .flatpickr-months .flatpickr-prev-month:hover svg,
+        .flatpickr-months .flatpickr-next-month:hover svg {
+            fill: var(--nv-green) !important;
+        }
+        .flatpickr-current-month .flatpickr-monthDropdown-months {
+            background: var(--input-bg) !important;
+            color: var(--text-main) !important;
+            border: 1px solid var(--border-subtle) !important;
+            border-radius: 4px !important;
+            padding: 2px 6px !important;
+            font-weight: 600 !important;
+        }
+        .flatpickr-current-month input.cur-year {
+            color: var(--text-main) !important;
+            font-weight: 600 !important;
+        }
+        .flatpickr-days {
+            width: 302px !important;
+        }
+        .dayContainer {
+            width: 302px !important;
+            min-width: 302px !important;
+            max-width: 302px !important;
+        }
+        .flatpickr-day {
+            color: var(--text-main) !important;
+            border-radius: 6px !important;
+            max-width: 40px !important;
+            height: 34px !important;
+            line-height: 34px !important;
+            font-size: 0.82rem !important;
+        }
+        .flatpickr-day.prevMonthDay,
+        .flatpickr-day.nextMonthDay {
+            color: var(--text-muted) !important;
+            opacity: 0.55 !important;
+        }
+        .flatpickr-day:hover,
+        .flatpickr-day:focus {
+            background: rgba(118, 185, 0, 0.16) !important;
+            border-color: rgba(118, 185, 0, 0.4) !important;
+            color: var(--text-main) !important;
+        }
+        .flatpickr-day.today {
+            border-color: var(--nv-green) !important;
+            color: var(--nv-green) !important;
+            font-weight: 700 !important;
+        }
+        .flatpickr-day.selected,
+        .flatpickr-day.selected:hover {
+            background: var(--nv-green) !important;
+            border-color: var(--nv-green) !important;
+            color: #000000 !important;
+            font-weight: 700 !important;
+        }
+        .flatpickr-time {
+            border-top: 1px solid var(--border-main) !important;
+            margin-top: 4px !important;
+            padding-top: 4px !important;
+            height: 44px !important;
+            max-height: 44px !important;
+            background: transparent !important;
+        }
+        .flatpickr-time input {
+            color: var(--text-main) !important;
+            background: var(--input-bg) !important;
+            font-size: 0.95rem !important;
+            font-weight: 600 !important;
+            border-radius: 4px !important;
+        }
+        .flatpickr-time input:hover,
+        .flatpickr-time input:focus {
+            background: rgba(118, 185, 0, 0.14) !important;
+        }
+        .flatpickr-time .flatpickr-time-separator {
+            color: var(--text-main) !important;
+        }
+        .flatpickr-time .numInputWrapper span.arrowUp:after {
+            border-bottom-color: var(--text-sub) !important;
+        }
+        .flatpickr-time .numInputWrapper span.arrowDown:after {
+            border-top-color: var(--text-sub) !important;
+        }
+        .fp-quick-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            padding: 8px 6px 4px;
+            margin-top: 4px;
+            border-top: 1px solid var(--border-main);
+        }
+        .fp-quick-btn {
+            padding: 5px 10px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            border-radius: 5px;
+            border: 1px solid var(--border-subtle);
+            background: var(--btn-secondary-bg);
+            color: var(--btn-secondary-text);
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+        .fp-quick-btn:hover {
+            border-color: var(--nv-green);
+            color: var(--nv-green);
+        }
+        .fp-quick-btn-done {
+            margin-left: auto;
+            padding: 5px 14px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            border-radius: 5px;
+            border: 1px solid var(--nv-green);
+            background: var(--nv-green);
+            color: #000000;
+            cursor: pointer;
+        }
+        .fp-quick-btn-done:hover {
+            background: var(--nv-green-hover);
         }
 
         /* Windows 11 Fluent Context Menu */
@@ -5983,14 +6142,14 @@
                                 <span class="filter-label">Từ:</span>
                                 <div class="filter-input-wrap">
                                     <svg class="datetime-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                                    <input type="text" id="filter-from" class="datetime-picker-input" placeholder="Từ ngày giờ">
+                                    <input type="text" id="filter-from" class="datetime-picker-input" placeholder="dd/mm/yyyy HH:mm">
                                 </div>
                             </div>
                             <div class="filter-row">
                                 <span class="filter-label">Đến:</span>
                                 <div class="filter-input-wrap">
                                     <svg class="datetime-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                                    <input type="text" id="filter-to" class="datetime-picker-input" placeholder="Đến ngày giờ">
+                                    <input type="text" id="filter-to" class="datetime-picker-input" placeholder="dd/mm/yyyy HH:mm">
                                 </div>
                             </div>
 
@@ -7385,7 +7544,7 @@ user=None`;
         }
 
         // Real-time API-driven VSS Search & Vision Agent Conversational Interaction
-        let currentSearchQuery = 'Tìm kiếm sự kiện gần đây';
+        let currentSearchQuery = '';
         let latestSearchPayload = null;
 
         // Clear Chat History & Reset View
@@ -7778,19 +7937,8 @@ user=None`;
                 }
             }
 
-            let fromVal = '';
-            if (flatpickrFromInstance && flatpickrFromInstance.selectedDates && flatpickrFromInstance.selectedDates.length > 0) {
-                fromVal = flatpickrFromInstance.input.value || formatDateTimeLocal(flatpickrFromInstance.selectedDates[0]);
-            } else {
-                fromVal = document.getElementById('filter-from')?.value || '';
-            }
-
-            let toVal = '';
-            if (flatpickrToInstance && flatpickrToInstance.selectedDates && flatpickrToInstance.selectedDates.length > 0) {
-                toVal = flatpickrToInstance.input.value || formatDateTimeLocal(flatpickrToInstance.selectedDates[0]);
-            } else {
-                toVal = document.getElementById('filter-to')?.value || '';
-            }
+            const fromVal = getFilterTimeInputValue('filter-from', flatpickrFromInstance);
+            const toVal = getFilterTimeInputValue('filter-to', flatpickrToInstance);
             let videoSrc = (specificEventIds && specificEventIds.length > 0) ? '' : (document.getElementById('filter-video-sources')?.value || '');
             if (!videoSrc && typeof selectedPlaybackChannels !== 'undefined' && selectedPlaybackChannels.size > 0) {
                 videoSrc = Array.from(selectedPlaybackChannels).join(',');
@@ -7875,11 +8023,7 @@ user=None`;
         // 1. Dành riêng cho TÌM KIẾM VIDEO (khi bấm Search ở thanh trên hoặc Apply Filter)
         async function executeSearch() {
             const input = document.getElementById('search-input');
-            let queryText = (input?.value || '').trim();
-            if (!queryText && currentSearchQuery) {
-                queryText = currentSearchQuery;
-                if (input) input.value = queryText;
-            }
+            const queryText = (input?.value || '').trim();
             currentSearchQuery = queryText;
 
             let ch = null;
@@ -8568,6 +8712,12 @@ user=None`;
                 const btn = document.getElementById(id);
                 if (btn) btn.classList.remove('active');
             });
+            if (typeof flatpickrFromInstance !== 'undefined' && flatpickrFromInstance) {
+                try { flatpickrFromInstance.close(); } catch (e) {}
+            }
+            if (typeof flatpickrToInstance !== 'undefined' && flatpickrToInstance) {
+                try { flatpickrToInstance.close(); } catch (e) {}
+            }
         }
 
         // Backwards compatibility
@@ -8586,6 +8736,8 @@ user=None`;
         }
 
         function applyFilters() {
+            syncFilterTimeInput('filter-from', flatpickrFromInstance, false);
+            syncFilterTimeInput('filter-to', flatpickrToInstance, true);
             const topk = document.getElementById('filter-topk')?.value || 10;
             const topkTag = document.getElementById('topk-tag-val');
             if (topkTag) topkTag.innerText = topk;
@@ -8709,43 +8861,206 @@ user=None`;
         let selectedPlaybackEventTags = new Set();
         let isCamGridVisible = false;
 
+        function parseFlexibleDateTime(valStr, isEnd = false) {
+            if (!valStr) return null;
+            const s = String(valStr).trim().replace('T', ' ');
+            if (!s) return null;
+
+            let m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+            if (m) {
+                const day = parseInt(m[1], 10);
+                const month = parseInt(m[2], 10) - 1;
+                const year = parseInt(m[3], 10);
+                const hour = m[4] !== undefined ? parseInt(m[4], 10) : (isEnd ? 23 : 0);
+                const minute = m[5] !== undefined ? parseInt(m[5], 10) : (isEnd ? 59 : 0);
+                const second = m[6] !== undefined ? parseInt(m[6], 10) : 0;
+                const dt = new Date(year, month, day, hour, minute, second);
+                if (!isNaN(dt.getTime()) && dt.getFullYear() === year && dt.getMonth() === month && dt.getDate() === day) {
+                    return dt;
+                }
+            }
+
+            m = s.match(/^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+            if (m) {
+                const year = parseInt(m[1], 10);
+                const month = parseInt(m[2], 10) - 1;
+                const day = parseInt(m[3], 10);
+                const hour = m[4] !== undefined ? parseInt(m[4], 10) : (isEnd ? 23 : 0);
+                const minute = m[5] !== undefined ? parseInt(m[5], 10) : (isEnd ? 59 : 0);
+                const second = m[6] !== undefined ? parseInt(m[6], 10) : 0;
+                const dt = new Date(year, month, day, hour, minute, second);
+                if (!isNaN(dt.getTime()) && dt.getFullYear() === year && dt.getMonth() === month && dt.getDate() === day) {
+                    return dt;
+                }
+            }
+            return null;
+        }
+
+        function formatDateTimeVn(dt) {
+            if (!(dt instanceof Date) || isNaN(dt.getTime())) return '';
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+        }
+
+        function formatDateTimeLocal(dt) {
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+        }
+
+        function syncFilterTimeInput(inputId, fpInstance, isEnd = false) {
+            const el = document.getElementById(inputId);
+            if (!el) return;
+            const raw = (el.value || '').trim();
+            if (!raw) {
+                if (fpInstance && fpInstance.selectedDates && fpInstance.selectedDates.length > 0) {
+                    fpInstance.clear(false);
+                }
+                return;
+            }
+            const parsed = parseFlexibleDateTime(raw, isEnd);
+            if (parsed) {
+                if (fpInstance) {
+                    fpInstance.setDate(parsed, false);
+                }
+                el.value = formatDateTimeVn(parsed);
+            }
+        }
+
+        function getFilterTimeInputValue(inputId, fpInstance) {
+            const el = document.getElementById(inputId);
+            const raw = (el?.value || '').trim();
+            if (raw) return raw;
+            if (fpInstance && fpInstance.selectedDates && fpInstance.selectedDates.length > 0) {
+                return formatDateTimeVn(fpInstance.selectedDates[0]);
+            }
+            return '';
+        }
+
+        function attachCalendarQuickFooter(instance, isEnd) {
+            if (!instance || !instance.calendarContainer) return;
+            if (instance.calendarContainer.querySelector('.fp-quick-footer')) return;
+
+            const footer = document.createElement('div');
+            footer.className = 'fp-quick-footer';
+
+            const btnToday = document.createElement('button');
+            btnToday.type = 'button';
+            btnToday.className = 'fp-quick-btn';
+            btnToday.textContent = isEnd ? 'Cuối hôm nay' : 'Đầu hôm nay';
+            btnToday.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const now = new Date();
+                const dt = isEnd
+                    ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 0)
+                    : new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+                clearPresetChipsActive();
+                instance.setDate(dt, false);
+            });
+
+            const btnClear = document.createElement('button');
+            btnClear.type = 'button';
+            btnClear.className = 'fp-quick-btn';
+            btnClear.textContent = 'Xóa';
+            btnClear.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                clearPresetChipsActive();
+                instance.clear(false);
+            });
+
+            const btnDone = document.createElement('button');
+            btnDone.type = 'button';
+            btnDone.className = 'fp-quick-btn-done';
+            btnDone.textContent = 'Xong';
+            btnDone.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                instance.close();
+            });
+
+            footer.appendChild(btnToday);
+            footer.appendChild(btnClear);
+            footer.appendChild(btnDone);
+            instance.calendarContainer.appendChild(footer);
+
+            // Prevent calendar clicks from bubbling to document click-outside handler
+            ['mousedown', 'click'].forEach((evtName) => {
+                instance.calendarContainer.addEventListener(evtName, (e) => {
+                    e.stopPropagation();
+                });
+            });
+        }
+
         function initPlaybackCalendarPickers() {
             if (typeof flatpickr === 'undefined') {
                 console.warn('Flatpickr library not loaded yet');
                 return;
             }
             try {
-                const config = {
-                    enableTime: true,
-                    dateFormat: "Y-m-d H:i:S",
-                    altInput: true,
-                    altFormat: "d/m/Y H:i",
-                    time_24hr: true,
-                    minuteIncrement: 1,
-                    locale: {
-                        firstDayOfWeek: 1
+                const vnLocale = {
+                    firstDayOfWeek: 1,
+                    weekdays: {
+                        shorthand: ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'],
+                        longhand: ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
+                    },
+                    months: {
+                        shorthand: ['Th1', 'Th2', 'Th3', 'Th4', 'Th5', 'Th6', 'Th7', 'Th8', 'Th9', 'Th10', 'Th11', 'Th12'],
+                        longhand: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12']
                     }
                 };
+
+                const baseConfig = {
+                    enableTime: true,
+                    dateFormat: "d/m/Y H:i",
+                    allowInput: true,
+                    clickOpens: true,
+                    disableMobile: true,
+                    time_24hr: true,
+                    minuteIncrement: 1,
+                    locale: vnLocale,
+                    parseDate: (datestr) => parseFlexibleDateTime(datestr, false) || new Date(datestr)
+                };
+
                 flatpickrFromInstance = flatpickr("#filter-from", {
-                    ...config,
+                    ...baseConfig,
+                    defaultHour: 0,
+                    defaultMinute: 0,
+                    parseDate: (datestr) => parseFlexibleDateTime(datestr, false),
+                    onReady: function(selectedDates, dateStr, instance) {
+                        attachCalendarQuickFooter(instance, false);
+                    },
                     onChange: function() {
                         clearPresetChipsActive();
                     }
                 });
+
                 flatpickrToInstance = flatpickr("#filter-to", {
-                    ...config,
+                    ...baseConfig,
+                    defaultHour: 23,
+                    defaultMinute: 59,
+                    parseDate: (datestr) => parseFlexibleDateTime(datestr, true),
+                    onReady: function(selectedDates, dateStr, instance) {
+                        attachCalendarQuickFooter(instance, true);
+                    },
                     onChange: function() {
                         clearPresetChipsActive();
                     }
                 });
+
+                const fromInput = document.getElementById('filter-from');
+                const toInput = document.getElementById('filter-to');
+                if (fromInput) {
+                    fromInput.addEventListener('input', () => clearPresetChipsActive());
+                    fromInput.addEventListener('blur', () => syncFilterTimeInput('filter-from', flatpickrFromInstance, false));
+                }
+                if (toInput) {
+                    toInput.addEventListener('input', () => clearPresetChipsActive());
+                    toInput.addEventListener('blur', () => syncFilterTimeInput('filter-to', flatpickrToInstance, true));
+                }
             } catch (err) {
                 console.error('Error initializing flatpickr:', err);
             }
-        }
-
-        function formatDateTimeLocal(dt) {
-            const pad = (n) => String(n).padStart(2, '0');
-            return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
         }
 
         function clearPresetChipsActive() {
@@ -8774,8 +9089,8 @@ user=None`;
                 const day = now.getDay() || 7;
                 fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1, 0, 0, 0);
             } else if (preset === 'all') {
-                if (flatpickrFromInstance) flatpickrFromInstance.clear();
-                if (flatpickrToInstance) flatpickrToInstance.clear();
+                if (flatpickrFromInstance) flatpickrFromInstance.clear(false);
+                if (flatpickrToInstance) flatpickrToInstance.clear(false);
                 const fromEl = document.getElementById('filter-from');
                 const toEl = document.getElementById('filter-to');
                 if (fromEl) fromEl.value = '';
@@ -8784,16 +9099,16 @@ user=None`;
             }
 
             if (fromDate && toDate) {
-                const fStr = formatDateTimeLocal(fromDate);
-                const tStr = formatDateTimeLocal(toDate);
+                const fStr = formatDateTimeVn(fromDate);
+                const tStr = formatDateTimeVn(toDate);
                 if (flatpickrFromInstance) {
-                    flatpickrFromInstance.setDate(fStr, true);
+                    flatpickrFromInstance.setDate(fromDate, false);
                 } else {
                     const fromEl = document.getElementById('filter-from');
                     if (fromEl) fromEl.value = fStr;
                 }
                 if (flatpickrToInstance) {
-                    flatpickrToInstance.setDate(tStr, true);
+                    flatpickrToInstance.setDate(toDate, false);
                 } else {
                     const toEl = document.getElementById('filter-to');
                     if (toEl) toEl.value = tStr;
@@ -8894,8 +9209,12 @@ user=None`;
         }
 
         function resetAllPlaybackFilters() {
-            if (flatpickrFromInstance) flatpickrFromInstance.clear();
-            if (flatpickrToInstance) flatpickrToInstance.clear();
+            if (flatpickrFromInstance) flatpickrFromInstance.clear(false);
+            if (flatpickrToInstance) flatpickrToInstance.clear(false);
+            const fromEl = document.getElementById('filter-from');
+            const toEl = document.getElementById('filter-to');
+            if (fromEl) fromEl.value = '';
+            if (toEl) toEl.value = '';
             clearPresetChipsActive();
             selectedPlaybackChannels.clear();
             render32CameraGrid();
@@ -8920,12 +9239,47 @@ user=None`;
             resetAllPlaybackFilters();
         }
 
-        // Global click-outside listener to close toolbar menus
+        // Global click-outside listener to close toolbar menus (ignoring Flatpickr calendar interactions & detached DOM rebuilds)
+        let _lastPointerInMenuOrCalendar = false;
+        function _isEventInsideMenuOrCalendar(e) {
+            if (!e) return false;
+            const target = e.target;
+            if (target && target.closest) {
+                if (
+                    target.closest('.win11-action-item') ||
+                    target.closest('.flatpickr-calendar') ||
+                    target.closest('#filter-popover')
+                ) {
+                    return true;
+                }
+            }
+            if (typeof e.composedPath === 'function') {
+                const path = e.composedPath();
+                if (path.some(el => el && el.classList && (
+                    el.classList.contains('win11-action-item') ||
+                    el.classList.contains('flatpickr-calendar') ||
+                    el.id === 'filter-popover'
+                ))) {
+                    return true;
+                }
+            }
+            // If DOM element was detached during click (e.g. Flatpickr month/day rebuild or grid toggle), do not treat as outside click
+            if (target && target.nodeType === 1 && !document.contains(target)) {
+                return true;
+            }
+            return false;
+        }
+
+        document.addEventListener('mousedown', function(e) {
+            _lastPointerInMenuOrCalendar = _isEventInsideMenuOrCalendar(e);
+        }, true);
+
         document.addEventListener('click', function(e) {
-            const actionItem = e.target.closest('.win11-action-item');
-            if (!actionItem) {
+            const insideNow = _isEventInsideMenuOrCalendar(e);
+            if (!insideNow && !_lastPointerInMenuOrCalendar) {
                 closeAllToolbarMenus();
             }
+            _lastPointerInMenuOrCalendar = false;
         });
 
         // 9. Video Modal + Ultra-Fast 3s AI Analysis

@@ -95,6 +95,24 @@ class TemporalAndSearchTest(unittest.TestCase):
         self.assertIn(23916, returned_ids)
         self.assertIn(24231, returned_ids)
 
+    def test_manual_date_range_dmy_filter(self):
+        from vss_search_engine import decompose_query
+        decomp = decompose_query("", {"from_time": "26/10/2026 00:00", "to_time": "28/10/2026 23:59"})
+        self.assertEqual(decomp["from_time"], "2026-10-26 00:00:00")
+        self.assertEqual(decomp["to_time"], "2026-10-28 23:59:59")
+        res = search_vss_archive("", {"from_time": "26/10/2026 00:00", "to_time": "28/10/2026 23:59"})
+        self.assertGreater(len(res["data"]), 0)
+
+    def test_manual_date_range_reversed_and_same_minute(self):
+        from vss_search_engine import decompose_query
+        swapped = decompose_query("", {"from_time": "28/10/2026 23:59", "to_time": "26/10/2026 00:00"})
+        self.assertEqual(swapped["from_time"], "2026-10-26 00:00:00")
+        self.assertEqual(swapped["to_time"], "2026-10-28 23:59:59")
+
+        same_min = decompose_query("", {"from_time": "2026-10-28 16:30:00", "to_time": "2026-10-28 16:30:00"})
+        self.assertEqual(same_min["from_time"], "2026-10-28 16:30:00")
+        self.assertEqual(same_min["to_time"], "2026-10-28 16:30:59")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -202,6 +202,12 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
     raw_to = filters.get("to_time") or filters.get("to") or temp_info.get("end_time") or ""
     from_time = normalize_search_time(raw_from, is_end=False)
     to_time = normalize_search_time(raw_to, is_end=True)
+    if from_time and to_time:
+        if from_time > to_time:
+            from_time = normalize_search_time(raw_to, is_end=False)
+            to_time = normalize_search_time(raw_from, is_end=True)
+        if from_time == to_time and to_time.endswith(":00"):
+            to_time = to_time[:-2] + "59"
     target_date = temp_info.get("date") if temp_info.get("is_date_filtered") else ""
     is_time_filtered = bool(temp_info.get("is_time_filtered") or from_time or to_time)
 
