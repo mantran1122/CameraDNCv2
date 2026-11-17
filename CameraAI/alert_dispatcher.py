@@ -126,6 +126,10 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
     app_base = os.getenv("CAMERAAI_BASE_URL", "").rstrip("/")
     full_clip_url = urljoin(f"{app_base}/", clip_url.lstrip("/")) if (app_base and clip_url) else clip_url
 
+    msg_text = f"🚨 [CẢNH BÁO ĐỎ] {label} tại {cam_name} lúc {ts}.\nChi tiết: {desc}"
+    if full_clip_url:
+        msg_text += f"\nXem video clip: {full_clip_url}"
+
     body = {
         "event_type": "high_security_alert",
         "severity": "high",
@@ -136,7 +140,10 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
         "timestamp": ts,
         "description": desc,
         "clip_url": full_clip_url,
-        "message": f"🚨 [CẢNH BÁO ĐỎ] {label} tại {cam_name} lúc {ts}. Chi tiết: {desc}",
+        "message": msg_text,
+        "text": msg_text,
+        "content": msg_text,
+        "msg": msg_text,
     }
 
     headers = {"Content-Type": "application/json"}
@@ -153,6 +160,43 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
     except Exception as exc:
         logger.error(f"[AlertDispatcher] Zalo Webhook connection error: {exc}")
     return False
+
+
+def test_zalo_webhook(webhook_url: Optional[str] = None, token: Optional[str] = None) -> Dict[str, Any]:
+    """Test connectivity to Zalo webhook bridge."""
+    target_url = (webhook_url or os.getenv("ZALO_WEBHOOK_URL", "")).strip()
+    if not target_url:
+        return {"success": False, "message": "Chưa cấu hình ZALO_WEBHOOK_URL trong .env"}
+
+    now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    msg_text = f"🚨 [TEST CẢNH BÁO] Hệ thống Camera AI DNC kết nối thành công tới Zalo Group lúc {now_str}."
+    body = {
+        "event_type": "test_alert",
+        "severity": "high",
+        "camera_name": "Camera 11 - Quản lý HSSV",
+        "channel": 11,
+        "event_code": "AudioMutation",
+        "label": "Âm thanh bất thường (Test)",
+        "timestamp": now_str,
+        "description": "Thử nghiệm kết nối bắn cảnh báo đỏ tự động vào Zalo Group",
+        "message": msg_text,
+        "text": msg_text,
+        "content": msg_text,
+        "msg": msg_text,
+    }
+
+    headers = {"Content-Type": "application/json"}
+    secret = (token or os.getenv("ZALO_WEBHOOK_SECRET", "")).strip()
+    if secret:
+        headers["Authorization"] = f"Bearer {secret}"
+
+    try:
+        resp = requests.post(target_url, json=body, headers=headers, timeout=8)
+        if resp.status_code in (200, 201, 202, 204):
+            return {"success": True, "status_code": resp.status_code, "message": "Đã gửi tin nhắn thử nghiệm thành công tới Zalo Group!"}
+        return {"success": False, "status_code": resp.status_code, "message": f"Zalo Webhook phản hồi mã lỗi {resp.status_code}: {resp.text[:200]}"}
+    except Exception as exc:
+        return {"success": False, "message": f"Không thể kết nối tới Zalo Webhook ({target_url}): {exc}"}
 
 
 def send_email_alert(payload: Dict[str, Any]) -> bool:

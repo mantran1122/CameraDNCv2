@@ -837,6 +837,75 @@
                                     </q-card-section>
                                 </q-card>
 
+                                <!-- Zalo Group Webhook Alert Card -->
+                                <q-card class="bg-metropolis-card text-white">
+                                    <q-card-section class="row items-center justify-between">
+                                        <div class="text-subtitle1 text-weight-bold text-cyan-3">
+                                            <q-icon name="send" class="q-mr-sm" color="cyan-3"></q-icon>
+                                            Bắn Cảnh Báo Đỏ vào Zalo Group
+                                        </div>
+                                        <q-badge :color="zaloConfig.is_configured ? 'positive' : 'grey-7'" :label="zaloConfig.is_configured ? 'Đã kích hoạt' : 'Chưa cấu hình'"></q-badge>
+                                    </q-card-section>
+                                    <q-separator dark></q-separator>
+                                    <q-card-section>
+                                        <div class="text-caption text-grey-4 q-mb-md">
+                                            Tự động gửi tin nhắn khẩn cấp (kèm vị trí camera, thời gian, mô tả và liên kết video) vào nhóm Zalo của Ban Giám hiệu / Đội An ninh khi xảy ra sự kiện nhãn đỏ (Đột nhập, ẩu đả, âm thanh đột biến...).
+                                        </div>
+                                        <q-form @submit.prevent="saveZaloConfig" class="q-gutter-md">
+                                            <q-input
+                                                v-model="zaloConfig.webhook_url"
+                                                label="Zalo Webhook URL / Relay Bridge URL *"
+                                                outlined
+                                                dark
+                                                dense
+                                                color="cyan-4"
+                                                placeholder="Ví dụ: http://127.0.0.1:5000/webhook hoặc URL webhook bot"
+                                                hint="Địa chỉ webhook nhận tin nhắn cảnh báo đỏ và chuyển tiếp vào Zalo Group"
+                                            >
+                                                <template v-slot:prepend>
+                                                    <q-icon name="link" color="cyan-4"></q-icon>
+                                                </template>
+                                            </q-input>
+
+                                            <q-input
+                                                v-model="zaloConfig.webhook_secret"
+                                                label="Secret Key / Token Xác thực (Tùy chọn)"
+                                                outlined
+                                                dark
+                                                dense
+                                                color="cyan-4"
+                                                type="password"
+                                                placeholder="Bearer Token hoặc Secret nếu có"
+                                            >
+                                                <template v-slot:prepend>
+                                                    <q-icon name="key" color="cyan-4"></q-icon>
+                                                </template>
+                                            </q-input>
+
+                                            <div class="row justify-between items-center q-pt-sm">
+                                                <q-btn
+                                                    unelevated
+                                                    outline
+                                                    color="amber-4"
+                                                    icon="notifications_active"
+                                                    label="Bắn Tin Test vào Zalo"
+                                                    @click="sendTestZaloAlert"
+                                                    :loading="testingZalo"
+                                                    :disable="!zaloConfig.webhook_url"
+                                                ></q-btn>
+                                                <q-btn
+                                                    unelevated
+                                                    color="cyan-8"
+                                                    icon="save"
+                                                    label="Lưu Cấu Hình Zalo"
+                                                    type="submit"
+                                                    :loading="savingZalo"
+                                                ></q-btn>
+                                            </div>
+                                        </q-form>
+                                    </q-card-section>
+                                </q-card>
+
                                 <!-- AI Cluster Health Card -->
                                 <q-card class="bg-metropolis-card text-white">
                                     <q-card-section>

@@ -2513,6 +2513,78 @@ async def test_vlm_connection_api(_: str = Depends(require_database_admin)):
         }
 
 
+class ZaloTestModel(BaseModel):
+    webhook_url: Optional[str] = None
+    secret: Optional[str] = None
+
+
+@app.post("/api/admin/test-zalo")
+async def test_zalo_webhook_api(payload: Optional[ZaloTestModel] = None, _: str = Depends(require_database_admin)):
+    """Trigger a test alert to Zalo Group Webhook."""
+    from alert_dispatcher import test_zalo_webhook
+    url = payload.webhook_url if payload else None
+    sec = payload.secret if payload else None
+    return await asyncio.to_thread(test_zalo_webhook, webhook_url=url, token=sec)
+
+
+class AlertConfigUpdateModel(BaseModel):
+    zalo_webhook_url: Optional[str] = None
+    zalo_webhook_secret: Optional[str] = None
+
+
+@app.get("/api/admin/alert-config")
+async def get_alert_config_api(_: str = Depends(require_database_admin)):
+    """Return external alert dispatcher configuration."""
+    return {
+        "zalo_webhook_url": os.getenv("ZALO_WEBHOOK_URL", ""),
+        "zalo_webhook_secret": os.getenv("ZALO_WEBHOOK_SECRET", ""),
+        "is_zalo_configured": bool(os.getenv("ZALO_WEBHOOK_URL", "").strip()),
+    }
+
+
+@app.post("/api/admin/alert-config")
+async def set_alert_config_api(payload: AlertConfigUpdateModel, _: str = Depends(require_database_admin)):
+    """Persist Zalo alert configuration to CameraAI/.env and os.environ."""
+    env_updates = {}
+    if payload.zalo_webhook_url is not None:
+        val = payload.zalo_webhook_url.strip()
+        os.environ["ZALO_WEBHOOK_URL"] = val
+        env_updates["ZALO_WEBHOOK_URL"] = val
+
+    if payload.zalo_webhook_secret is not None:
+        val = payload.zalo_webhook_secret.strip()
+        os.environ["ZALO_WEBHOOK_SECRET"] = val
+        env_updates["ZALO_WEBHOOK_SECRET"] = val
+
+    # Persist to .env
+    env_file = config.BASE_DIR / ".env"
+    if env_file.is_file() and env_updates:
+        lines = env_file.read_text(encoding="utf-8").splitlines()
+        new_lines = []
+        seen = set()
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and "=" in stripped:
+                k, _ = stripped.split("=", 1)
+                k = k.strip()
+                if k in env_updates:
+                    new_lines.append(f"{k}={env_updates[k]}")
+                    seen.add(k)
+                    continue
+            new_lines.append(line)
+        for k, v in env_updates.items():
+            if k not in seen:
+                new_lines.append(f"{k}={v}")
+        env_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+    return {
+        "status": "success",
+        "message": "Cấu hình Zalo Webhook đã được lưu thành công!",
+        "zalo_webhook_url": os.getenv("ZALO_WEBHOOK_URL", ""),
+        "is_zalo_configured": bool(os.getenv("ZALO_WEBHOOK_URL", "").strip()),
+    }
+
+
 @app.get("/api/admin/gemini-config")
 async def get_gemini_config(_: str = Depends(require_database_admin)):
     """Legacy compatibility endpoint returning the active VLM model from config/.env."""

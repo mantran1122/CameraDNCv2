@@ -149,6 +149,15 @@
             const uploadPromptFile = ref(null);
             const uploadingPrompt = ref(false);
 
+            // Zalo Group Webhook Alert Config
+            const zaloConfig = reactive({
+                webhook_url: '',
+                webhook_secret: '',
+                is_configured: false
+            });
+            const savingZalo = ref(false);
+            const testingZalo = ref(false);
+
             // Change Admin Password Dialog
             const changeAdminPassDialog = reactive({
                 show: false,
@@ -186,7 +195,8 @@
                     fetchSecurityData(),
                     fetchAuditLogs(),
                     fetchGeminiConfig(),
-                    fetchCosmosConfig()
+                    fetchCosmosConfig(),
+                    fetchZaloConfig()
                 ]);
             };
 
@@ -642,6 +652,67 @@
                 }
             };
 
+            // Zalo Group Webhook Methods
+            const fetchZaloConfig = async () => {
+                try {
+                    const res = await fetch('/api/admin/alert-config');
+                    if (res.ok) {
+                        const data = await res.json();
+                        zaloConfig.webhook_url = data.zalo_webhook_url || '';
+                        zaloConfig.webhook_secret = data.zalo_webhook_secret || '';
+                        zaloConfig.is_configured = !!data.is_zalo_configured;
+                    }
+                } catch (e) {
+                    console.error('Lỗi tải Zalo config:', e);
+                }
+            };
+
+            const saveZaloConfig = async () => {
+                savingZalo.value = true;
+                try {
+                    const res = await fetch('/api/admin/alert-config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            zalo_webhook_url: zaloConfig.webhook_url,
+                            zalo_webhook_secret: zaloConfig.webhook_secret
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.detail || 'Lỗi lưu cấu hình Zalo Webhook');
+                    $q.notify({ type: 'positive', message: data.message || 'Đã lưu cấu hình Zalo Webhook!' });
+                    await fetchZaloConfig();
+                } catch (e) {
+                    $q.notify({ type: 'negative', message: e.message });
+                } finally {
+                    savingZalo.value = false;
+                }
+            };
+
+            const sendTestZaloAlert = async () => {
+                testingZalo.value = true;
+                try {
+                    const res = await fetch('/api/admin/test-zalo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            webhook_url: zaloConfig.webhook_url,
+                            secret: zaloConfig.webhook_secret
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        $q.notify({ type: 'positive', message: data.message || 'Bắn tin thử nghiệm thành công tới Zalo Group!' });
+                    } else {
+                        $q.notify({ type: 'warning', message: data.message || 'Gửi thất bại, vui lòng kiểm tra lại URL Webhook!' });
+                    }
+                } catch (e) {
+                    $q.notify({ type: 'negative', message: 'Lỗi kết nối tới Zalo Webhook: ' + e.message });
+                } finally {
+                    testingZalo.value = false;
+                }
+            };
+
             // Admin Password Change
             const openChangeAdminPassDialog = () => {
                 changeAdminPassDialog.newPassword = '';
@@ -754,6 +825,13 @@
                 onPromptProfileChange,
                 saveCosmosPrompt,
                 uploadPrompt,
+
+                // Zalo Group Webhook
+                zaloConfig,
+                savingZalo,
+                testingZalo,
+                saveZaloConfig,
+                sendTestZaloAlert,
 
                 // Admin Pass
                 changeAdminPassDialog,
