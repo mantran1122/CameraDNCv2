@@ -304,17 +304,90 @@ def send_email_alert(payload: Dict[str, Any]) -> bool:
     return False
 
 
-def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
-    """Entry point: Dispatches red alerts to all enabled channels asynchronously."""
-    severity = str(event_payload.get("severity") or "").lower()
-    event_code = str(event_payload.get("event_code") or "")
-    critical_codes = {"Fight", "Intrusion", "CrossLine", "AudioMutation", "SoundDetection"}
+DEFAULT_ZALO_ALERT_EVENTS = [
+    "Fight",
+    "Intrusion",
+    "CrossLine",
+    "AudioMutation",
+    "SoundDetection",
+    "AudioAnomaly",
+    "RtspSessionDisconnect",
+]
+DEFAULT_ZALO_ALERT_CHANNELS = list(range(1, 33))
 
-    # Only dispatch if explicitly severity == 'high' or is in critical abnormal behaviors
-    if severity != "high" and event_code not in critical_codes:
+
+def get_zalo_alert_config() -> Dict[str, Any]:
+    """Retrieve Zalo alert configuration with behavior and camera filters."""
+    config_file = config.STORAGE_DIR / "alert_config.json"
+    cfg = {
+        "zalo_webhook_url": os.getenv("ZALO_WEBHOOK_URL", "").strip(),
+        "zalo_webhook_secret": os.getenv("ZALO_WEBHOOK_SECRET", "").strip(),
+        "zalo_alert_events": list(DEFAULT_ZALO_ALERT_EVENTS),
+        "zalo_alert_channels": list(DEFAULT_ZALO_ALERT_CHANNELS),
+    }
+    if config_file.is_file():
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                if saved.get("zalo_webhook_url"):
+                    cfg["zalo_webhook_url"] = saved["zalo_webhook_url"].strip()
+                if "zalo_webhook_secret" in saved:
+                    cfg["zalo_webhook_secret"] = str(saved["zalo_webhook_secret"] or "").strip()
+                if "zalo_alert_events" in saved and isinstance(saved["zalo_alert_events"], list):
+                    cfg["zalo_alert_events"] = saved["zalo_alert_events"]
+                if "zalo_alert_channels" in saved and isinstance(saved["zalo_alert_channels"], list):
+                    cfg["zalo_alert_channels"] = [int(c) for c in saved["zalo_alert_channels"] if str(c).isdigit()]
+        except Exception as e:
+            logger.warning(f"Error loading alert_config.json: {e}")
+    return cfg
+
+
+def save_zalo_alert_config(updates: Dict[str, Any]) -> Dict[str, Any]:
+    """Save Zalo alert configuration to storage/alert_config.json."""
+    current = get_zalo_alert_config()
+    current.update(updates)
+    config_file = config.STORAGE_DIR / "alert_config.json"
+    try:
+        config.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump(current, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Error saving alert_config.json: {e}")
+    return current
+
+
+def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
+    """Entry point: Dispatches alerts to configured channels based on Admin rule matrix."""
+    channel = int(event_payload.get("channel") or 0)
+    event_code = str(event_payload.get("event_code") or "")
+    severity = str(event_payload.get("severity") or "").lower()
+
+    # Load dynamic alert configuration configured by Admin in Web UI
+    zalo_cfg = get_zalo_alert_config()
+    allowed_events = set(zalo_cfg.get("zalo_alert_events") or DEFAULT_ZALO_ALERT_EVENTS)
+    allowed_channels = set(zalo_cfg.get("zalo_alert_channels") or DEFAULT_ZALO_ALERT_CHANNELS)
+
+    # 1. Filter by Camera Room / Channel
+    if allowed_channels and channel not in allowed_channels:
+        logger.debug(f"[AlertDispatcher] ch={channel} not in allowed alert channels, skipped.")
         return
 
-    channel = int(event_payload.get("channel") or 0)
+    # 2. Filter by Behavior Event Code configured by Admin
+    is_event_allowed = False
+    if event_code in allowed_events:
+        is_event_allowed = True
+    elif event_code in ("SoundDetection", "AudioAnomaly") and "AudioMutation" in allowed_events:
+        is_event_allowed = True
+    elif event_code == "SmartMotionHuman" and "HumanTrait" in allowed_events:
+        is_event_allowed = True
+    elif severity == "high" and "Fight" in allowed_events:
+        # High severity safety fallback
+        is_event_allowed = True
+
+    if not is_event_allowed:
+        logger.debug(f"[AlertDispatcher] code={event_code} (severity={severity}) not in allowed alert events, skipped.")
+        return
+
     if _is_cooling_down(channel, event_code):
         logger.debug(f"[AlertDispatcher] ch={channel}, code={event_code} is cooling down, skipped group alert.")
         return

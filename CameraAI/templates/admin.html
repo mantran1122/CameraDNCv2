@@ -841,48 +841,133 @@
                                 <q-card class="bg-metropolis-card text-white">
                                     <q-card-section class="row items-center justify-between">
                                         <div class="text-subtitle1 text-weight-bold text-cyan-3">
-                                            <q-icon name="send" class="q-mr-sm" color="cyan-3"></q-icon>
-                                            Bắn Cảnh Báo Đỏ vào Zalo Group
+                                            <q-icon name="notifications_active" class="q-mr-sm" color="amber-4"></q-icon>
+                                            Cấu hình Nhận Thông Báo Gửi Vào Zalo Group
                                         </div>
-                                        <q-badge :color="zaloConfig.is_configured ? 'positive' : 'grey-7'" :label="zaloConfig.is_configured ? 'Đã kích hoạt' : 'Chưa cấu hình'"></q-badge>
+                                        <div class="row items-center q-gutter-xs">
+                                            <q-badge :color="zaloConfig.is_configured ? 'positive' : 'grey-7'" :label="zaloConfig.is_configured ? 'Đã kích hoạt Webhook' : 'Chưa cấu hình URL'"></q-badge>
+                                            <q-badge color="cyan-9" :label="zaloConfig.alert_events.length + ' hành vi'"></q-badge>
+                                            <q-badge color="purple-9" :label="zaloConfig.alert_channels.length + ' phòng'"></q-badge>
+                                        </div>
                                     </q-card-section>
                                     <q-separator dark></q-separator>
                                     <q-card-section>
                                         <div class="text-caption text-grey-4 q-mb-md">
-                                            Tự động gửi tin nhắn khẩn cấp (kèm vị trí camera, thời gian, mô tả và liên kết video) vào nhóm Zalo của Ban Giám hiệu / Đội An ninh khi xảy ra sự kiện nhãn đỏ (Đột nhập, ẩu đả, âm thanh đột biến...).
+                                            Tự động lọc và chuyển tiếp các sự kiện bất thường đã chọn vào nhóm Zalo của Ban Giám hiệu / Đội An ninh. Bạn có toàn quyền chọn loại sự kiện (chỉ báo động đỏ, tắt thông báo người vào) và chỉ định các phòng camera muốn theo dõi.
                                         </div>
                                         <q-form @submit.prevent="saveZaloConfig" class="q-gutter-md">
-                                            <q-input
-                                                v-model="zaloConfig.webhook_url"
-                                                label="Zalo Webhook URL / Relay Bridge URL *"
-                                                outlined
-                                                dark
-                                                dense
-                                                color="cyan-4"
-                                                placeholder="Ví dụ: http://127.0.0.1:5000/webhook hoặc URL webhook bot"
-                                                hint="Địa chỉ webhook nhận tin nhắn cảnh báo đỏ và chuyển tiếp vào Zalo Group"
-                                            >
-                                                <template v-slot:prepend>
-                                                    <q-icon name="link" color="cyan-4"></q-icon>
-                                                </template>
-                                            </q-input>
+                                            <div class="row q-col-gutter-sm">
+                                                <div class="col-12 col-md-8">
+                                                    <q-input
+                                                        v-model="zaloConfig.webhook_url"
+                                                        label="Zalo Webhook URL / Relay Bridge URL *"
+                                                        outlined
+                                                        dark
+                                                        dense
+                                                        color="cyan-4"
+                                                        placeholder="Ví dụ: http://127.0.0.1:5055/webhook hoặc URL webhook bot"
+                                                        hint="Địa chỉ webhook nhận tin nhắn cảnh báo đỏ và chuyển tiếp vào Zalo Group"
+                                                    >
+                                                        <template v-slot:prepend>
+                                                            <q-icon name="link" color="cyan-4"></q-icon>
+                                                        </template>
+                                                    </q-input>
+                                                </div>
+                                                <div class="col-12 col-md-4">
+                                                    <q-input
+                                                        v-model="zaloConfig.webhook_secret"
+                                                        label="Secret Key / Token Xác thực (Tùy chọn)"
+                                                        outlined
+                                                        dark
+                                                        dense
+                                                        color="cyan-4"
+                                                        type="password"
+                                                        placeholder="Bearer Token nếu có"
+                                                    >
+                                                        <template v-slot:prepend>
+                                                            <q-icon name="key" color="cyan-4"></q-icon>
+                                                        </template>
+                                                    </q-input>
+                                                </div>
+                                            </div>
 
-                                            <q-input
-                                                v-model="zaloConfig.webhook_secret"
-                                                label="Secret Key / Token Xác thực (Tùy chọn)"
-                                                outlined
-                                                dark
-                                                dense
-                                                color="cyan-4"
-                                                type="password"
-                                                placeholder="Bearer Token hoặc Secret nếu có"
-                                            >
-                                                <template v-slot:prepend>
-                                                    <q-icon name="key" color="cyan-4"></q-icon>
-                                                </template>
-                                            </q-input>
+                                            <!-- 1. BỘ CHỌN HÀNH VI GỬI VÀO ZALO -->
+                                            <div class="q-pt-sm">
+                                                <div class="row justify-between items-center q-mb-xs">
+                                                    <div class="text-weight-bold text-amber-3 text-subtitle2">
+                                                        <q-icon name="checklist" class="q-mr-xs"></q-icon>
+                                                        1. Chọn Loại Hành Vi Gửi Vào Zalo:
+                                                    </div>
+                                                    <div class="row q-gutter-xs">
+                                                        <q-btn flat dense size="xs" color="negative" icon="shield" label="Chỉ chọn Cảnh báo Đỏ" @click="selectRedOnlyEvents">
+                                                            <q-tooltip>Tắt hết thông báo người vào/chuyển động, chỉ nhận Ẩu đả, Đột nhập, Âm thanh la hét</q-tooltip>
+                                                        </q-btn>
+                                                        <q-btn flat dense size="xs" color="cyan-3" label="Chọn tất cả" @click="selectAllEvents"></q-btn>
+                                                        <q-btn flat dense size="xs" color="grey-5" label="Bỏ chọn hết" @click="clearAllEvents"></q-btn>
+                                                    </div>
+                                                </div>
+                                                <div class="text-caption text-grey-5 q-mb-sm">
+                                                    💡 <i>Mẹo: Để không bị spam tin nhắn "người vào", hãy bỏ tick <b>"Phát hiện người (Human Trait)"</b> và <b>"Chuyển động"</b>.</i>
+                                                </div>
+                                                <div class="row q-col-gutter-xs" style="background: rgba(15, 23, 42, 0.6); padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+                                                    <div v-for="ev in availableAlertEvents" :key="ev.code" class="col-12 col-sm-6 col-md-4">
+                                                        <q-checkbox
+                                                            v-model="zaloConfig.alert_events"
+                                                            :val="ev.code"
+                                                            :label="ev.label"
+                                                            dark
+                                                            dense
+                                                            :color="['Fight', 'Intrusion', 'CrossLine', 'AudioMutation', 'SoundDetection', 'AudioAnomaly'].includes(ev.code) ? 'negative' : (ev.code === 'HumanTrait' ? 'warning' : 'cyan')"
+                                                            class="text-caption"
+                                                        >
+                                                            <template v-slot:default>
+                                                                <span :class="['Fight', 'Intrusion', 'CrossLine', 'AudioMutation', 'SoundDetection', 'AudioAnomaly'].includes(ev.code) ? 'text-red-3 text-weight-medium' : 'text-grey-3'">
+                                                                    {{ ev.label }}
+                                                                </span>
+                                                            </template>
+                                                        </q-checkbox>
+                                                    </div>
+                                                </div>
+                                            </div>
 
-                                            <div class="row justify-between items-center q-pt-sm">
+                                            <!-- 2. BỘ CHỌN CAMERA CÁC PHÒNG GỬI VÀO ZALO -->
+                                            <div class="q-pt-sm">
+                                                <div class="row justify-between items-center q-mb-xs">
+                                                    <div class="text-weight-bold text-cyan-3 text-subtitle2">
+                                                        <q-icon name="videocam" class="q-mr-xs"></q-icon>
+                                                        2. Chọn Camera Các Phòng Nhận Cảnh Báo ({{ zaloConfig.alert_channels.length }}/{{ availableChannels.length }} phòng):
+                                                    </div>
+                                                    <div class="row q-gutter-xs">
+                                                        <q-btn flat dense size="xs" color="cyan-3" label="Chọn tất cả 32 phòng" @click="selectAllZaloChannels"></q-btn>
+                                                        <q-btn flat dense size="xs" color="grey-5" label="Bỏ chọn hết" @click="clearAllZaloChannels"></q-btn>
+                                                    </div>
+                                                </div>
+                                                <div class="camera-matrix-grid" style="max-height: 220px; overflow-y: auto; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px;">
+                                                    <div
+                                                        v-for="cam in availableChannels"
+                                                        :key="cam.channel"
+                                                        class="camera-matrix-item"
+                                                        :class="{ 'bg-cyan-10': zaloConfig.alert_channels.includes(cam.channel) }"
+                                                        @click="zaloConfig.alert_channels.includes(cam.channel) ? zaloConfig.alert_channels.splice(zaloConfig.alert_channels.indexOf(cam.channel), 1) : zaloConfig.alert_channels.push(cam.channel)"
+                                                    >
+                                                        <div class="row items-center no-wrap">
+                                                            <q-checkbox
+                                                                :model-value="zaloConfig.alert_channels.includes(cam.channel)"
+                                                                @update:model-value="zaloConfig.alert_channels.includes(cam.channel) ? zaloConfig.alert_channels.splice(zaloConfig.alert_channels.indexOf(cam.channel), 1) : zaloConfig.alert_channels.push(cam.channel)"
+                                                                dense
+                                                                dark
+                                                                color="cyan-4"
+                                                                class="q-mr-xs"
+                                                            ></q-checkbox>
+                                                            <div class="ellipsis text-caption" :class="zaloConfig.alert_channels.includes(cam.channel) ? 'text-white text-weight-bold' : 'text-grey-4'">
+                                                                {{ cam.label }}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="row justify-between items-center q-pt-md">
                                                 <q-btn
                                                     unelevated
                                                     outline
@@ -897,7 +982,7 @@
                                                     unelevated
                                                     color="cyan-8"
                                                     icon="save"
-                                                    label="Lưu Cấu Hình Zalo"
+                                                    label="Lưu Cấu Hình Nhận Thông Báo Zalo"
                                                     type="submit"
                                                     :loading="savingZalo"
                                                 ></q-btn>

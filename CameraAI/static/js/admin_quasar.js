@@ -153,10 +153,30 @@
             const zaloConfig = reactive({
                 webhook_url: '',
                 webhook_secret: '',
-                is_configured: false
+                is_configured: false,
+                alert_events: [],
+                alert_channels: []
             });
+            const availableAlertEvents = ref([]);
+            const availableChannels = ref([]);
             const savingZalo = ref(false);
             const testingZalo = ref(false);
+
+            const selectRedOnlyEvents = () => {
+                zaloConfig.alert_events = ['Intrusion', 'CrossLine', 'Fight', 'AudioMutation', 'SoundDetection', 'AudioAnomaly', 'RtspSessionDisconnect'];
+            };
+            const selectAllEvents = () => {
+                zaloConfig.alert_events = availableAlertEvents.value.map(e => e.code);
+            };
+            const clearAllEvents = () => {
+                zaloConfig.alert_events = [];
+            };
+            const selectAllZaloChannels = () => {
+                zaloConfig.alert_channels = availableChannels.value.map(c => c.channel);
+            };
+            const clearAllZaloChannels = () => {
+                zaloConfig.alert_channels = [];
+            };
 
             // Change Admin Password Dialog
             const changeAdminPassDialog = reactive({
@@ -661,6 +681,10 @@
                         zaloConfig.webhook_url = data.zalo_webhook_url || '';
                         zaloConfig.webhook_secret = data.zalo_webhook_secret || '';
                         zaloConfig.is_configured = !!data.is_zalo_configured;
+                        zaloConfig.alert_events = Array.isArray(data.zalo_alert_events) ? data.zalo_alert_events : [];
+                        zaloConfig.alert_channels = Array.isArray(data.zalo_alert_channels) ? data.zalo_alert_channels : [];
+                        availableAlertEvents.value = data.available_events || [];
+                        availableChannels.value = data.available_channels || [];
                     }
                 } catch (e) {
                     console.error('Lỗi tải Zalo config:', e);
@@ -675,12 +699,14 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             zalo_webhook_url: zaloConfig.webhook_url,
-                            zalo_webhook_secret: zaloConfig.webhook_secret
+                            zalo_webhook_secret: zaloConfig.webhook_secret,
+                            zalo_alert_events: zaloConfig.alert_events,
+                            zalo_alert_channels: zaloConfig.alert_channels
                         })
                     });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.detail || 'Lỗi lưu cấu hình Zalo Webhook');
-                    $q.notify({ type: 'positive', message: data.message || 'Đã lưu cấu hình Zalo Webhook!' });
+                    $q.notify({ type: 'positive', message: data.message || 'Đã lưu cấu hình cảnh báo Zalo thành công!' });
                     await fetchZaloConfig();
                 } catch (e) {
                     $q.notify({ type: 'negative', message: e.message });
@@ -828,8 +854,15 @@
 
                 // Zalo Group Webhook
                 zaloConfig,
+                availableAlertEvents,
+                availableChannels,
                 savingZalo,
                 testingZalo,
+                selectRedOnlyEvents,
+                selectAllEvents,
+                clearAllEvents,
+                selectAllZaloChannels,
+                clearAllZaloChannels,
                 saveZaloConfig,
                 sendTestZaloAlert,
 

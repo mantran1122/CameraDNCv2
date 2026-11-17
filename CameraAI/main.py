@@ -2530,33 +2530,71 @@ async def test_zalo_webhook_api(payload: Optional[ZaloTestModel] = None, _: str 
 class AlertConfigUpdateModel(BaseModel):
     zalo_webhook_url: Optional[str] = None
     zalo_webhook_secret: Optional[str] = None
+    zalo_alert_events: Optional[List[str]] = None
+    zalo_alert_channels: Optional[List[int]] = None
 
 
 @app.get("/api/admin/alert-config")
 async def get_alert_config_api(_: str = Depends(require_database_admin)):
-    """Return external alert dispatcher configuration."""
+    """Return external alert dispatcher configuration including behavior and channel rules."""
+    from alert_dispatcher import get_zalo_alert_config
+    cfg = get_zalo_alert_config()
+
+    # Available behaviors with labels & severity
+    available_events = getattr(config, "ABNORMAL_BEHAVIOR_OPTIONS", [])
+
+    # Available channels with camera names
+    available_channels = []
+    cam_names = getattr(config, "CAMERA_NAMES", {})
+    for ch in range(1, 33):
+        ch_str = str(ch)
+        name = cam_names.get(ch_str) or f"Camera Kênh {ch:02d}"
+        available_channels.append({
+            "channel": ch,
+            "name": name,
+            "label": f"Ch {ch:02d}: {name}"
+        })
+
     return {
-        "zalo_webhook_url": os.getenv("ZALO_WEBHOOK_URL", ""),
-        "zalo_webhook_secret": os.getenv("ZALO_WEBHOOK_SECRET", ""),
-        "is_zalo_configured": bool(os.getenv("ZALO_WEBHOOK_URL", "").strip()),
+        "zalo_webhook_url": cfg.get("zalo_webhook_url", ""),
+        "zalo_webhook_secret": cfg.get("zalo_webhook_secret", ""),
+        "is_zalo_configured": bool(cfg.get("zalo_webhook_url", "").strip()),
+        "zalo_alert_events": cfg.get("zalo_alert_events", []),
+        "zalo_alert_channels": cfg.get("zalo_alert_channels", []),
+        "available_events": available_events,
+        "available_channels": available_channels,
     }
 
 
 @app.post("/api/admin/alert-config")
 async def set_alert_config_api(payload: AlertConfigUpdateModel, _: str = Depends(require_database_admin)):
-    """Persist Zalo alert configuration to CameraAI/.env and os.environ."""
+    """Persist Zalo alert configuration (Webhook URL, Event codes, Camera channels) to disk."""
+    from alert_dispatcher import save_zalo_alert_config
+    updates = {}
     env_updates = {}
+
     if payload.zalo_webhook_url is not None:
         val = payload.zalo_webhook_url.strip()
         os.environ["ZALO_WEBHOOK_URL"] = val
         env_updates["ZALO_WEBHOOK_URL"] = val
+        updates["zalo_webhook_url"] = val
 
     if payload.zalo_webhook_secret is not None:
         val = payload.zalo_webhook_secret.strip()
         os.environ["ZALO_WEBHOOK_SECRET"] = val
         env_updates["ZALO_WEBHOOK_SECRET"] = val
+        updates["zalo_webhook_secret"] = val
 
-    # Persist to .env
+    if payload.zalo_alert_events is not None:
+        updates["zalo_alert_events"] = payload.zalo_alert_events
+
+    if payload.zalo_alert_channels is not None:
+        updates["zalo_alert_channels"] = payload.zalo_alert_channels
+
+    # Save to storage/alert_config.json
+    saved_cfg = save_zalo_alert_config(updates)
+
+    # Persist to .env if url/secret changed
     env_file = config.BASE_DIR / ".env"
     if env_file.is_file() and env_updates:
         lines = env_file.read_text(encoding="utf-8").splitlines()
@@ -2579,9 +2617,11 @@ async def set_alert_config_api(payload: AlertConfigUpdateModel, _: str = Depends
 
     return {
         "status": "success",
-        "message": "Cấu hình Zalo Webhook đã được lưu thành công!",
-        "zalo_webhook_url": os.getenv("ZALO_WEBHOOK_URL", ""),
-        "is_zalo_configured": bool(os.getenv("ZALO_WEBHOOK_URL", "").strip()),
+        "message": "Cấu hình gửi cảnh báo Zalo (Hành vi & Camera) đã được lưu thành công!",
+        "zalo_webhook_url": saved_cfg.get("zalo_webhook_url", ""),
+        "is_zalo_configured": bool(saved_cfg.get("zalo_webhook_url", "").strip()),
+        "zalo_alert_events": saved_cfg.get("zalo_alert_events", []),
+        "zalo_alert_channels": saved_cfg.get("zalo_alert_channels", []),
     }
 
 

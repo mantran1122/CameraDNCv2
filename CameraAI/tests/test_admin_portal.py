@@ -188,6 +188,39 @@ class AdminPortalTests(unittest.TestCase):
         self.assertEqual(res2.status_code, 200)
         self.assertEqual(config.NVR_PASSWORD, initial_pw)
 
+    def test_alert_config_behavior_and_channel_rules(self):
+        """Verify GET/POST /api/admin/alert-config saves and filters behavior events and channels."""
+        self.login(self.admin_user, self.admin_pass)
+        # 1. GET initial config
+        res = self.client.get("/api/admin/alert-config")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("zalo_alert_events", data)
+        self.assertIn("zalo_alert_channels", data)
+        self.assertIn("available_events", data)
+        self.assertIn("available_channels", data)
+
+        # 2. POST custom alert config: Only Fight and AudioMutation for Channel 11
+        update_payload = {
+            "zalo_webhook_url": "http://127.0.0.1:5055/webhook",
+            "zalo_webhook_secret": "test_secret_123",
+            "zalo_alert_events": ["Fight", "AudioMutation"],
+            "zalo_alert_channels": [11],
+        }
+        post_res = self.client.post("/api/admin/alert-config", json=update_payload)
+        self.assertEqual(post_res.status_code, 200)
+        post_data = post_res.json()
+        self.assertEqual(post_data["status"], "success")
+        self.assertEqual(post_data["zalo_alert_events"], ["Fight", "AudioMutation"])
+        self.assertEqual(post_data["zalo_alert_channels"], [11])
+
+        # 3. GET verify persistence
+        get_res = self.client.get("/api/admin/alert-config")
+        self.assertEqual(get_res.status_code, 200)
+        persisted = get_res.json()
+        self.assertEqual(persisted["zalo_alert_events"], ["Fight", "AudioMutation"])
+        self.assertEqual(persisted["zalo_alert_channels"], [11])
+
 
 if __name__ == "__main__":
     unittest.main()
