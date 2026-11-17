@@ -61,6 +61,7 @@
   - [x] Tích hợp gửi email Gmail qua giao thức SMTP bảo mật.
   - [x] Kết nối Webhook Group Zalo.
   - [x] Móc nối tự động vào hàm phát sự kiện realtime `broadcast_event_sync` trong `main.py`.
+  - [x] **Ma trận Cấu hình Thông báo Zalo trong Admin Control Center:** Cho phép Admin tự chọn loại hành vi gửi (nút 1-click 'Chỉ chọn Cảnh báo Đỏ', loại bỏ 'Phát hiện người' / 'Chuyển động') và chọn danh sách Camera các phòng theo dõi. Lưu cấu hình bền vững vào `storage/alert_config.json`.
 - [x] **Chính sách Retention video đỏ:**
   - [x] Thêm cờ `is_protected` vào CSDL `events` trong `database.py` (tự động bật khi `severity == 'high'`).
   - [x] Cập nhật hàm dọn dẹp `delete_expired_events()` giữ video đỏ 90 ngày.
