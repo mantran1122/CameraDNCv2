@@ -108,6 +108,29 @@ async function initZalo() {
             }
         }
 
+        // Tự động liên kết nhóm từ Link mời Zalo nếu có
+        if (api && bridgeConfig.inviteLink && !bridgeConfig.targetGroupId) {
+            try {
+                console.log(`[ZaloBridge] Đang kiểm tra liên kết nhóm từ link: ${bridgeConfig.inviteLink}...`);
+                const linkInfo = await api.getGroupLinkInfo({ link: bridgeConfig.inviteLink });
+                if (linkInfo && linkInfo.groupId) {
+                    bridgeConfig.targetGroupId = linkInfo.groupId;
+                    bridgeConfig.groupName = linkInfo.name || "Nhóm Cảnh Báo";
+                    saveConfig();
+                    console.log(`[ZaloBridge] 🔗 Tự động liên kết thành công với nhóm: "${bridgeConfig.groupName}" (ID: ${bridgeConfig.targetGroupId})`);
+                    api.sendMessage(
+                        {
+                            msg: `✅ ĐÃ LIÊN KẾT NHÓM THÀNH CÔNG!\nKể từ bây giờ, mọi cảnh báo đỏ từ hệ thống Camera AI DNC sẽ tự động được gửi vào nhóm "${bridgeConfig.groupName}".`
+                        },
+                        bridgeConfig.targetGroupId,
+                        ThreadType.Group
+                    ).catch(() => {});
+                }
+            } catch (e) {
+                console.warn("[ZaloBridge] Không thể tự động phân giải group link:", e.message);
+            }
+        }
+
         // Lắng nghe tin nhắn để tự động liên kết nhóm
         if (api.listener) {
             api.listener.on("message", (msg) => {
