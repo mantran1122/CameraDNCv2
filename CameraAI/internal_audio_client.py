@@ -9,6 +9,7 @@ import json
 import logging
 import math
 import os
+import shutil
 import subprocess
 import tempfile
 import time
@@ -91,14 +92,32 @@ def send_clean_audio_to_server(
             result = resp.json()
             return _normalize_audio_response(result, latency_ms)
         elif resp.status_code == 404 or resp.status_code == 500:
-            # Try fallback endpoint if /analyze gave 404/500: e.g. /v1/audio/transcriptions
-            fallback_endpoint = f"{server_url.rsplit('/', 1)[0]}/transcribe" if "/audio" in server_url else f"{server_url}/transcribe"
-            if fallback_endpoint != endpoint:
-                logger.info(f"[InternalAudioClient] Primary endpoint returned {resp.status_code}, trying fallback: {fallback_endpoint}")
-                resp_fb = requests.post(fallback_endpoint, headers=headers, files={"file": (path_obj.name, file_bytes, "audio/wav")}, data=data, timeout=timeout)
-                if resp_fb.status_code == 200:
-                    latency_ms = int((time.time() - start_time) * 1000)
-                    return _normalize_audio_response(resp_fb.json(), latency_ms)
+            # Try fallback OpenAI-compatible Whisper endpoint: e.g. /v1/audio/transcriptions or /transcribe
+            fallback_endpoints = []
+            if "/audio" in server_url:
+                base_v1 = server_url.rsplit("/audio", 1)[0]
+                fallback_endpoints.append(f"{base_v1}/audio/transcriptions")
+                fallback_endpoints.append(f"{base_v1}/transcribe")
+            else:
+                fallback_endpoints.append(f"{server_url}/audio/transcriptions")
+                fallback_endpoints.append(f"{server_url}/transcriptions")
+                fallback_endpoints.append(f"{server_url}/transcribe")
+
+            for fb_ep in fallback_endpoints:
+                if fb_ep == endpoint:
+                    continue
+                try:
+                    logger.info(f"[InternalAudioClient] Primary endpoint returned {resp.status_code}, trying fallback: {fb_ep}")
+                    fb_data = dict(data)
+                    fb_data["language"] = "vi"
+                    if "model" not in fb_data or not fb_data["model"] or fb_data["model"] == config.INTERNAL_AUDIO_MODEL_NAME:
+                        fb_data["model"] = "whisper-1"
+                    resp_fb = requests.post(fb_ep, headers=headers, files={"file": (path_obj.name, file_bytes, "audio/wav")}, data=fb_data, timeout=timeout)
+                    if resp_fb.status_code == 200:
+                        latency_ms = int((time.time() - start_time) * 1000)
+                        return _normalize_audio_response(resp_fb.json(), latency_ms)
+                except Exception as fb_err:
+                    logger.debug(f"[InternalAudioClient] Fallback to {fb_ep} failed: {fb_err}")
 
         # If server returned an error status, raise or log detailed info
         logger.warning(f"[InternalAudioClient] Server returned status {resp.status_code}: {resp.text[:300]}")
@@ -171,19 +190,37 @@ def extract_and_analyze_clip_audio(
             "audio_model": "None"
         }
 
-    # 1. Kiểm tra audio stream qua ffprobe
+    # 1. Kiểm tra audio stream qua ffprobe / ffmpeg
     has_audio_track = False
-    try:
-        probe = subprocess.run(
-            [config.FFPROBE_PATH, "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", str(clip_obj)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=10,
-        )
-        has_audio_track = bool(probe.stdout.strip())
-    except Exception as exc:
-        logger.warning(f"[AudioExtract] ffprobe error: {exc}")
+    ffprobe_bin = getattr(config, "FFPROBE_PATH", "ffprobe")
+    if shutil.which(ffprobe_bin):
+        try:
+            probe = subprocess.run(
+                [ffprobe_bin, "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", str(clip_obj)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=10,
+            )
+            if probe.returncode == 0:
+                has_audio_track = bool(probe.stdout.strip())
+        except Exception as exc:
+            logger.debug(f"[AudioExtract] ffprobe note: {exc}")
+
+    # Fallback to ffmpeg directly (chạy ổn định trên mọi môi trường Windows/Linux không có ffprobe riêng)
+    if not has_audio_track:
+        try:
+            ffmpeg_bin = getattr(config, "FFMPEG_PATH", "ffmpeg")
+            res = subprocess.run(
+                [ffmpeg_bin, "-i", str(clip_obj)],
+                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                text=True,
+                timeout=10,
+            )
+            has_audio_track = any("Stream #" in line and "Audio:" in line for line in (res.stderr or "").splitlines())
+        except Exception as exc:
+            logger.warning(f"[AudioExtract] ffmpeg audio stream check error: {exc}")
 
     if not has_audio_track:
         return {
@@ -306,7 +343,7 @@ def extract_and_analyze_clip_audio(
                 "speech_detected": 0,
                 "detected_sounds": [],
                 "risk_level": "none",
-                "summary": "Không thể phân tích nội dung âm thanh.",
+                "summary": f"Âm thanh môi trường ghi nhận ở mức {audio_rms:.1f} dBFS (không phát hiện tiếng nói rõ ràng).",
                 "audio_model": "None"
             }
 

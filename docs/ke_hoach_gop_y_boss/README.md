@@ -14,4 +14,5 @@
 4. [KE_HOACH_3_NANG_CAP_FILTER_THANH_PLAYBACK_DOWNLOAD.md](KE_HOACH_3_NANG_CAP_FILTER_THANH_PLAYBACK_DOWNLOAD.md): Kế hoạch nâng cấp bộ lọc thành giao diện Playback hoàn chỉnh, xem trực tiếp và tải MP4.
 5. [KE_HOACH_4_UI_NOTIFICATION_VA_VIDEO_MANAGER_EVENT_POPUP.md](KE_HOACH_4_UI_NOTIFICATION_VA_VIDEO_MANAGER_EVENT_POPUP.md): Kế hoạch đổi icon Sáng/Tối thành icon Thông báo, ô xem sự kiện camera trong Video Manager, loại bỏ thanh KPI dưới đáy (`.ncc-kpi-bar`) và sửa lỗi nút `Đổi` camera khi đang phóng to (Maximize).
 6. [KE_HOACH_5_BAO_CAO_DEM_TU_DONG_22H_4H.md](KE_HOACH_5_BAO_CAO_DEM_TU_DONG_22H_4H.md): Kế hoạch phân tích video tự động ban đêm (`22:00 -> 04:00` sáng) theo cửa sổ cuốn chiếu và xuất báo cáo ngắn gọn từng Camera cho cấp `Admin` / `Manager`.
+7. [KE_HOACH_6_RETENTION_THONG_BAO_ZALO_AUDIO_FIX.md](KE_HOACH_6_RETENTION_THONG_BAO_ZALO_AUDIO_FIX.md): Kế hoạch lưu trữ video nhãn đỏ trên 1 tháng, thông báo khẩn Group Zalo / Gmail / Telegram và sửa dứt điểm lỗi phân tích âm thanh.
 

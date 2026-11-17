@@ -369,12 +369,11 @@ def health() -> dict:
     return result
 
 
-def purge_expired_day_folders(retention_days: int = 30) -> dict:
+def purge_expired_day_folders(retention_days: int = 30, protected_filenames: Optional[set] = None) -> dict:
     """Scan and delete full day folders (cameras/{cam}/{year}/{month}/{day}) on Synology FileStation
     older than retention_days according to actual calendar dates.
 
-    This ensures that 30-day rolling retention strictly honors calendar dates (including months
-    with 31, 30, or 28/29 days) and purges entire day folders at once to free NAS storage immediately.
+    Preserves protected red-alert clips (> 30 days) if present in expired day folders.
     """
     if not enabled():
         return {"status": "disabled", "deleted_folders": [], "errors": []}
@@ -383,6 +382,13 @@ def purge_expired_day_folders(retention_days: int = 30) -> dict:
     cutoff_date = datetime.now().date() - timedelta(days=retention_days)
     deleted_folders = []
     errors = []
+
+    if protected_filenames is None:
+        try:
+            import database
+            protected_filenames = database.get_protected_clip_filenames()
+        except Exception:
+            protected_filenames = set()
 
     try:
         base_cameras_path = remote_path("cameras")
@@ -430,18 +436,41 @@ def purge_expired_day_folders(retention_days: int = 30) -> dict:
                             except ValueError:
                                 continue
 
-                            # If the calendar date of the folder is older than cutoff_date, delete the whole day folder
+                            # If the calendar date of the folder is older than cutoff_date
                             if folder_date < cutoff_date:
-                                try:
-                                    api.delete(day_path)
-                                    deleted_folders.append({
-                                        "path": day_path,
-                                        "date": folder_date.isoformat(),
-                                    })
-                                    print(f"[Synology Retention] Deleted expired day folder: {day_path} ({folder_date} < cutoff {cutoff_date})")
-                                except Exception as exc:
-                                    errors.append({"path": day_path, "error": str(exc)})
-                                    print(f"[Synology Retention Error] Failed to delete {day_path}: {exc}")
+                                has_protected = False
+                                if protected_filenames:
+                                    try:
+                                        day_files = api.list_folder(day_path).get("files", [])
+                                        has_protected = any(f.get("name") in protected_filenames for f in day_files)
+                                    except Exception:
+                                        has_protected = False
+
+                                if has_protected:
+                                    # Protect red alert clips: only delete individual non-protected files in this day
+                                    try:
+                                        day_files = api.list_folder(day_path).get("files", [])
+                                        for f in day_files:
+                                            if not f.get("isdir") and f.get("name") not in protected_filenames:
+                                                try:
+                                                    api.delete(f["path"])
+                                                except Exception:
+                                                    pass
+                                        print(f"[Synology Retention] Preserved protected clips in expired day folder: {day_path}")
+                                    except Exception as p_err:
+                                        print(f"[Synology Retention] Partial cleanup error in {day_path}: {p_err}")
+                                else:
+                                    # Safe to purge full day folder
+                                    try:
+                                        api.delete(day_path)
+                                        deleted_folders.append({
+                                            "path": day_path,
+                                            "date": folder_date.isoformat(),
+                                        })
+                                        print(f"[Synology Retention] Deleted expired day folder: {day_path} ({folder_date} < cutoff {cutoff_date})")
+                                    except Exception as exc:
+                                        errors.append({"path": day_path, "error": str(exc)})
+                                        print(f"[Synology Retention Error] Failed to delete {day_path}: {exc}")
 
                         # Clean up empty month directory if all days are gone
                         try:

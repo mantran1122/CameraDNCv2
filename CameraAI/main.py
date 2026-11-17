@@ -558,6 +558,13 @@ def broadcast_event_sync(event_obj: dict):
             "data": payload,
         }
         asyncio.run_coroutine_threadsafe(manager.broadcast(ws_msg), loop)
+
+        # Dispatch external alerts (Telegram Group, Zalo Webhook, Gmail) for high-severity events
+        try:
+            from alert_dispatcher import dispatch_high_severity_alert_async
+            dispatch_high_severity_alert_async(payload)
+        except Exception as dispatch_err:
+            print(f"[Alert Dispatch Error] {dispatch_err}")
     except Exception as e:
         print(f"[WebSocket Broadcast Error] {e}")
 
@@ -656,13 +663,19 @@ def purge_expired_metadata(retention_days: Optional[int] = None) -> dict:
     import shutil
     days = retention_days if retention_days is not None else config.METADATA_RETENTION_DAYS
     cutoff_date = datetime.now().date() - timedelta(days=days)
+
+    protected_clips = set()
+    try:
+        protected_clips = database.get_protected_clip_filenames()
+    except Exception as exc:
+        print(f"[Cleanup] Protected clips fetch notice: {exc}")
     
     # 1. Clean Synology NAS day folders
     nas_result = {"status": "disabled", "deleted_count": 0}
     try:
         from synology_storage import purge_expired_day_folders, enabled as synology_enabled
         if synology_enabled():
-            nas_result = purge_expired_day_folders(retention_days=days)
+            nas_result = purge_expired_day_folders(retention_days=days, protected_filenames=protected_clips)
     except Exception as exc:
         print(f"[Cleanup] Synology folder purge error: {exc}")
         nas_result = {"status": "error", "error": str(exc), "deleted_count": 0}
@@ -692,12 +705,22 @@ def purge_expired_metadata(retention_days: Optional[int] = None) -> dict:
                             except ValueError:
                                 continue
                             if folder_date < cutoff_date:
-                                try:
-                                    shutil.rmtree(day_dir, ignore_errors=True)
-                                    local_removed_folders += 1
-                                    print(f"[Cleanup] Removed local expired day folder: {day_dir}")
-                                except Exception as exc:
-                                    print(f"[Cleanup] Could not remove local folder {day_dir}: {exc}")
+                                has_protected = any(f.name in protected_clips for f in day_dir.iterdir() if f.is_file())
+                                if has_protected:
+                                    for f in day_dir.iterdir():
+                                        if f.is_file() and f.name not in protected_clips:
+                                            try:
+                                                f.unlink()
+                                            except Exception:
+                                                pass
+                                    print(f"[Cleanup] Preserved protected clips in local day folder: {day_dir}")
+                                else:
+                                    try:
+                                        shutil.rmtree(day_dir, ignore_errors=True)
+                                        local_removed_folders += 1
+                                        print(f"[Cleanup] Removed local expired day folder: {day_dir}")
+                                    except Exception as exc:
+                                        print(f"[Cleanup] Could not remove local folder {day_dir}: {exc}")
                         # Remove empty month/year folder
                         try:
                             if not any(month_dir.iterdir()):

@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import queue
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -112,16 +113,35 @@ class AudioAnalysisWorker:
             self._set_status(event_id, "stt_failed", error_message=str(exc))
 
     def _has_audio_stream(self, clip_path: Path) -> bool:
-        result = subprocess.run(
-            [config.FFPROBE_PATH, "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", str(clip_path)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=15,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"ffprobe failed: {result.stderr.strip() or result.returncode}")
-        return bool(result.stdout.strip())
+        ffprobe_bin = getattr(config, "FFPROBE_PATH", "ffprobe")
+        if shutil.which(ffprobe_bin):
+            try:
+                result = subprocess.run(
+                    [ffprobe_bin, "-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", str(clip_path)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=15,
+                )
+                if result.returncode == 0:
+                    return bool(result.stdout.strip())
+            except Exception:
+                pass
+
+        # Robust cross-platform fallback using ffmpeg
+        try:
+            ffmpeg_bin = getattr(config, "FFMPEG_PATH", "ffmpeg")
+            res = subprocess.run(
+                [ffmpeg_bin, "-i", str(clip_path)],
+                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                text=True,
+                timeout=15,
+            )
+            return any("Stream #" in line and "Audio:" in line for line in (res.stderr or "").splitlines())
+        except Exception as exc:
+            print(f"[AUDIO] Audio stream check error with ffmpeg: {exc}")
+            return False
 
     def _extract_wav(self, clip_path: Path) -> str:
         handle, wav_path = tempfile.mkstemp(prefix="camera_audio_", suffix=".wav")

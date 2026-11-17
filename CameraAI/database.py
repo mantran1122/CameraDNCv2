@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import json
 from datetime import datetime, date, timedelta
@@ -74,9 +75,14 @@ def init_db():
         audio_level_db REAL,
         metadata_json TEXT,
         clip_filename TEXT,
-        clip_duration_sec INTEGER DEFAULT 10
+        clip_duration_sec INTEGER DEFAULT 10,
+        is_protected INTEGER DEFAULT 0
     );
     """)
+    try:
+        cursor.execute("ALTER TABLE events ADD COLUMN is_protected INTEGER DEFAULT 0")
+    except Exception:
+        pass
 
     # Table for aggregated daily summary
     cursor.execute("""
@@ -164,6 +170,7 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_code ON events(event_code, timestamp DESC);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_type_sev ON events(event_type, severity, timestamp DESC);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_has_clip ON events(clip_filename, timestamp DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_protected ON events(is_protected, timestamp DESC);")
 
 
     # Repair legacy rows that were marked completed even though neither STT nor
@@ -207,17 +214,21 @@ def save_event(
     audio_level_db: Optional[float] = None,
     metadata_dict: Optional[Dict[str, Any]] = None,
     clip_filename: Optional[str] = None,
-    clip_duration_sec: int = 10
+    clip_duration_sec: int = 10,
+    is_protected: Optional[int] = None
 ) -> int:
     conn = get_db_connection()
     cursor = conn.cursor()
     
     meta_json = json.dumps(metadata_dict or {}, ensure_ascii=False)
+    if is_protected is None:
+        is_protected = 1 if (str(severity).lower() == "high" or event_code in ("Fight", "Intrusion", "CrossLine", "AudioMutation")) else 0
+
     cursor.execute("""
         INSERT INTO events (
-            event_code, event_type, channel, timestamp, description, severity, audio_level_db, metadata_json, clip_filename, clip_duration_sec
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (event_code, event_type, channel, timestamp, description, severity, audio_level_db, meta_json, clip_filename, clip_duration_sec))
+            event_code, event_type, channel, timestamp, description, severity, audio_level_db, metadata_json, clip_filename, clip_duration_sec, is_protected
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (event_code, event_type, channel, timestamp, description, severity, audio_level_db, meta_json, clip_filename, clip_duration_sec, is_protected))
     
     event_id = cursor.lastrowid
     conn.commit()
@@ -519,13 +530,45 @@ def replace_event_clip_reference(event_id: int, old_reference: str, new_referenc
     return updated
 
 
-def delete_expired_events(retention_days: int) -> List[str]:
-    """Delete expired metadata and return the associated clip filenames."""
-    cutoff = (datetime.now() - timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
+def get_protected_clip_filenames() -> set[str]:
+    """Return the set of basenames for all clips that are protected (red labels/anomalies)."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, clip_filename FROM events WHERE timestamp < ?", (cutoff,))
-    expired = cursor.fetchall()
+    try:
+        cursor.execute("SELECT clip_filename FROM events WHERE is_protected = 1 AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''")
+        names = {os.path.basename(str(row["clip_filename"]).replace("\\", "/")) for row in cursor.fetchall()}
+        return names
+    except Exception:
+        return set()
+    finally:
+        conn.close()
+
+
+def delete_expired_events(retention_days: int, protected_retention_days: Optional[int] = None) -> List[str]:
+    """Delete expired metadata: normal events older than retention_days,
+    and protected red events older than protected_retention_days (default 90 days)."""
+    p_days = protected_retention_days if protected_retention_days is not None else int(os.getenv("CAMERAAI_RED_ALERT_RETENTION_DAYS", "90"))
+    cutoff_normal = (datetime.now() - timedelta(days=retention_days)).strftime("%Y-%m-%d %H:%M:%S")
+    cutoff_protected = (datetime.now() - timedelta(days=p_days)).strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 1. Normal events older than retention_days
+    cursor.execute(
+        "SELECT id, clip_filename FROM events WHERE (is_protected IS NULL OR is_protected = 0) AND timestamp < ?",
+        (cutoff_normal,)
+    )
+    normal_expired = cursor.fetchall()
+
+    # 2. Protected red events older than protected_retention_days (> 90 days)
+    cursor.execute(
+        "SELECT id, clip_filename FROM events WHERE is_protected = 1 AND timestamp < ?",
+        (cutoff_protected,)
+    )
+    protected_expired = cursor.fetchall()
+
+    expired = list(normal_expired) + list(protected_expired)
     event_ids = [row["id"] for row in expired]
     filenames = [row["clip_filename"] for row in expired if row["clip_filename"]]
     if event_ids:
