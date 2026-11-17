@@ -158,6 +158,15 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
             return True
         logger.warning(f"[AlertDispatcher] Zalo Webhook error HTTP {resp.status_code}: {resp.text[:200]}")
     except Exception as exc:
+        if "127.0.0.1:5055" in webhook_url or "localhost:5055" in webhook_url:
+            for alt in ["http://zalo-bridge:5055/webhook", "http://host.docker.internal:5055/webhook"]:
+                try:
+                    resp = requests.post(alt, json=body, headers=headers, timeout=8)
+                    if resp.status_code in (200, 201, 202, 204):
+                        logger.info(f"[AlertDispatcher] Sent Zalo Webhook alert via fallback {alt}")
+                        return True
+                except Exception:
+                    pass
         logger.error(f"[AlertDispatcher] Zalo Webhook connection error: {exc}")
     return False
 
@@ -196,6 +205,14 @@ def test_zalo_webhook(webhook_url: Optional[str] = None, token: Optional[str] = 
             return {"success": True, "status_code": resp.status_code, "message": "Đã gửi tin nhắn thử nghiệm thành công tới Zalo Group!"}
         return {"success": False, "status_code": resp.status_code, "message": f"Zalo Webhook phản hồi mã lỗi {resp.status_code}: {resp.text[:200]}"}
     except Exception as exc:
+        if "127.0.0.1:5055" in target_url or "localhost:5055" in target_url:
+            for alt in ["http://zalo-bridge:5055/webhook", "http://host.docker.internal:5055/webhook"]:
+                try:
+                    resp = requests.post(alt, json=body, headers=headers, timeout=8)
+                    if resp.status_code in (200, 201, 202, 204):
+                        return {"success": True, "status_code": resp.status_code, "message": f"Đã gửi tin nhắn thử nghiệm thành công tới Zalo Group (qua container link {alt})!"}
+                except Exception:
+                    pass
         return {"success": False, "message": f"Không thể kết nối tới Zalo Webhook ({target_url}): {exc}"}
 
 

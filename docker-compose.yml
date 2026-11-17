@@ -54,5 +54,21 @@ services:
       retries: 3
       start_period: 15s
 
+  zalo-bridge:
+    build:
+      context: ./scripts/zalo_bridge
+      dockerfile: Dockerfile
+    image: camera-zalo-bridge:latest
+    container_name: camera-zalo-bridge
+    restart: unless-stopped
+    ports:
+      - "5055:5055"
+    volumes:
+      - ./scripts/zalo_bridge/data:/app/data
+    environment:
+      - PORT=5055
+      - DATA_DIR=/app/data
+      - ZALO_GROUP_LINK=https://zalo.me/g/libazgippahcfbk99qkc
+
 volumes:
   postgres_data:

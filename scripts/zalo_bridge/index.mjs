@@ -5,8 +5,18 @@ import { Zalo, ThreadType } from "zca-js";
 import qrcode from "qrcode-terminal";
 
 const PORT = parseInt(process.env.PORT || "5055", 10);
-const APPSTATE_FILE = path.resolve("./appstate.json");
-const CONFIG_FILE = path.resolve("./zalo_config.json");
+const DATA_DIR = process.env.DATA_DIR || "./";
+if (!fs.existsSync(DATA_DIR)) {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+}
+
+const APPSTATE_FILE = fs.existsSync(path.resolve(DATA_DIR, "appstate.json"))
+    ? path.resolve(DATA_DIR, "appstate.json")
+    : (fs.existsSync(path.resolve("./appstate.json")) ? path.resolve("./appstate.json") : path.resolve(DATA_DIR, "appstate.json"));
+
+const CONFIG_FILE = fs.existsSync(path.resolve(DATA_DIR, "zalo_config.json"))
+    ? path.resolve(DATA_DIR, "zalo_config.json")
+    : (fs.existsSync(path.resolve("./zalo_config.json")) ? path.resolve("./zalo_config.json") : path.resolve(DATA_DIR, "zalo_config.json"));
 
 // Đọc cấu hình nhóm mục tiêu (nếu đã lưu từ trước)
 let bridgeConfig = {
