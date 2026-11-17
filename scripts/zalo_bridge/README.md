@@ -1,52 +1,40 @@
-# HƯỚNG DẪN KẾT NỐI BẮN CẢNH BÁO ĐỎ VÀO ZALO GROUP
+# HƯỚNG DẪN KẾT NỐI BOT BẮN CẢNH BÁO ĐỎ VÀO ZALO GROUP
 
-Module này cung cấp dịch vụ **Zalo Group Webhook Bridge** để nhận cảnh báo nguy cấp (Nhãn Đỏ) từ hệ thống Camera AI DNC và chuyển tiếp tức thì vào Group Zalo của Ban Giám hiệu / Đội Bảo vệ.
-
----
-
-## 1. Cơ chế hoạt động
-
-```
-[Camera AI DNC] 
-      │ (Phát hiện ẩu đả / đột nhập / âm thanh la hét)
-      ▼
-[alert_dispatcher.py] 
-      │ (Tự động gửi HTTP POST Webhook JSON)
-      ▼
-[Zalo Group Webhook Bridge] (URL: http://127.0.0.1:5000/webhook)
-      │
-      ▼
-[Group Zalo Ban Giám Hiệu / An Ninh] (Nhận tin nhắn báo động + link clip)
-```
+Dịch vụ này giúp tự động chuyển tiếp các sự kiện cảnh báo đỏ nguy cấp (**Ẩu đả, Đột nhập, Âm thanh bất thường**) từ hệ thống Camera AI DNC vào trực tiếp Nhóm Zalo an ninh:
+👉 **Link nhóm Zalo:** [https://zalo.me/g/libazgippahcfbk99qkc](https://zalo.me/g/libazgippahcfbk99qkc)
 
 ---
 
-## 2. Cách thiết lập cấu hình
+## 🚀 3 BƯỚC KÍCH HOẠT NHANH (MẤT 1 PHÚT)
 
-### Cách A: Cấu hình trực tiếp trên Web Admin (Dễ nhất)
-1. Mở trang quản trị: `http://<IP_MAY_CHU>:8000/admin`
-2. Đăng nhập bằng tài khoản Quản trị viên.
-3. Chọn Tab **4. Cấu hình AI & Prompt** -> Tìm mục **"Bắn Cảnh Báo Đỏ vào Zalo Group"**.
-4. Điền **Zalo Webhook URL** (Ví dụ: `http://127.0.0.1:5000/webhook` hoặc URL webhook bot Zalo của trường).
-5. Bấm nút **"Bắn Tin Test vào Zalo"** để kiểm tra ngay lập tức.
-6. Bấm **"Lưu Cấu Hình Zalo"**.
-
-### Cách B: Cấu hình qua file `.env` trên máy chủ
-Mở file `~/projects/CameraDNCv2/CameraAI/.env` và thêm:
-```bash
-ZALO_WEBHOOK_URL=http://127.0.0.1:5000/webhook
-ZALO_WEBHOOK_SECRET=your_secret_token_here
-```
-
----
-
-## 3. Khởi chạy Bridge độc lập (Tùy chọn)
-
-Nếu bạn chưa có sẵn Webhook Zalo và muốn chạy một bridge microservice nội bộ:
-
+### Bước 1: Khởi động Bot Zalo Bridge trên máy chủ
+Trên terminal máy chủ (hoặc máy trạm):
 ```bash
 cd ~/projects/CameraDNCv2/scripts/zalo_bridge
-python bridge.py
+npm install
+npm start
 ```
-Bridge sẽ lắng nghe tại `http://0.0.0.0:5000/webhook`.
-Mỗi khi có sự kiện đỏ, bridge sẽ in ra console và chuyển tiếp tới Zalo Group ID được cấu hình.
+Terminal sẽ in ra một **mã QR**.
+
+### Bước 2: Quét mã QR trên điện thoại
+1. Mở ứng dụng Zalo trên điện thoại (dùng nick phụ hoặc nick của bạn).
+2. Quét mã QR trên màn hình terminal để đăng nhập bot.
+3. Bot sẽ lưu phiên vào file `appstate.json` (từ lần sau sẽ tự động đăng nhập, không cần quét lại).
+
+### Bước 3: Kích hoạt nhóm nhận tin
+1. Đảm bảo tài khoản Zalo vừa quét QR đã tham gia nhóm: **https://zalo.me/g/libazgippahcfbk99qkc**
+2. Vào nhóm chat đó và gõ lệnh:
+   ```text
+   /setalert
+   ```
+3. Bot sẽ tự động trả lời xác nhận:
+   > *"✅ ĐÃ LIÊN KẾT NHÓM THÀNH CÔNG! Kể từ bây giờ, mọi cảnh báo đỏ từ hệ thống Camera AI DNC sẽ tự động được gửi vào nhóm này."*
+
+---
+
+## ⚙️ Cấu hình Camera AI nhận Webhook
+Trong file `CameraAI/.env` trên máy chủ, thiết lập:
+```bash
+ZALO_WEBHOOK_URL=http://127.0.0.1:5055/webhook
+```
+*(Hoặc vào trang Web Admin `http://<IP_MAY_CHU>:8000/admin` -> Tab 4 -> Điền URL và bấm **"Bắn Tin Test vào Zalo"**)*.

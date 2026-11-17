@@ -1,0 +1,15 @@
+{
+  "name": "camera-dnc-zalo-bridge",
+  "version": "1.0.0",
+  "description": "Zalo Group Alert Bridge for CameraDNCv2",
+  "main": "index.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode-terminal": "^0.12.0",
+    "zca-js": "^2.3.0"
+  }
+}
