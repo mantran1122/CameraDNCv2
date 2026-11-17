@@ -55,6 +55,7 @@ services:
       start_period: 15s
 
   zalo-bridge:
+    init: true
     build:
       context: ./scripts/zalo_bridge
       dockerfile: Dockerfile

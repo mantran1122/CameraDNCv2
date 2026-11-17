@@ -288,6 +288,15 @@ app.get("/health", (req, res) => {
     });
 });
 
+process.on("SIGINT", () => {
+    console.log("\n[ZaloBridge] Nhận tín hiệu SIGINT (Ctrl+C), đang tắt bridge...");
+    process.exit(0);
+});
+process.on("SIGTERM", () => {
+    console.log("\n[ZaloBridge] Nhận tín hiệu SIGTERM, đang tắt bridge...");
+    process.exit(0);
+});
+
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`[ZaloBridge] HTTP Webhook đang lắng nghe tại: http://0.0.0.0:${PORT}/webhook`);
     initZalo();
