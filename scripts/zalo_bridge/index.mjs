@@ -91,21 +91,18 @@ async function initZalo() {
                             break;
                         case LoginQRCallbackEventType.GotLoginInfo:
                             console.log("[ZaloBridge] 🎉 Đăng nhập thành công! Đang lưu phiên làm việc...");
+                            try {
+                                fs.writeFileSync(APPSTATE_FILE, JSON.stringify(event.data, null, 2), "utf-8");
+                                console.log(`[ZaloBridge] ✅ Đã lưu phiên đăng nhập thành công vào ${APPSTATE_FILE}!`);
+                            } catch (err) {
+                                console.warn("[ZaloBridge] Lỗi lưu appstate.json:", err.message);
+                            }
                             break;
                     }
                 }
             );
             console.log("-------------------------------------------------------------");
             console.log("✅ Đăng nhập Zalo thành công!");
-
-            // Lưu appstate cho các lần sau
-            try {
-                const appstate = await api.getAppState();
-                fs.writeFileSync(APPSTATE_FILE, JSON.stringify(appstate, null, 2), "utf-8");
-                console.log(`[ZaloBridge] Đã lưu phiên đăng nhập vào ${APPSTATE_FILE}!`);
-            } catch (e) {
-                console.warn("[ZaloBridge] Không lưu được appstate:", e.message);
-            }
         }
 
         // Tự động liên kết nhóm từ Link mời Zalo nếu có
