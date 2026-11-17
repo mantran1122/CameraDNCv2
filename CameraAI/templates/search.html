@@ -1029,6 +1029,103 @@
             color: #ef4444;
         }
 
+        .severity-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.725rem;
+            font-weight: 600;
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-sub);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        .severity-pill:hover {
+            border-color: var(--text-sub);
+            color: var(--text-main);
+        }
+        .severity-pill.active {
+            background: rgba(118, 185, 0, 0.15);
+            border-color: var(--nv-green);
+            color: var(--nv-green);
+            font-weight: 700;
+        }
+        .severity-pill.danger {
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+        }
+        .severity-pill.danger.active, .severity-pill.danger:hover {
+            background: rgba(239, 68, 68, 0.18);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+        .severity-pill.warning {
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #fde68a;
+        }
+        .severity-pill.warning.active, .severity-pill.warning:hover {
+            background: rgba(245, 158, 11, 0.18);
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+        .google-pagination-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 16px 8px;
+            margin-top: 14px;
+            border-top: 1px solid var(--border-subtle);
+            flex-wrap: wrap;
+        }
+        .page-btn {
+            min-width: 32px;
+            height: 30px;
+            padding: 0 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            background: var(--input-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--nv-green);
+            color: var(--nv-green);
+        }
+        .page-btn.active {
+            background: var(--nv-green);
+            border-color: var(--nv-green);
+            color: #000000;
+            font-weight: 700;
+        }
+        .page-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+        .search-stats-bar {
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
         /* Camera Selection Mode: Dropdown vs Grid */
         .cam-selector-actions {
             display: flex;
@@ -6153,13 +6250,25 @@
                                 </div>
                             </div>
 
+                            <!-- Tầng 1: Mức độ rủi ro (Severity) -->
+                            <div style="margin-bottom: 8px;">
+                                <div style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Mức độ rủi ro</div>
+                                <div class="event-tags-wrap" id="severity-filter-wrap" style="display: flex; gap: 4px; flex-wrap: wrap;">
+                                    <span class="severity-pill danger" data-severity="high" onclick="toggleSeverityFilter('high')">🔴 Báo động Đỏ</span>
+                                    <span class="severity-pill warning" data-severity="medium" onclick="toggleSeverityFilter('medium')">🟡 Cảnh báo Vàng</span>
+                                    <span class="severity-pill info" data-severity="info" onclick="toggleSeverityFilter('info')">⚪ Thông thường</span>
+                                    <span class="severity-pill active" data-severity="" onclick="toggleSeverityFilter('')">Tất cả</span>
+                                </div>
+                            </div>
+
+                            <!-- Tầng 2: Hành vi cụ thể -->
                             <div>
-                                <div style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Sự kiện</div>
+                                <div style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Hành vi cụ thể</div>
                                 <div class="event-tags-wrap" id="event-tags-filter-wrap">
-                                    <span class="event-tag-chip danger" data-code="Fight" onclick="toggleEventTagChip(this)">Ẩu đả</span>
+                                    <span class="event-tag-chip danger" data-code="AudioMutation" onclick="toggleEventTagChip(this)">Âm thanh la hét</span>
                                     <span class="event-tag-chip danger" data-code="Intrusion" onclick="toggleEventTagChip(this)">Đột nhập</span>
                                     <span class="event-tag-chip danger" data-code="CrossLine" onclick="toggleEventTagChip(this)">Vượt rào</span>
-                                    <span class="event-tag-chip" data-code="AudioMutation" onclick="toggleEventTagChip(this)">Âm thanh</span>
+                                    <span class="event-tag-chip danger" data-code="Fight" onclick="toggleEventTagChip(this)">Ẩu đả</span>
                                     <span class="event-tag-chip" data-code="HumanTrait" onclick="toggleEventTagChip(this)">Có người</span>
                                     <span class="event-tag-chip" data-code="VideoMotion" onclick="toggleEventTagChip(this)">Chuyển động</span>
                                 </div>
@@ -6384,6 +6493,9 @@
 
             <!-- Scrollable Results Viewport -->
             <div class="results-scroll-area">
+                <!-- Google-style stats summary bar -->
+                <div id="search-stats-header" class="search-stats-bar" style="display: none;"></div>
+
                 <!-- Initial Empty State (matching media_1788858322440.png & media_1788857677018.png) -->
                 <div class="empty-state-container" id="empty-state">
                     <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="width: 52px; height: 52px; max-width: 52px; max-height: 52px; flex-shrink: 0;">
@@ -6397,6 +6509,9 @@
                 <div class="results-grid" id="results-grid" style="display: none;">
                     <!-- Populated dynamically via renderVideoCards() -->
                 </div>
+
+                <!-- Google / YouTube Multi-page Pagination Controls -->
+                <div id="pagination-controls" class="google-pagination-wrap" style="display: none;"></div>
             </div>
         </main>
 
@@ -7970,8 +8085,11 @@ user=None`;
                         from_time: fromVal,
                         to_time: toVal,
                         event_codes: selectedCodes,
+                        severity: window.selectedSeverity || null,
                         min_cosine_similarity: minSim,
-                        top_k: topK
+                        top_k: 24,
+                        page: window.currentSearchPage || 1,
+                        page_size: 24
                     })
                 });
                 clearTimeout(timeoutTimer);
@@ -7987,7 +8105,7 @@ user=None`;
                     syncWorkflowStage('critic_eval', 'BƯỚC: CRITIC AGENT ĐÁNH GIÁ & XẾP HẠNG CLIPS...');
                     setTimeout(() => {
                         if (!window.isChatActive) {
-                            const count = items.length || window.latestSearchResults?.length || 0;
+                            const count = vssData.total_matches || items.length || 0;
                             const outChLabel = targetChannel ? `CAM ${String(targetChannel).padStart(2, '0')}` : 'ĐA KÊNH';
                             syncWorkflowStage('output', `BƯỚC: XUẤT ${count} VIDEO (${outChLabel})`);
                         }
@@ -7996,9 +8114,15 @@ user=None`;
 
                 // Render kết quả video thực tế tìm được (nếu không có thì hiển thị empty state, không giữ video cũ)
                 renderVideoCards(items || []);
+                renderPagination(vssData);
+                renderSearchStats(vssData);
             } catch (err) {
                 clearTimeout(timeoutTimer);
                 console.error('[Search Error]:', err);
+                const pagWrap = document.getElementById('pagination-controls');
+                if (pagWrap) pagWrap.style.display = 'none';
+                const statsBar = document.getElementById('search-stats-header');
+                if (statsBar) statsBar.style.display = 'none';
                 if (!isInitial && !window.isChatActive) {
                     syncWorkflowStage('error', 'LỖI TRUY VẤN CSDL VIDEO');
                 }
@@ -8021,7 +8145,10 @@ user=None`;
         }
 
         // 1. Dành riêng cho TÌM KIẾM VIDEO (khi bấm Search ở thanh trên hoặc Apply Filter)
-        async function executeSearch() {
+        async function executeSearch(resetPage = true) {
+            if (resetPage) {
+                window.currentSearchPage = 1;
+            }
             const input = document.getElementById('search-input');
             const queryText = (input?.value || '').trim();
             currentSearchQuery = queryText;
@@ -9116,6 +9243,28 @@ user=None`;
             }
         }
 
+        window.selectedSeverity = '';
+        window.currentSearchPage = 1;
+
+        function toggleSeverityFilter(sev) {
+            const pills = document.querySelectorAll('.severity-pill');
+            if (window.selectedSeverity === sev) {
+                window.selectedSeverity = '';
+            } else {
+                window.selectedSeverity = sev;
+            }
+            pills.forEach(p => {
+                const pSev = p.getAttribute('data-severity');
+                if (pSev === window.selectedSeverity) {
+                    p.classList.add('active');
+                } else {
+                    p.classList.remove('active');
+                }
+            });
+            window.currentSearchPage = 1;
+            executeSearch();
+        }
+
         function toggleEventTagChip(chip) {
             const code = chip.getAttribute('data-code');
             if (!code) return;
@@ -9126,6 +9275,94 @@ user=None`;
                 chip.classList.add('active');
                 selectedPlaybackEventTags.add(code);
             }
+            window.currentSearchPage = 1;
+        }
+
+        function goToSearchPage(targetPage) {
+            window.currentSearchPage = targetPage;
+            executeSearch(false);
+            const scrollArea = document.querySelector('.results-scroll-area');
+            if (scrollArea) scrollArea.scrollTop = 0;
+        }
+
+        function renderSearchStats(vssData) {
+            const statsBar = document.getElementById('search-stats-header');
+            if (!statsBar) return;
+            const total = vssData?.total_matches || vssData?.total_count || 0;
+            const page = vssData?.page || 1;
+            const totalPages = vssData?.total_pages || 1;
+            const timeMs = vssData?.execution_time_ms || 15;
+            const sev = vssData?.severity || window.selectedSeverity;
+            const sevBadge = sev === 'high' 
+                ? '<span style="color: #ef4444; font-weight: 700; background: rgba(239,68,68,0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239,68,68,0.3);">🔴 BÁO ĐỘNG ĐỎ</span> ' 
+                : (sev === 'medium' ? '<span style="color: #f59e0b; font-weight: 700; background: rgba(245,158,11,0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(245,158,11,0.3);">🟡 CẢNH BÁO VÀNG</span> ' : '');
+
+            if (total > 0) {
+                statsBar.style.display = 'flex';
+                statsBar.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        ${sevBadge}
+                        <span>Tìm thấy khoảng <strong>${total.toLocaleString('vi-VN')}</strong> kết quả (${timeMs}ms)</span>
+                    </div>
+                    <div>
+                        <span>Trang <strong>${page}</strong> / <strong>${totalPages}</strong> (24 video/trang)</span>
+                    </div>
+                `;
+            } else {
+                statsBar.style.display = 'none';
+            }
+        }
+
+        function renderPagination(vssData) {
+            const pagWrap = document.getElementById('pagination-controls');
+            if (!pagWrap) return;
+            const total = vssData?.total_matches || vssData?.total_count || 0;
+            const page = vssData?.page || 1;
+            const totalPages = vssData?.total_pages || 1;
+
+            if (totalPages <= 1) {
+                pagWrap.style.display = 'none';
+                return;
+            }
+
+            pagWrap.style.display = 'flex';
+            let html = '';
+
+            // Nút "Trước" (Previous)
+            html += `<button type="button" class="page-btn" ${page <= 1 ? 'disabled' : ''} onclick="goToSearchPage(${page - 1})">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span>Trước</span>
+            </button>`;
+
+            // Đa trang kiểu Google (Hiển thị 5-7 số trang quanh trang hiện tại)
+            const maxVisible = 5;
+            let startPage = Math.max(1, page - Math.floor(maxVisible / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+            if (endPage - startPage + 1 < maxVisible) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<button type="button" class="page-btn" onclick="goToSearchPage(1)">1</button>`;
+                if (startPage > 2) html += `<span style="color: var(--text-muted); padding: 0 4px;">...</span>`;
+            }
+
+            for (let p = startPage; p <= endPage; p++) {
+                html += `<button type="button" class="page-btn ${p === page ? 'active' : ''}" onclick="goToSearchPage(${p})">${p}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += `<span style="color: var(--text-muted); padding: 0 4px;">...</span>`;
+                html += `<button type="button" class="page-btn" onclick="goToSearchPage(${totalPages})">${totalPages}</button>`;
+            }
+
+            // Nút "Sau" (Next)
+            html += `<button type="button" class="page-btn" ${page >= totalPages ? 'disabled' : ''} onclick="goToSearchPage(${page + 1})">
+                <span>Sau</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>`;
+
+            pagWrap.innerHTML = html;
         }
 
         function toggleCamGridMode() {

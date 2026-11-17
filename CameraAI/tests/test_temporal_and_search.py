@@ -18,7 +18,8 @@ class TemporalAndSearchTest(unittest.TestCase):
             INSERT OR REPLACE INTO events (id, event_code, event_type, channel, timestamp, description, severity, clip_filename)
             VALUES 
             (23916, 'Intrusion', 'Intrusion', 11, '2026-10-20 10:00:00', 'Xâm nhập Cam 11', 'high', 'clips/cam11.mp4'),
-            (24231, 'Fight', 'Fight', 18, '2026-10-20 10:05:00', 'Đánh nhau Cam 18', 'high', 'clips/cam18.mp4')
+            (24231, 'Fight', 'Fight', 18, '2026-10-20 10:05:00', 'Đánh nhau Cam 18', 'high', 'clips/cam18.mp4'),
+            (24500, 'VideoMotion', 'normal_metadata', 11, '2026-10-27 12:00:00', 'Chuyển động Cam 11', 'info', 'clips/cam11_27.mp4')
         """)
         conn.commit()
         conn.close()

@@ -6,7 +6,9 @@ Integrated with local CameraAI SQLite Database & Gemini/Local LLM.
 
 import re
 import json
+import math
 import sqlite3
+import time
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
@@ -223,7 +225,10 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
         "to_time": to_time,
         "target_date": target_date,
         "is_time_filtered": is_time_filtered,
-        "top_k": int(filters.get("top_k") or 10),
+        "severity": filters.get("severity"),
+        "page": max(1, int(filters.get("page") or 1)),
+        "page_size": max(1, min(100, int(filters.get("page_size") or filters.get("top_k") or 24))),
+        "top_k": int(filters.get("top_k") or 24),
         "min_similarity": float(filters.get("min_cosine_similarity") or filters.get("min_sim") or 0.0)
     }
 
@@ -339,6 +344,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
     4. Critic Agent verification
     5. VSS Blueprint formatted response
     """
+    t_start = time.time()
     filters = filters or {}
     decomp = decompose_query(query, filters)
     ch = decomp.get("channel")
@@ -390,6 +396,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
 
     target_id = decomp.get("target_event_id")
     event_ids = decomp.get("event_ids") or []
+    total_matches = 0
 
     allowed_clause = ""
     allowed_params = []
@@ -449,6 +456,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
                             nr["description"] = f"[Clip tương ứng lúc {nr.get('timestamp')} trên Cam {nr.get('channel')}] {nr.get('description', '')}"
                             rows = [nr]
                             break
+        total_matches = len(rows)
     elif event_ids:
         # Highest precision: prioritize specific event IDs grounded by Agent RAG across any cameras
         placeholders = ",".join(["?"] * len(event_ids))
@@ -462,8 +470,9 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         sql += f" ORDER BY id DESC LIMIT {max(200, req_top_k * 4)}"
         cursor.execute(sql, params)
         rows = [dict(r) for r in cursor.fetchall()]
+        total_matches = len(rows)
     else:
-        if not (decomp.get("from_time") or decomp.get("to_time") or decomp.get("target_date") or decomp.get("event_codes") or decomp.get("raw_query")):
+        if not (decomp.get("from_time") or decomp.get("to_time") or decomp.get("target_date") or decomp.get("event_codes") or decomp.get("raw_query") or decomp.get("severity")):
             sql += " AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''"
         # Enforce channel filter strictly so other cameras are never accidentally leaked
         if len(chs) == 1:
@@ -490,9 +499,24 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
             sql += f" AND event_code IN ({placeholders})"
             params.extend(decomp["event_codes"])
 
-        req_top_k = max(int(decomp.get("top_k") or 10), 10)
-        sql += f" ORDER BY id DESC LIMIT {max(200, req_top_k * 4)}"
-        cursor.execute(sql, params)
+        # Severity filter (e.g. 'high' for Red Alerts, 'medium', 'info')
+        if decomp.get("severity"):
+            sql += " AND severity = ?"
+            params.append(decomp["severity"].lower())
+
+        # Exact total matches for Google-style multi-page navigation
+        count_sql = "SELECT COUNT(*) FROM events WHERE " + sql.split("WHERE", 1)[1]
+        cursor.execute(count_sql, params)
+        total_matches = cursor.fetchone()[0]
+
+        # Google / YouTube Pagination: fetch only page_size rows for current page
+        page = max(1, int(decomp.get("page") or 1))
+        page_size = max(1, min(100, int(decomp.get("page_size") or decomp.get("top_k") or 24)))
+        offset = (page - 1) * page_size
+
+        sql += " ORDER BY id DESC LIMIT ? OFFSET ?"
+        page_params = list(params) + [page_size, offset]
+        cursor.execute(sql, page_params)
         rows = [dict(r) for r in cursor.fetchall()]
 
     # ONLY do generic browsing fallback if user gave NO specific criteria at all (e.g. empty search or "tất cả video")
@@ -620,7 +644,12 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
 
     # Sort results by similarity descending
     results.sort(key=lambda x: (1 if x["critic_result"]["result"] == "confirmed" else 0, x["similarity"]), reverse=True)
-    final_results = results[:decomp["top_k"]]
+    page = max(1, int(decomp.get("page") or 1))
+    page_size = max(1, min(100, int(decomp.get("page_size") or decomp.get("top_k") or 24)))
+    total_pages = max(1, math.ceil(total_matches / page_size)) if page_size else 1
+    final_results = results[:page_size]
+
+    t_elapsed_ms = round((time.time() - t_start) * 1000, 2)
 
     # Python Code representation for Vision Agent Function Start trace
     function_input_code = (
@@ -631,7 +660,8 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         f"channel={decomp['channel'] or 11}\n"
         f"attributes={decomp['attributes']}\n"
         f"min_similarity={decomp['min_similarity']}\n"
-        f"top_k={decomp['top_k']}\n"
+        f"top_k={page_size}\n"
+        f"page={page}\n"
         f"critic_enabled=True"
     )
 
@@ -639,7 +669,13 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         "query": decomp["raw_query"],
         "data": final_results,
         "count": len(final_results),
-        "total_matches": len(final_results),
+        "total_matches": total_matches,
+        "total_count": total_matches,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "severity": decomp.get("severity"),
+        "execution_time_ms": t_elapsed_ms,
         "function_input_code": function_input_code,
-        "summary": f"Found {len(final_results)} events matching '{decomp['raw_query']}' in camera archive."
+        "summary": f"Tìm thấy khoảng {total_matches:,} sự kiện ({t_elapsed_ms}ms) — Trang {page}/{total_pages}."
     }
