@@ -1,22 +1,18 @@
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
-import { Zalo, ThreadType } from "zca-js";
+import { Zalo, ThreadType, LoginQRCallbackEventType } from "zca-js";
 import qrcode from "qrcode-terminal";
 
 const PORT = parseInt(process.env.PORT || "5055", 10);
-const DATA_DIR = process.env.DATA_DIR || "./";
+const DATA_DIR = process.env.DATA_DIR || "./data";
 if (!fs.existsSync(DATA_DIR)) {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
 }
 
-const APPSTATE_FILE = fs.existsSync(path.resolve(DATA_DIR, "appstate.json"))
-    ? path.resolve(DATA_DIR, "appstate.json")
-    : (fs.existsSync(path.resolve("./appstate.json")) ? path.resolve("./appstate.json") : path.resolve(DATA_DIR, "appstate.json"));
-
-const CONFIG_FILE = fs.existsSync(path.resolve(DATA_DIR, "zalo_config.json"))
-    ? path.resolve(DATA_DIR, "zalo_config.json")
-    : (fs.existsSync(path.resolve("./zalo_config.json")) ? path.resolve("./zalo_config.json") : path.resolve(DATA_DIR, "zalo_config.json"));
+const APPSTATE_FILE = path.resolve(DATA_DIR, "appstate.json");
+const CONFIG_FILE = path.resolve(DATA_DIR, "zalo_config.json");
+const QR_FILE = path.resolve(DATA_DIR, "qr.png");
 
 // Đọc cấu hình nhóm mục tiêu (nếu đã lưu từ trước)
 let bridgeConfig = {
@@ -64,13 +60,41 @@ async function initZalo() {
         }
 
         if (!api) {
-            console.log("\n📲 VUI LÒNG MỞ ỨNG DỤNG ZALO TRÊN ĐIỆN THOẠI VÀ QUÉT MÃ QR DƯỚI ĐÂY:");
+            console.log("\n📲 VUI LÒNG MỞ ỨNG DỤNG ZALO TRÊN ĐIỆN THOẠI ĐỂ QUÉT MÃ QR:");
+            console.log(`🌐 Bạn có thể mở trực tiếp link trên trình duyệt để quét: http://<IP_SERVER>:${PORT}/login`);
+            console.log(`📁 File ảnh QR cũng được lưu tại: ${QR_FILE}`);
             console.log("-------------------------------------------------------------");
-            api = await zalo.loginQR({
-                qrCallback: (qrData) => {
-                    qrcode.generate(qrData, { small: true });
+
+            api = await zalo.loginQR(
+                {
+                    qrPath: QR_FILE
+                },
+                async (event) => {
+                    switch (event.type) {
+                        case LoginQRCallbackEventType.QRCodeGenerated:
+                            console.log(`[ZaloBridge] 📸 Mã QR mới đã được tạo! Mở http://<IP_SERVER>:${PORT}/login để xem ảnh và quét.`);
+                            if (event.actions && typeof event.actions.saveToFile === "function") {
+                                await event.actions.saveToFile(QR_FILE);
+                            }
+                            break;
+                        case LoginQRCallbackEventType.QRCodeScanned:
+                            console.log(`[ZaloBridge] 📱 Đã quét QR thành công bởi [${event.data?.display_name || "Người dùng"}]. Vui lòng bấm Đăng nhập trên điện thoại!`);
+                            break;
+                        case LoginQRCallbackEventType.QRCodeExpired:
+                            console.log("[ZaloBridge] ⏳ Mã QR đã hết hạn. Đang tự động làm mới mã QR...");
+                            if (event.actions && typeof event.actions.retry === "function") {
+                                event.actions.retry();
+                            }
+                            break;
+                        case LoginQRCallbackEventType.QRCodeDeclined:
+                            console.log("[ZaloBridge] ⚠️ Bạn đã từ chối đăng nhập trên điện thoại.");
+                            break;
+                        case LoginQRCallbackEventType.GotLoginInfo:
+                            console.log("[ZaloBridge] 🎉 Đăng nhập thành công! Đang lưu phiên làm việc...");
+                            break;
+                    }
                 }
-            });
+            );
             console.log("-------------------------------------------------------------");
             console.log("✅ Đăng nhập Zalo thành công!");
 
@@ -78,7 +102,7 @@ async function initZalo() {
             try {
                 const appstate = await api.getAppState();
                 fs.writeFileSync(APPSTATE_FILE, JSON.stringify(appstate, null, 2), "utf-8");
-                console.log("[ZaloBridge] Đã lưu phiên đăng nhập vào appstate.json!");
+                console.log(`[ZaloBridge] Đã lưu phiên đăng nhập vào ${APPSTATE_FILE}!`);
             } catch (e) {
                 console.warn("[ZaloBridge] Không lưu được appstate:", e.message);
             }
@@ -121,6 +145,66 @@ async function initZalo() {
 // Khởi tạo Express HTTP Webhook Server
 const app = express();
 app.use(express.json());
+
+// Giao diện web hiển thị mã QR để quét bằng điện thoại
+app.get("/login", (req, res) => {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`<!DOCTYPE html>
+<html>
+<head>
+    <title>Zalo Bot Login QR - Camera DNC</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="5">
+    <style>
+        body { background: #111827; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .card { background: #1f2937; border-radius: 16px; padding: 28px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #374151; max-width: 420px; width: 100%; text-align: center; }
+        h1 { font-size: 20px; margin-bottom: 8px; color: #60a5fa; }
+        p { font-size: 14px; color: #9ca3af; margin-bottom: 20px; line-height: 1.5; }
+        .qr-wrap { background: #fff; padding: 16px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        img { width: 260px; height: 260px; display: block; border-radius: 4px; }
+        .footer { margin-top: 18px; font-size: 13px; color: #10b981; }
+        .instruction { text-align: left; background: #374151; padding: 12px 16px; border-radius: 8px; font-size: 13px; color: #d1d5db; margin-top: 20px; }
+        code { background: #111827; color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>📲 Đăng Nhập Bot Zalo</h1>
+        <p>Mở Zalo trên điện thoại, bấm biểu tượng <b>Quét mã QR</b> để quét mã dưới đây:</p>
+        <div class="qr-wrap">
+            <img src="/qr?t=${Date.now()}" alt="Mã QR Zalo (Đang tạo...)">
+        </div>
+        <div class="instruction">
+            <b>👉 Các bước thực hiện:</b>
+            <ol style="margin: 8px 0 0 18px; padding: 0; line-height: 1.6;">
+                <li>Dùng Zalo quét mã và chọn <b>Đăng nhập</b>.</li>
+                <li>Vào nhóm Zalo gửi tin nhắn: <code>/setalert</code>.</li>
+            </ol>
+        </div>
+        <div class="footer">⚡ Trang tự động làm mới mỗi 5 giây</div>
+    </div>
+</body>
+</html>`);
+});
+
+// Trả về file ảnh QR png trực tiếp
+app.get("/qr", (req, res) => {
+    const candidates = [
+        QR_FILE,
+        path.resolve("./qr.png"),
+        path.resolve("/app/qr.png"),
+        path.resolve("/app/data/qr.png")
+    ];
+    for (const c of candidates) {
+        if (fs.existsSync(c)) {
+            res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+            res.setHeader("Content-Type", "image/png");
+            return res.sendFile(c);
+        }
+    }
+    res.status(404).send("Mã QR chưa sẵn sàng hoặc Bot đã đăng nhập thành công.");
+});
 
 // Endpoint nhận Webhook từ Camera AI
 app.post("/webhook", async (req, res) => {
