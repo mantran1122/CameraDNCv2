@@ -22,13 +22,21 @@ class MetadataRetentionTest(unittest.TestCase):
     def test_removes_old_event_and_keeps_recent_event(self):
         old_time = (datetime.now() - timedelta(days=4)).strftime("%Y-%m-%d %H:%M:%S")
         recent_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        old_id = database.save_event("Intrusion", "video_anomaly", 1, old_time, "Old", clip_filename="old.mp4")
+        old_id = database.save_event("VideoMotion", "normal_metadata", 1, old_time, "Old", clip_filename="old.mp4")
         recent_id = database.save_event("HumanTrait", "normal_metadata", 1, recent_time, "Recent")
         database.create_audio_analysis(old_id)
         self.assertEqual(database.delete_expired_events(3), ["old.mp4"])
         self.assertIsNone(database.get_event_by_id(old_id))
         self.assertIsNotNone(database.get_event_by_id(recent_id))
         self.assertIsNone(database.get_audio_analysis(old_id))
+
+    def test_retains_protected_red_event_longer(self):
+        old_time = (datetime.now() - timedelta(days=40)).strftime("%Y-%m-%d %H:%M:%S")
+        red_id = database.save_event("Intrusion", "video_anomaly", 1, old_time, "Red Alert", clip_filename="red.mp4")
+        # 30-day retention for normal events should NOT remove the 40-day-old protected red event (90-day retention)
+        deleted = database.delete_expired_events(30)
+        self.assertNotIn("red.mp4", deleted)
+        self.assertIsNotNone(database.get_event_by_id(red_id))
 
     def test_purge_expired_day_folders_calendar_logic(self):
         import config

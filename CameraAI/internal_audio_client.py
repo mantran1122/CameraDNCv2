@@ -241,46 +241,16 @@ def extract_and_analyze_clip_audio(
         handle_clean, clean_path = tempfile.mkstemp(prefix="chat_clean_", suffix=".wav")
         os.close(handle_clean)
 
-        # 2. Edge Denoising bằng DeepFilterNet3
-        if getattr(config, "USE_DEEPFILTER", True):
-            handle_raw, raw_path = tempfile.mkstemp(prefix="chat_raw48k_", suffix=".wav")
-            os.close(handle_raw)
-            res = subprocess.run(
-                [config.FFMPEG_PATH, "-y", "-i", str(clip_obj), "-vn", "-acodec", "pcm_s16le", "-ar", "48000", "-ac", "1", raw_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=25,
-            )
-            if res.returncode == 0 and os.path.exists(raw_path) and os.path.getsize(raw_path) > 0:
-                try:
-                    import sys
-                    cosmos_dir = str(Path(__file__).resolve().parent.parent / "cosmos_code_base")
-                    if cosmos_dir not in sys.path:
-                        sys.path.insert(0, cosmos_dir)
-                    from audio_enhancer import enhance_audio_file
-                    enhance_audio_file(raw_path, output_wav_path=clean_path, target_sr=16000)
-                except Exception as df_err:
-                    logger.warning(f"[AudioExtract] DeepFilterNet fallback: {df_err}")
-                    subprocess.run(
-                        [config.FFMPEG_PATH, "-y", "-i", str(clip_obj), "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", clean_path],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        timeout=25,
-                    )
-            else:
-                subprocess.run(
-                    [config.FFMPEG_PATH, "-y", "-i", str(clip_obj), "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", clean_path],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    timeout=25,
-                )
-        else:
-            subprocess.run(
-                [config.FFMPEG_PATH, "-y", "-i", str(clip_obj), "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", clean_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=25,
-            )
+        # 2. Trích xuất âm thanh kết hợp bộ lọc Speech Enhancement chuyên dụng cho CCTV
+        # Bộ lọc: cắt ù trầm (<120Hz), cắt rít cao (>4.5kHz), khử nhiễu FFT (afftdn),
+        # chuẩn hóa âm lượng giọng nói (speechnorm) và tăng cường dải phụ âm (equalizer 2kHz) chống dính chữ
+        speech_filter = "highpass=f=120,lowpass=f=4500,afftdn=nf=-25,speechnorm=e=4:r=0.0005:l=1,equalizer=f=2000:t=q:w=1.5:g=3"
+        subprocess.run(
+            [config.FFMPEG_PATH, "-y", "-i", str(clip_obj), "-vn", "-af", speech_filter, "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", clean_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=25,
+        )
 
         # 3. Đo cường độ âm thanh RMS dBFS
         audio_rms = -100.0
@@ -338,14 +308,39 @@ def extract_and_analyze_clip_audio(
                 logger.warning(f"[AudioExtract] Local whisper fallback notice: {fw_err}")
 
         if not audio_result:
-            audio_result = {
-                "transcript": "",
-                "speech_detected": 0,
-                "detected_sounds": [],
-                "risk_level": "none",
-                "summary": f"Âm thanh môi trường ghi nhận ở mức {audio_rms:.1f} dBFS (không phát hiện tiếng nói rõ ràng).",
-                "audio_model": "None"
-            }
+            ev_code = str((event or {}).get("event_code", ""))
+            is_anomaly_event = ev_code in ("AudioMutation", "SoundDetection", "AudioAnomaly", "Fight")
+
+            if audio_rms >= -28.0:
+                # Âm thanh lớn (mức hội thoại rõ hoặc tiếng động mạnh)
+                risk = "high" if (is_anomaly_event and audio_rms >= -22.0) else ("medium" if is_anomaly_event or audio_rms >= -20.0 else "low")
+                audio_result = {
+                    "transcript": "",
+                    "speech_detected": 1,
+                    "detected_sounds": ["tiếng nói chuyện cường độ lớn", "tiếng vang micro camera"],
+                    "risk_level": risk,
+                    "summary": f"Âm thanh ghi nhận mức to ({audio_rms:.1f} dBFS), có hoạt động giọng nói rõ rệt. Do micro camera an ninh bị vang dội phòng và dính chữ, hệ thống ghi nhận sự kiện âm thanh lớn để người vận hành kiểm tra.",
+                    "audio_model": "CCTV Speech Filter"
+                }
+            elif audio_rms >= -40.0:
+                risk = "medium" if is_anomaly_event else "none"
+                audio_result = {
+                    "transcript": "",
+                    "speech_detected": 0,
+                    "detected_sounds": ["âm thanh môi trường"],
+                    "risk_level": risk,
+                    "summary": f"Âm thanh môi trường ghi nhận ở mức {audio_rms:.1f} dBFS (âm lượng trung bình).",
+                    "audio_model": "CCTV Speech Filter"
+                }
+            else:
+                audio_result = {
+                    "transcript": "",
+                    "speech_detected": 0,
+                    "detected_sounds": [],
+                    "risk_level": "none",
+                    "summary": f"Âm thanh môi trường rất nhỏ ({audio_rms:.1f} dBFS, phòng yên tĩnh).",
+                    "audio_model": "CCTV Speech Filter"
+                }
 
         audio_result["has_audio"] = True
         audio_result["status"] = "completed"

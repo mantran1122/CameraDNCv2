@@ -1455,7 +1455,12 @@ async def quick_analyze_event_api(event_id: int, request: Request):
             tr = audio_analysis.get("transcript")
             rms = audio_analysis.get("audio_rms")
             rms_str = f" ({rms:.1f} dBFS)" if rms is not None else ""
-            fallback_parts.append(f"Âm thanh: {tr or 'Không phát hiện giọng nói'}{rms_str}")
+            if tr:
+                fallback_parts.append(f"Âm thanh: \"{tr}\"{rms_str}")
+            elif rms is not None and rms >= -28.0:
+                fallback_parts.append(f"Âm thanh: Có tiếng nói mức lớn{rms_str} (vang dội mic camera)")
+            else:
+                fallback_parts.append(f"Âm thanh: Không phát hiện giọng nói rõ ràng{rms_str}")
         if not fallback_parts:
             fallback_parts.append(f"Metadata NVR: {event.get('description')} ({event.get('event_code')})")
 

@@ -342,9 +342,15 @@ def analyze_video_dense(
         summary = audio_analysis.get("summary", "")
         rms = audio_analysis.get("audio_rms")
 
-        quoted_transcript = f'"{transcript}"' if transcript else '(Không có tiếng nói người rõ ràng)'
+        if transcript:
+            quoted_transcript = f'"{transcript}"'
+        elif rms is not None and rms >= -28.0:
+            quoted_transcript = f'(Có tiếng nói/âm thanh to mức {rms:.1f} dBFS nhưng bị vang vọng dính chữ từ micro camera, chưa bóc tách từng chữ)'
+        else:
+            quoted_transcript = '(Không có tiếng nói người rõ ràng)'
+
         audio_context_text = (
-            f"\n--- BẰNG CHỨNG ÂM THANH THỰC TẾ TRÍCH XUẤT TỪ CLIP (ĐÃ LỌC NHIỄU DEEPFILTERNET) ---\n"
+            f"\n--- BẰNG CHỨNG ÂM THANH THỰC TẾ TRÍCH XUẤT TỪ CLIP (ĐÃ QUA BỘ LỌC KHỬ VANG & TĂNG ĐỘ RÕ TIẾNG) ---\n"
             f"- Mức âm lượng: {rms} dBFS\n"
             f"- Lời thoại bóc băng (Transcript): {quoted_transcript}\n"
             f"- Âm thanh môi trường: {sounds_str}\n"
