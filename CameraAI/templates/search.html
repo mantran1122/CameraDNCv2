@@ -6300,7 +6300,20 @@
                                 </div>
                                 <span class="filter-label" style="width: 55px;">Tối đa:</span>
                                 <div class="filter-input-wrap">
-                                    <input type="number" id="filter-topk" value="12" min="1" max="100" style="height: 28px;">
+                                    <input type="number" id="filter-topk" value="24" min="1" max="100" style="height: 28px;">
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 5px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                    <span style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted);">Số clip / trang:</span>
+                                    <div class="preset-chips-wrap" id="topk-presets-wrap" style="display: flex; gap: 4px;">
+                                        <span class="preset-chip" onclick="setTopKValue(12, this)">12</span>
+                                        <span class="preset-chip active" onclick="setTopKValue(24, this)">24</span>
+                                        <span class="preset-chip" onclick="setTopKValue(48, this)">48</span>
+                                        <span class="preset-chip" onclick="setTopKValue(100, this)">100</span>
+                                        <span class="preset-chip" onclick="setTopKValue(100, this, true)">Tất cả</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -8059,7 +8072,7 @@ user=None`;
                 videoSrc = Array.from(selectedPlaybackChannels).join(',');
             }
             const minSim = parseFloat(document.getElementById('filter-min-sim')?.value) || 0.0;
-            const topK = parseInt(document.getElementById('filter-topk')?.value) || 12;
+            const topK = parseInt(document.getElementById('filter-topk')?.value) || 24;
             const srcType = document.getElementById('source-type-select')?.value || 'video_file';
             const selectedCodes = (specificEventIds && specificEventIds.length > 0)
                 ? []
@@ -8087,9 +8100,9 @@ user=None`;
                         event_codes: selectedCodes,
                         severity: window.selectedSeverity || null,
                         min_cosine_similarity: minSim,
-                        top_k: 24,
+                        top_k: topK,
                         page: window.currentSearchPage || 1,
-                        page_size: 24
+                        page_size: topK
                     })
                 });
                 clearTimeout(timeoutTimer);
@@ -8865,11 +8878,16 @@ user=None`;
         function applyFilters() {
             syncFilterTimeInput('filter-from', flatpickrFromInstance, false);
             syncFilterTimeInput('filter-to', flatpickrToInstance, true);
-            const topk = document.getElementById('filter-topk')?.value || 10;
+            const topkInput = document.getElementById('filter-topk');
+            let topk = parseInt(topkInput?.value) || 24;
+            if (topk < 1) topk = 1;
+            if (topk > 100) topk = 100;
+            if (topkInput) topkInput.value = topk;
             const topkTag = document.getElementById('topk-tag-val');
             if (topkTag) topkTag.innerText = topk;
             closeAllToolbarMenus();
-            executeSearch();
+            window.currentSearchPage = 1;
+            executeSearch(true);
         }
 
         function setViewMode(mode) {
@@ -9262,7 +9280,18 @@ user=None`;
                 }
             });
             window.currentSearchPage = 1;
-            executeSearch();
+            // Note: Does not execute search immediately. Multi-filter criteria are applied when clicking [Áp dụng].
+        }
+
+        function setTopKValue(val, btnEl, isAll = false) {
+            document.querySelectorAll('#topk-presets-wrap .preset-chip').forEach(c => c.classList.remove('active'));
+            if (btnEl) btnEl.classList.add('active');
+            const topkInput = document.getElementById('filter-topk');
+            if (topkInput) {
+                topkInput.value = val;
+            }
+            const topkTag = document.getElementById('topk-tag-val');
+            if (topkTag) topkTag.innerText = isAll ? 'Tất cả' : val;
         }
 
         function toggleEventTagChip(chip) {
@@ -9291,6 +9320,7 @@ user=None`;
             const total = vssData?.total_matches || vssData?.total_count || 0;
             const page = vssData?.page || 1;
             const totalPages = vssData?.total_pages || 1;
+            const pageSize = vssData?.page_size || 24;
             const timeMs = vssData?.execution_time_ms || 15;
             const sev = vssData?.severity || window.selectedSeverity;
             const sevBadge = sev === 'high' 
@@ -9305,7 +9335,7 @@ user=None`;
                         <span>Tìm thấy khoảng <strong>${total.toLocaleString('vi-VN')}</strong> kết quả (${timeMs}ms)</span>
                     </div>
                     <div>
-                        <span>Trang <strong>${page}</strong> / <strong>${totalPages}</strong> (24 video/trang)</span>
+                        <span>Trang <strong>${page}</strong> / <strong>${totalPages}</strong> (${pageSize} video/trang)</span>
                     </div>
                 `;
             } else {
@@ -9457,19 +9487,37 @@ user=None`;
             render32CameraGrid();
             syncCamGridToDropdown();
 
+            // Reset severity pills
+            window.selectedSeverity = '';
+            document.querySelectorAll('.severity-pill').forEach(pill => {
+                if (pill.getAttribute('data-severity') === '') {
+                    pill.classList.add('active');
+                } else {
+                    pill.classList.remove('active');
+                }
+            });
+
+            // Reset event tag chips
             selectedPlaybackEventTags.clear();
             document.querySelectorAll('#event-tags-filter-wrap .event-tag-chip').forEach(chip => {
                 chip.classList.remove('active');
             });
 
+            // Reset similarity & top_k
             const simEl = document.getElementById('filter-min-sim');
             const topkEl = document.getElementById('filter-topk');
             const topkTag = document.getElementById('topk-tag-val');
             if (simEl) simEl.value = '0.00';
-            if (topkEl) topkEl.value = '12';
-            if (topkTag) topkTag.innerText = '12';
+            if (topkEl) topkEl.value = '24';
+            if (topkTag) topkTag.innerText = '24';
+            document.querySelectorAll('#topk-presets-wrap .preset-chip').forEach(c => {
+                if (c.textContent.trim() === '24') c.classList.add('active');
+                else c.classList.remove('active');
+            });
+
             closeAllToolbarMenus();
-            executeSearch();
+            window.currentSearchPage = 1;
+            executeSearch(true);
         }
 
         function resetAllFilters() {

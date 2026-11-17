@@ -115,5 +115,29 @@ class TemporalAndSearchTest(unittest.TestCase):
         self.assertEqual(same_min["to_time"], "2026-10-28 16:30:59")
 
 
+    def test_search_vss_severity_and_pagination(self):
+        # Querying with severity='high' should only return high severity events
+        res = search_vss_archive("", {"severity": "high", "page": 1, "page_size": 5, "top_k": 5})
+        self.assertGreater(res["total_matches"], 0)
+        self.assertLessEqual(len(res["data"]), 5)
+        for item in res["data"]:
+            self.assertEqual(item["severity"], "high")
+
+    def test_search_vss_combined_channel_severity_date(self):
+        # Combining channel + severity + date range
+        res = search_vss_archive("báo động đỏ", {
+            "channel": 11,
+            "severity": "high",
+            "from_time": "2026-10-25 00:00:00",
+            "to_time": "2026-10-29 23:59:59",
+            "top_k": 10,
+            "page": 1,
+            "page_size": 10
+        })
+        for item in res["data"]:
+            self.assertEqual(item["channel"], 11)
+            self.assertEqual(item["severity"], "high")
+
+
 if __name__ == "__main__":
     unittest.main()

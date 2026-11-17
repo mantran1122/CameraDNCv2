@@ -89,16 +89,24 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
     filters = filters or {}
 
     # 1. Channel detection: Highest priority to explicit filter channel
-    # Channel detection
     channel = filters.get("channel")
+    
+    # Query text analysis for channels or all-camera phrases
+    ch_in_query = re.search(r'(?:cam|kênh|kenh|channel|ch)\s*0*(\d+)', lowered)
     is_all_phrase = any(
         k in lowered for k in [
-            "tất cả", "tat ca", "toàn bộ", "toan bo", "mọi camera", "moi camera",
-            "các camera", "cac camera", "các cam", "cac cam", "toàn hệ thống", "hệ thống", "all"
+            "mọi camera", "moi camera", "các camera", "cac camera", "các cam", "cac cam",
+            "toàn bộ camera", "toan bo camera", "tất cả camera", "tat ca camera",
+            "toàn hệ thống", "hệ thống"
         ]
     )
     if is_all_phrase:
         channel = None
+    elif ch_in_query:
+        try:
+            channel = int(ch_in_query.group(1))
+        except Exception:
+            pass
     elif channel is not None:
         try:
             channel = int(filters["channel"])
@@ -213,6 +221,16 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
     target_date = temp_info.get("date") if temp_info.get("is_date_filtered") else ""
     is_time_filtered = bool(temp_info.get("is_time_filtered") or from_time or to_time)
 
+    # Severity extraction: explicit filter > query text keywords
+    detected_severity = filters.get("severity")
+    if not detected_severity:
+        if any(w in lowered for w in ["báo động đỏ", "bao dong do", "cảnh báo đỏ", "canh bao do", "sự kiện đỏ", "su kien do", "mức đỏ", "muc do", "nguy hiểm cao", "nguy hiem cao"]):
+            detected_severity = "high"
+        elif any(w in lowered for w in ["cảnh báo vàng", "canh bao vang", "sự kiện vàng", "su kien vang", "mức vàng", "muc vang", "trung bình", "trung binh"]):
+            detected_severity = "medium"
+        elif any(w in lowered for w in ["thông thường", "thong thuong", "mức info", "muc info", "bình thường", "binh thuong"]):
+            detected_severity = "info"
+
     return {
         "raw_query": query,
         "channel": channel,
@@ -225,7 +243,7 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
         "to_time": to_time,
         "target_date": target_date,
         "is_time_filtered": is_time_filtered,
-        "severity": filters.get("severity"),
+        "severity": detected_severity,
         "page": max(1, int(filters.get("page") or 1)),
         "page_size": max(1, min(100, int(filters.get("page_size") or filters.get("top_k") or 24))),
         "top_k": int(filters.get("top_k") or 24),
@@ -528,6 +546,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         or decomp.get("to_time")
         or decomp.get("target_date")
         or decomp.get("event_codes")
+        or decomp.get("severity")
         or decomp.get("is_time_filtered")
     )
 
@@ -638,6 +657,9 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         "clip_filename": clip_name,
         "event_id": row["id"],
         "channel": row["channel"],
+        "severity": row.get("severity", "info"),
+        "event_code": row.get("event_code", "Alarm"),
+        "timestamp": row.get("timestamp"),
         "pills": [f"{k}: {'✓' if v else '✗'}" for k, v in critic["criteria_met"].items()],
         "critic_result": critic
         })
