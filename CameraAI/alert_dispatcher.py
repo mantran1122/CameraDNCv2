@@ -149,7 +149,12 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
     full_clip_url = urljoin(f"{app_base}/", clip_url.lstrip("/")) if (app_base and clip_url) else clip_url
 
     msg_text = f"[CẢNH BÁO ĐỎ] {label} tại {cam_name} lúc {ts}.\nChi tiết: {desc}"
-    if full_clip_url and (full_clip_url.startswith("http://") or full_clip_url.startswith("https://")):
+    if event_code == "RtspSessionDisconnect":
+        msg_text = f"[CẢNH BÁO ĐỎ] Mất kết nối Camera tại {cam_name} lúc {ts}.\nChi tiết: Tín hiệu gián đoạn kéo dài trên 1 phút. Vui lòng kiểm tra đường truyền hoặc nguồn thiết bị."
+        full_clip_url = ""
+        payload["clip_filename"] = ""
+        payload["clip_url"] = ""
+    elif full_clip_url and (full_clip_url.startswith("http://") or full_clip_url.startswith("https://")):
         msg_text += f"\nXem video trực tuyến: {full_clip_url}"
 
     body = {
@@ -470,8 +475,12 @@ def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
         payload = dict(event_payload)
         ev_id = payload.get("id")
 
+        # Sự cố mất kết nối mạng camera không đính kèm clip
+        if event_code == "RtspSessionDisconnect":
+            payload["clip_filename"] = ""
+            payload["clip_url"] = ""
         # Đợi tối đa 15s để clip_capture_worker hoàn thành việc trích xuất video thực tế từ đầu ghi NVR
-        if not payload.get("clip_filename") and ev_id:
+        elif not payload.get("clip_filename") and ev_id:
             for _ in range(30):
                 time.sleep(0.5)
                 try:

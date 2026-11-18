@@ -22,6 +22,24 @@ class DahuaNVRListener(threading.Thread):
         self.current_response = None
         self._watchdog_thread = None
         self._last_clip_queued = {}  # channel -> timestamp float
+        self._last_event_per_channel = {}  # channel -> timestamp float
+
+    def _is_rtsp_alive(self, channel: int) -> bool:
+        """Kiểm tra phản hồi nhanh (2s) của luồng RTSP camera."""
+        import subprocess
+        from urllib.parse import quote
+        rtsp_user = quote(str(config.NVR_USER), safe="")
+        rtsp_password = quote(str(config.NVR_PASSWORD), safe="")
+        url = f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{config.RTSP_PORT}/cam/realmonitor?channel={channel}&subtype=1"
+        cmd = [
+            config.FFMPEG_PATH, "-v", "error", "-rtsp_transport", "tcp",
+            "-t", "1", "-i", url, "-f", "null", "-"
+        ]
+        try:
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=4)
+            return res.returncode == 0
+        except Exception:
+            return False
 
     def stop(self):
         self.is_running = False
@@ -179,6 +197,7 @@ class DahuaNVRListener(threading.Thread):
             return
 
         channel = int(index) + 1 if index.isdigit() else 1
+        self._last_event_per_channel[channel] = time.time()
 
         # Check active channels filter
         if config.ACTIVE_CHANNELS and channel not in config.ACTIVE_CHANNELS:
@@ -186,6 +205,45 @@ class DahuaNVRListener(threading.Thread):
 
         now = datetime.now()
         timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Xử lý riêng sự kiện ngắt phiên RTSP theo chỉ đạo của sếp: Chỉ báo động khi mất kết nối thực tế >= 1 phút (60s)
+        if code == "RtspSessionDisconnect":
+            event_id = database.save_event(
+                event_code=code,
+                event_type="network_anomaly",
+                channel=channel,
+                timestamp=timestamp_str,
+                description=f"Mất kết nối luồng RTSP tại Cam {channel:02d}",
+                severity="medium",
+                metadata_dict=event_data,
+            )
+            self.last_event_time = time.time()
+            self.total_events_received += 1
+
+            def _verify_outage(ch: int, ev_id: int):
+                time.sleep(60)
+                now_check = time.time()
+                last_active = self._last_event_per_channel.get(ch, 0.0)
+                # 1. Nếu trong 60s qua camera vẫn gửi metadata (chuyển động, người...) -> Đang hoạt động bình thường!
+                if now_check - last_active < 55.0:
+                    print(f"[RtspWatchdog] Cam {ch} có sự kiện hoạt động gần đây ({now_check - last_active:.1f}s trước). Bỏ qua cảnh báo mất kết nối tạm thời.")
+                    return
+                # 2. Kiểm tra trực tiếp luồng RTSP của camera
+                if self._is_rtsp_alive(ch):
+                    print(f"[RtspWatchdog] Luồng RTSP Cam {ch} vẫn phản hồi tốt sau 60s. Bỏ qua cảnh báo ngắt phiên tạm thời.")
+                    return
+                # 3. Mất kết nối thực tế kéo dài trên 1 phút!
+                print(f"[RtspWatchdog] XÁC NHẬN MẤT KẾT NỐI Cam {ch} >= 1 phút! Bắt đầu phát cảnh báo đỏ.")
+                ev_obj = database.get_event_by_id(ev_id)
+                if ev_obj:
+                    ev_obj["description"] = f"Mất kết nối Camera tại Cam {ch:02d} (Tín hiệu gián đoạn trên 1 phút)"
+                    ev_obj["severity"] = "high"
+                    if self.broadcast_callback:
+                        self.broadcast_callback(ev_obj)
+
+            t = threading.Thread(target=_verify_outage, args=(channel, event_id), daemon=True, name=f"rtsp-watchdog-{channel}")
+            t.start()
+            return
 
         event_type = "normal_metadata"
         severity = "info"
