@@ -435,17 +435,22 @@ function resolveVideoFile(payload) {
         }
     }
 
-    // 3. Fallback: Nếu không tìm thấy file cụ thể theo tên, lấy sample có sẵn
+    // 3. Fallback: Nếu không tìm thấy file cụ thể theo tên, ưu tiên lấy clip camera thật có sẵn trong cameras/
     for (const root of searchRoots) {
         if (!fs.existsSync(root)) continue;
-        for (const sampleName of ["sample_h264.mp4", "test_compressed_h264.mp4", "sample_valid.mp4"]) {
+        const camDir = path.resolve(root, "cameras");
+        const realCamMp4 = findAnyMp4(camDir);
+        if (realCamMp4) return realCamMp4;
+
+        const anyMp4 = findAnyMp4(root);
+        if (anyMp4) return anyMp4;
+
+        for (const sampleName of ["sample_valid.mp4", "sample_h264.mp4", "test_compressed_h264.mp4"]) {
             const sPath = path.resolve(root, sampleName);
             if (fs.existsSync(sPath) && fs.statSync(sPath).isFile() && fs.statSync(sPath).size > 0) {
                 return sPath;
             }
         }
-        const anyMp4 = findAnyMp4(root);
-        if (anyMp4) return anyMp4;
     }
 
     return null;

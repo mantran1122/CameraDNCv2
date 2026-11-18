@@ -197,18 +197,29 @@ def test_zalo_webhook(webhook_url: Optional[str] = None, token: Optional[str] = 
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     msg_text = f"[TEST CẢNH BÁO] Hệ thống Camera AI DNC kết nối thành công tới Zalo Group lúc {now_str}."
 
-    # Tự động tìm video clip MP4 có sẵn trong storage/clips để đính kèm thử nghiệm
+    # Tự động tìm video clip MP4 để đính kèm thử nghiệm (ưu tiên clip camera thực tế đã ghi hình)
     test_clip_file = ""
     test_clip_url = ""
     app_base = os.getenv("CAMERAAI_BASE_URL", "").rstrip("/")
     clips_dir = getattr(config, "CLIPS_DIR", Path(__file__).resolve().parent / "storage" / "clips")
 
-    # Ưu tiên các file sample có sẵn
-    for sample_name in ["sample_h264.mp4", "test_compressed_h264.mp4", "sample_valid.mp4"]:
-        if (clips_dir / sample_name).is_file():
-            test_clip_file = sample_name
-            test_clip_url = f"/clips/{sample_name}"
-            break
+    # 1. Ưu tiên lấy clip camera thực tế mới nhất trong storage/clips/cameras/
+    cam_dir = clips_dir / "cameras"
+    if cam_dir.is_dir():
+        cam_clips = [p for p in cam_dir.rglob("*.mp4") if p.stat().st_size > 200 * 1024]
+        if cam_clips:
+            cam_clips.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            chosen = cam_clips[0]
+            test_clip_file = str(chosen.relative_to(clips_dir)).replace("\\", "/")
+            test_clip_url = f"/clips/{test_clip_file}"
+
+    # 2. Nếu chưa có clip camera thật, fallback sang các file sample có sẵn
+    if not test_clip_file:
+        for sample_name in ["sample_valid.mp4", "sample_h264.mp4", "test_compressed_h264.mp4"]:
+            if (clips_dir / sample_name).is_file():
+                test_clip_file = sample_name
+                test_clip_url = f"/clips/{sample_name}"
+                break
 
     if not test_clip_file and clips_dir.is_dir():
         mp4_files = list(clips_dir.rglob("*.mp4"))
