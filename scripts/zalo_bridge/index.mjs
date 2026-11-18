@@ -435,24 +435,20 @@ function resolveVideoFile(payload) {
         }
     }
 
-    // 3. Fallback: Nếu không tìm thấy file cụ thể theo tên, ưu tiên lấy clip camera thật có sẵn trong cameras/
-    for (const root of searchRoots) {
-        if (!fs.existsSync(root)) continue;
-        const camDir = path.resolve(root, "cameras");
-        const realCamMp4 = findAnyMp4(camDir);
-        if (realCamMp4) return realCamMp4;
-
-        const anyMp4 = findAnyMp4(root);
-        if (anyMp4) return anyMp4;
-
-        for (const sampleName of ["sample_valid.mp4", "sample_h264.mp4", "test_compressed_h264.mp4"]) {
-            const sPath = path.resolve(root, sampleName);
-            if (fs.existsSync(sPath) && fs.statSync(sPath).isFile() && fs.statSync(sPath).size > 0) {
-                return sPath;
+    // 3. Fallback: CHỈ khi là tin thử nghiệm (test_alert), mới lấy file mẫu có sẵn
+    if (payload.event_type === "test_alert") {
+        for (const root of searchRoots) {
+            if (!fs.existsSync(root)) continue;
+            for (const sampleName of ["sample_valid.mp4", "sample_h264.mp4", "test_compressed_h264.mp4"]) {
+                const sPath = path.resolve(root, sampleName);
+                if (fs.existsSync(sPath) && fs.statSync(sPath).isFile() && fs.statSync(sPath).size > 0) {
+                    return sPath;
+                }
             }
         }
     }
 
+    // Tuyệt đối không gửi file clip của camera/sự kiện khác cho sự kiện an ninh thật
     return null;
 }
 

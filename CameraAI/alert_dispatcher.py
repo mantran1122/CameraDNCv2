@@ -468,6 +468,28 @@ def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
 
     def _worker():
         payload = dict(event_payload)
+        ev_id = payload.get("id")
+
+        # Đợi tối đa 7s để clip_capture_worker hoàn thành việc trích xuất video thực tế từ đầu ghi NVR
+        if not payload.get("clip_filename") and ev_id:
+            try:
+                import database
+                for _ in range(14):
+                    time.sleep(0.5)
+                    ev_db = database.get_event_by_id(int(ev_id))
+                    if ev_db and ev_db.get("clip_filename"):
+                        captured_filename = ev_db["clip_filename"]
+                        payload["clip_filename"] = captured_filename
+                        app_base = os.getenv("CAMERAAI_BASE_URL", "").rstrip("/")
+                        rel_clip = str(captured_filename).replace("\\", "/").lstrip("/")
+                        full_url = f"{app_base}/clips/{rel_clip}" if app_base else f"/clips/{rel_clip}"
+                        payload["clip_url"] = full_url
+                        if payload.get("message") and "Xem video clip:" not in payload["message"]:
+                            payload["message"] += f"\nXem video clip: {full_url}"
+                        break
+            except Exception as e:
+                logger.debug(f"[AlertDispatcher] Lỗi chờ clip: {e}")
+
         # 1. Telegram Group Bot
         send_telegram_alert(payload)
         # 2. Zalo Group Webhook
