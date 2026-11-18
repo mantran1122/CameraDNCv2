@@ -43,14 +43,70 @@ console.log("🚀 KHỞI ĐỘNG ZALO GROUP ALERT BRIDGE CHO CAMERADNCV2");
 console.log("=============================================================");
 
 let api = null;
-const zalo = new Zalo();
+let currentQrDataUri = null;
+const zalo = new Zalo({ selfListen: true });
+
+async function resolveGroupTarget() {
+    if (!api) return;
+
+    // 1. Nếu có link mời và chưa có targetGroupId, thử phân giải qua getGroupLinkInfo
+    if (bridgeConfig.inviteLink && !bridgeConfig.targetGroupId) {
+        try {
+            console.log(`[ZaloBridge] Đang kiểm tra liên kết nhóm từ link: ${bridgeConfig.inviteLink}...`);
+            const linkInfo = await api.getGroupLinkInfo({ link: bridgeConfig.inviteLink });
+            if (linkInfo && linkInfo.groupId) {
+                bridgeConfig.targetGroupId = String(linkInfo.groupId);
+                bridgeConfig.groupName = linkInfo.name || "Nhóm Cảnh Báo Camera DNC";
+                saveConfig();
+                console.log(`[ZaloBridge] 🔗 Tự động liên kết thành công với nhóm: "${bridgeConfig.groupName}" (ID: ${bridgeConfig.targetGroupId})`);
+                await api.sendMessage(
+                    {
+                        msg: `✅ ĐÃ LIÊN KẾT NHÓM CẢNH BÁO CAMERA DNC THÀNH CÔNG!\nKể từ bây giờ, mọi cảnh báo đỏ từ hệ thống Camera AI DNC sẽ tự động được gửi vào nhóm "${bridgeConfig.groupName}".`
+                    },
+                    bridgeConfig.targetGroupId,
+                    ThreadType.Group
+                ).catch(() => {});
+                return;
+            }
+        } catch (e) {
+            console.warn("[ZaloBridge] Không thể tự động phân giải group link:", e.message);
+        }
+    }
+
+    // 2. Nếu vẫn chưa có targetGroupId, quét danh sách các nhóm mà Bot đã tham gia
+    if (!bridgeConfig.targetGroupId) {
+        try {
+            const allGroups = await api.getAllGroups();
+            const groupIds = Object.keys(allGroups?.gridVerMap || {});
+            console.log(`[ZaloBridge] Bot hiện đang tham gia ${groupIds.length} nhóm Zalo.`);
+            if (groupIds.length === 1) {
+                bridgeConfig.targetGroupId = groupIds[0];
+                try {
+                    const gInfo = await api.getGroupInfo(groupIds[0]);
+                    bridgeConfig.groupName = gInfo?.gridInfoMap?.[groupIds[0]]?.name || "Nhóm Cảnh Báo DNC";
+                } catch (e) {}
+                saveConfig();
+                console.log(`[ZaloBridge] 🔗 Tự động liên kết nhóm duy nhất của Bot: "${bridgeConfig.groupName}" (ID: ${bridgeConfig.targetGroupId})`);
+                await api.sendMessage(
+                    {
+                        msg: `✅ ĐÃ LIÊN KẾT NHÓM CẢNH BÁO CAMERA DNC THÀNH CÔNG!\nKể từ bây giờ, mọi cảnh báo đỏ từ hệ thống Camera AI DNC sẽ tự động được gửi vào nhóm này.`
+                    },
+                    bridgeConfig.targetGroupId,
+                    ThreadType.Group
+                ).catch(() => {});
+            }
+        } catch (e) {
+            console.warn("[ZaloBridge] Không thể quét danh sách nhóm của bot:", e.message);
+        }
+    }
+}
 
 async function initZalo() {
     try {
         if (fs.existsSync(APPSTATE_FILE)) {
             console.log("[ZaloBridge] Đang khôi phục phiên đăng nhập từ appstate.json...");
-            const appstate = JSON.parse(fs.readFileSync(APPSTATE_FILE, "utf-8"));
             try {
+                const appstate = JSON.parse(fs.readFileSync(APPSTATE_FILE, "utf-8"));
                 api = await zalo.login(appstate);
                 console.log("✅ Đăng nhập Zalo thành công từ phiên đã lưu!");
             } catch (err) {
@@ -73,6 +129,9 @@ async function initZalo() {
                     switch (event.type) {
                         case LoginQRCallbackEventType.QRCodeGenerated:
                             console.log(`[ZaloBridge] 📸 Mã QR mới đã được tạo! Mở http://<IP_SERVER>:${PORT}/login để xem ảnh và quét.`);
+                            if (event.data?.image) {
+                                currentQrDataUri = event.data.image;
+                            }
                             if (event.actions && typeof event.actions.saveToFile === "function") {
                                 await event.actions.saveToFile(QR_FILE);
                             }
@@ -105,50 +164,56 @@ async function initZalo() {
             console.log("✅ Đăng nhập Zalo thành công!");
         }
 
-        // Tự động liên kết nhóm từ Link mời Zalo nếu có
-        if (api && bridgeConfig.inviteLink && !bridgeConfig.targetGroupId) {
-            try {
-                console.log(`[ZaloBridge] Đang kiểm tra liên kết nhóm từ link: ${bridgeConfig.inviteLink}...`);
-                const linkInfo = await api.getGroupLinkInfo({ link: bridgeConfig.inviteLink });
-                if (linkInfo && linkInfo.groupId) {
-                    bridgeConfig.targetGroupId = linkInfo.groupId;
-                    bridgeConfig.groupName = linkInfo.name || "Nhóm Cảnh Báo";
-                    saveConfig();
-                    console.log(`[ZaloBridge] 🔗 Tự động liên kết thành công với nhóm: "${bridgeConfig.groupName}" (ID: ${bridgeConfig.targetGroupId})`);
-                    api.sendMessage(
-                        {
-                            msg: `✅ ĐÃ LIÊN KẾT NHÓM THÀNH CÔNG!\nKể từ bây giờ, mọi cảnh báo đỏ từ hệ thống Camera AI DNC sẽ tự động được gửi vào nhóm "${bridgeConfig.groupName}".`
-                        },
-                        bridgeConfig.targetGroupId,
-                        ThreadType.Group
-                    ).catch(() => {});
-                }
-            } catch (e) {
-                console.warn("[ZaloBridge] Không thể tự động phân giải group link:", e.message);
-            }
-        }
+        // Tự động giải quyết nhóm mục tiêu
+        await resolveGroupTarget();
 
-        // Lắng nghe tin nhắn để tự động liên kết nhóm
-        if (api.listener) {
-            api.listener.on("message", (msg) => {
-                if (msg.type === ThreadType.Group) {
-                    const text = String(msg.data?.content || "").trim();
+        // Lắng nghe tin nhắn để tự động liên kết nhóm (hỗ trợ cả tài khoản bot tự gõ /setalert nhờ selfListen: true)
+        if (api && api.listener) {
+            api.listener.on("message", async (msg) => {
+                try {
+                    let text = "";
+                    if (typeof msg.data?.content === "string") {
+                        text = msg.data.content.trim();
+                    } else if (msg.data?.content && typeof msg.data.content === "object") {
+                        text = String(msg.data.content.title || msg.data.content.description || "").trim();
+                    }
+                    const lower = text.toLowerCase();
                     const senderName = msg.data?.dName || "Người dùng";
 
-                    // Khi ai đó gõ /setalert hoặc /start trong nhóm
-                    if (text === "/setalert" || text === "/start" || text === "/link") {
-                        bridgeConfig.targetGroupId = msg.threadId;
-                        saveConfig();
-                        console.log(`[ZaloBridge] 🔗 Đã liên kết nhóm Zalo ID: ${msg.threadId}`);
+                    // Khi người dùng (hoặc chính bot) gõ /setalert, /start, /link
+                    if (lower.startsWith("/setalert") || lower.startsWith("/start") || lower.startsWith("/link") || lower === "setalert") {
+                        if (msg.type === ThreadType.Group) {
+                            bridgeConfig.targetGroupId = String(msg.threadId);
+                            try {
+                                const groupInfo = await api.getGroupInfo(msg.threadId);
+                                const info = groupInfo?.gridInfoMap?.[msg.threadId];
+                                if (info?.name) bridgeConfig.groupName = info.name;
+                            } catch (e) {}
+                            saveConfig();
+                            console.log(`[ZaloBridge] 🔗 Đã liên kết nhóm Zalo ID: ${msg.threadId} ("${bridgeConfig.groupName}") từ tin nhắn của ${senderName}`);
 
-                        api.sendMessage(
-                            {
-                                msg: `✅ ĐÃ LIÊN KẾT NHÓM THÀNH CÔNG!\nKể từ bây giờ, mọi cảnh báo đỏ (Ẩu đả, Đột nhập, Âm thanh bất thường) từ hệ thống Camera AI DNC sẽ tự động được gửi vào nhóm này.\n(Người cấu hình: ${senderName})`
-                            },
-                            msg.threadId,
-                            ThreadType.Group
-                        ).catch(console.error);
+                            await api.sendMessage(
+                                {
+                                    msg: `✅ ĐÃ LIÊN KẾT NHÓM CẢNH BÁO CAMERA DNC THÀNH CÔNG!\n` +
+                                         `📌 Nhóm: ${bridgeConfig.groupName || msg.threadId}\n` +
+                                         `👤 Người kích hoạt: ${senderName}\n\n` +
+                                         `Kể từ bây giờ, mọi sự kiện báo động đỏ (Ẩu đả, Đột nhập, Âm thanh bất thường...) cấu hình trên Admin sẽ tự động gửi video và thông tin vào nhóm này.`
+                                },
+                                msg.threadId,
+                                ThreadType.Group
+                            ).catch(console.error);
+                        } else {
+                            await api.sendMessage(
+                                {
+                                    msg: `⚠️ Lệnh này cần được gửi trong NHÓM Zalo bạn muốn nhận cảnh báo (không phải tin nhắn riêng). Hãy vào nhóm và gõ: /setalert`
+                                },
+                                msg.threadId,
+                                ThreadType.User
+                            ).catch(console.error);
+                        }
                     }
+                } catch (msgErr) {
+                    console.error("[ZaloBridge] Lỗi xử lý tin nhắn lắng nghe:", msgErr);
                 }
             });
 
@@ -166,50 +231,89 @@ async function initZalo() {
 const app = express();
 app.use(express.json());
 
-// Giao diện web hiển thị mã QR để quét bằng điện thoại
+// Giao diện web hiển thị mã QR để quét bằng điện thoại (Tự động cập nhật trạng thái)
 app.get("/login", (req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(`<!DOCTYPE html>
 <html>
 <head>
-    <title>Zalo Bot Login QR - Camera DNC</title>
+    <title>Zalo Bot Login - Camera DNC</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="refresh" content="5">
     <style>
-        body { background: #111827; color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-        .card { background: #1f2937; border-radius: 16px; padding: 28px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #374151; max-width: 420px; width: 100%; text-align: center; }
-        h1 { font-size: 20px; margin-bottom: 8px; color: #60a5fa; }
-        p { font-size: 14px; color: #9ca3af; margin-bottom: 20px; line-height: 1.5; }
-        .qr-wrap { background: #fff; padding: 16px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        body { background: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .card { background: #1e293b; border-radius: 16px; padding: 28px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); border: 1px solid #334155; max-width: 440px; width: 100%; text-align: center; }
+        h1 { font-size: 20px; margin-bottom: 8px; color: #38bdf8; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        p { font-size: 14px; color: #94a3b8; margin-bottom: 20px; line-height: 1.5; }
+        .qr-wrap { background: #fff; padding: 16px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-height: 260px; min-width: 260px; }
         img { width: 260px; height: 260px; display: block; border-radius: 4px; }
-        .footer { margin-top: 18px; font-size: 13px; color: #10b981; }
-        .instruction { text-align: left; background: #374151; padding: 12px 16px; border-radius: 8px; font-size: 13px; color: #d1d5db; margin-top: 20px; }
-        code { background: #111827; color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        .success-box { background: #064e3b; border: 1px solid #059669; color: #a7f3d0; padding: 20px; border-radius: 12px; margin-bottom: 16px; }
+        .instruction { text-align: left; background: #334155; padding: 14px 16px; border-radius: 10px; font-size: 13px; color: #cbd5e1; margin-top: 20px; }
+        code { background: #0f172a; color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-right: 6px; }
+        .status-dot.active { background: #10b981; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h1>📲 Đăng Nhập Bot Zalo</h1>
-        <p>Mở Zalo trên điện thoại, bấm biểu tượng <b>Quét mã QR</b> để quét mã dưới đây:</p>
-        <div class="qr-wrap">
-            <img src="/qr?t=${Date.now()}" alt="Mã QR Zalo (Đang tạo...)">
+        <h1>📲 Zalo Bot Alert Bridge</h1>
+        <div id="content">
+            <p>Đang kiểm tra kết nối tới Bot Zalo...</p>
         </div>
         <div class="instruction">
-            <b>👉 Các bước thực hiện:</b>
+            <b>👉 Các bước kích hoạt:</b>
             <ol style="margin: 8px 0 0 18px; padding: 0; line-height: 1.6;">
-                <li>Dùng Zalo quét mã và chọn <b>Đăng nhập</b>.</li>
-                <li>Vào nhóm Zalo gửi tin nhắn: <code>/setalert</code>.</li>
+                <li>Dùng Zalo trên điện thoại quét mã QR và chọn <b>Đăng nhập</b>.</li>
+                <li>Vào nhóm Zalo nhận cảnh báo và gửi: <code>/setalert</code>.</li>
             </ol>
         </div>
-        <div class="footer">⚡ Trang tự động làm mới mỗi 5 giây</div>
     </div>
+
+    <script>
+        async function updateStatus() {
+            try {
+                const res = await fetch('/health?t=' + Date.now());
+                const data = await res.json();
+                const container = document.getElementById('content');
+                if (data.zalo_connected) {
+                    let groupInfo = data.target_group_id ?
+                        '<p style="color:#34d399;font-weight:bold;">Đã liên kết nhóm: ' + (data.group_name || data.target_group_id) + '</p>' :
+                        '<p style="color:#fbbf24;">Bot đã đăng nhập! Vui lòng vào nhóm Zalo gửi <code>/setalert</code> để liên kết.</p>';
+                    container.innerHTML = \`
+                        <div class="success-box">
+                            <h2 style="margin:0 0 8px 0;font-size:18px;color:#34d399;">✅ Đã Đăng Nhập Zalo Thành Công!</h2>
+                            \${groupInfo}
+                        </div>
+                    \`;
+                } else {
+                    container.innerHTML = \`
+                        <p>Mở Zalo trên điện thoại, bấm biểu tượng <b>Quét mã QR</b> để đăng nhập:</p>
+                        <div class="qr-wrap">
+                            <img src="/qr?t=\${Date.now()}" alt="Mã QR Zalo (Đang tạo...)">
+                        </div>
+                        <p style="margin-top:12px;font-size:12px;color:#64748b;">Mã QR tự động làm mới nếu hết hạn.</p>
+                    \`;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        updateStatus();
+        setInterval(updateStatus, 3000);
+    </script>
 </body>
 </html>`);
 });
 
-// Trả về file ảnh QR png trực tiếp
+// Trả về file ảnh QR png trực tiếp hoặc dữ liệu base64
 app.get("/qr", (req, res) => {
+    if (currentQrDataUri && currentQrDataUri.startsWith("data:image/png;base64,")) {
+        const base64Data = currentQrDataUri.replace(/^data:image\/png;base64,/, "");
+        const imgBuffer = Buffer.from(base64Data, "base64");
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+        res.setHeader("Content-Type", "image/png");
+        return res.send(imgBuffer);
+    }
     const candidates = [
         QR_FILE,
         path.resolve("./qr.png"),
@@ -224,6 +328,22 @@ app.get("/qr", (req, res) => {
         }
     }
     res.status(404).send("Mã QR chưa sẵn sàng hoặc Bot đã đăng nhập thành công.");
+});
+
+// Endpoint cấu hình thủ công Group ID
+app.post("/set-group", (req, res) => {
+    const { groupId, groupName } = req.body || {};
+    if (!groupId) {
+        return res.status(400).json({ error: "groupId is required" });
+    }
+    bridgeConfig.targetGroupId = String(groupId).trim();
+    if (groupName) bridgeConfig.groupName = String(groupName).trim();
+    saveConfig();
+    return res.json({
+        success: true,
+        target_group_id: bridgeConfig.targetGroupId,
+        group_name: bridgeConfig.groupName
+    });
 });
 
 // Endpoint nhận Webhook từ Camera AI
@@ -283,7 +403,8 @@ app.get("/health", (req, res) => {
     res.json({
         status: "ok",
         zalo_connected: !!api,
-        target_group_id: bridgeConfig.targetGroupId || "Chưa liên kết (Gõ /setalert trong nhóm)",
+        target_group_id: bridgeConfig.targetGroupId || "",
+        group_name: bridgeConfig.groupName || "",
         invite_link: bridgeConfig.inviteLink
     });
 });

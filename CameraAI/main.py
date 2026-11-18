@@ -2527,6 +2527,39 @@ async def test_zalo_webhook_api(payload: Optional[ZaloTestModel] = None, _: str 
     return await asyncio.to_thread(test_zalo_webhook, webhook_url=url, token=sec)
 
 
+@app.get("/api/admin/zalo-status")
+async def get_zalo_bridge_status_api(_: str = Depends(require_database_admin)):
+    """Check live status of the Zalo Bot Bridge container."""
+    from alert_dispatcher import _get_candidate_webhook_urls
+    candidates = _get_candidate_webhook_urls(None)
+    health_candidates = [u.replace("/webhook", "/health") for u in candidates]
+
+    for url in health_candidates:
+        try:
+            resp = await asyncio.to_thread(requests.get, url, timeout=3)
+            if resp.status_code == 200:
+                data = resp.json()
+                return {
+                    "online": True,
+                    "endpoint": url,
+                    "zalo_connected": bool(data.get("zalo_connected")),
+                    "target_group_id": data.get("target_group_id") or "",
+                    "group_name": data.get("group_name") or "",
+                    "invite_link": data.get("invite_link") or "",
+                }
+        except Exception:
+            continue
+
+    return {
+        "online": False,
+        "endpoint": None,
+        "zalo_connected": False,
+        "target_group_id": "",
+        "group_name": "",
+        "invite_link": "https://zalo.me/g/libazgippahcfbk99qkc",
+    }
+
+
 class AlertConfigUpdateModel(BaseModel):
     zalo_webhook_url: Optional[str] = None
     zalo_webhook_secret: Optional[str] = None

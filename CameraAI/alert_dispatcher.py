@@ -110,11 +110,32 @@ def send_telegram_alert(payload: Dict[str, Any]) -> bool:
     return False
 
 
+DEFAULT_ZALO_WEBHOOK_URL = "http://zalo-bridge:5055/webhook"
+
+
+def _get_candidate_webhook_urls(target_url: Optional[str]) -> List[str]:
+    """Resolve webhook URL candidates prioritizing Docker container network name."""
+    url = (target_url or "").strip()
+    if not url:
+        return [DEFAULT_ZALO_WEBHOOK_URL, "http://127.0.0.1:5055/webhook"]
+
+    candidates: List[str] = []
+    # If URL contains 127.0.0.1 or localhost, Docker container network name must come first
+    if "127.0.0.1:5055" in url or "localhost:5055" in url:
+        candidates.append("http://zalo-bridge:5055/webhook")
+        candidates.append(url)
+        candidates.append("http://host.docker.internal:5055/webhook")
+    else:
+        candidates.append(url)
+        if "zalo-bridge" not in url:
+            candidates.append("http://zalo-bridge:5055/webhook")
+    return candidates
+
+
 def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
     """Send alert payload to a Zalo Group Bot / Webhook relay bridge."""
-    webhook_url = os.getenv("ZALO_WEBHOOK_URL", "").strip()
-    if not webhook_url:
-        return False
+    webhook_url = os.getenv("ZALO_WEBHOOK_URL", "").strip() or DEFAULT_ZALO_WEBHOOK_URL
+    candidates = _get_candidate_webhook_urls(webhook_url)
 
     channel = payload.get("channel", 0)
     event_code = payload.get("event_code", "Unknown")
@@ -151,31 +172,25 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
     if zalo_token:
         headers["Authorization"] = f"Bearer {zalo_token}"
 
-    try:
-        resp = requests.post(webhook_url, json=body, headers=headers, timeout=8)
-        if resp.status_code in (200, 201, 202, 204):
-            logger.info(f"[AlertDispatcher] Sent Zalo Webhook alert for ch={channel}, code={event_code}")
-            return True
-        logger.warning(f"[AlertDispatcher] Zalo Webhook error HTTP {resp.status_code}: {resp.text[:200]}")
-    except Exception as exc:
-        if "127.0.0.1:5055" in webhook_url or "localhost:5055" in webhook_url:
-            for alt in ["http://zalo-bridge:5055/webhook", "http://host.docker.internal:5055/webhook"]:
-                try:
-                    resp = requests.post(alt, json=body, headers=headers, timeout=8)
-                    if resp.status_code in (200, 201, 202, 204):
-                        logger.info(f"[AlertDispatcher] Sent Zalo Webhook alert via fallback {alt}")
-                        return True
-                except Exception:
-                    pass
-        logger.error(f"[AlertDispatcher] Zalo Webhook connection error: {exc}")
+    for url in candidates:
+        try:
+            resp = requests.post(url, json=body, headers=headers, timeout=8)
+            if resp.status_code in (200, 201, 202, 204):
+                logger.info(f"[AlertDispatcher] Sent Zalo Webhook alert for ch={channel}, code={event_code} via {url}")
+                return True
+            logger.warning(f"[AlertDispatcher] Zalo Webhook error HTTP {resp.status_code} on {url}: {resp.text[:200]}")
+        except Exception as exc:
+            logger.debug(f"[AlertDispatcher] Error calling {url}: {exc}")
+            continue
+
+    logger.error(f"[AlertDispatcher] Zalo Webhook failed across all candidates for ch={channel}")
     return False
 
 
 def test_zalo_webhook(webhook_url: Optional[str] = None, token: Optional[str] = None) -> Dict[str, Any]:
     """Test connectivity to Zalo webhook bridge."""
-    target_url = (webhook_url or os.getenv("ZALO_WEBHOOK_URL", "")).strip()
-    if not target_url:
-        return {"success": False, "message": "Chưa cấu hình ZALO_WEBHOOK_URL trong .env"}
+    raw_url = webhook_url or os.getenv("ZALO_WEBHOOK_URL", "")
+    candidates = _get_candidate_webhook_urls(raw_url)
 
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     msg_text = f"🚨 [TEST CẢNH BÁO] Hệ thống Camera AI DNC kết nối thành công tới Zalo Group lúc {now_str}."
@@ -199,21 +214,38 @@ def test_zalo_webhook(webhook_url: Optional[str] = None, token: Optional[str] = 
     if secret:
         headers["Authorization"] = f"Bearer {secret}"
 
-    try:
-        resp = requests.post(target_url, json=body, headers=headers, timeout=8)
-        if resp.status_code in (200, 201, 202, 204):
-            return {"success": True, "status_code": resp.status_code, "message": "Đã gửi tin nhắn thử nghiệm thành công tới Zalo Group!"}
-        return {"success": False, "status_code": resp.status_code, "message": f"Zalo Webhook phản hồi mã lỗi {resp.status_code}: {resp.text[:200]}"}
-    except Exception as exc:
-        if "127.0.0.1:5055" in target_url or "localhost:5055" in target_url:
-            for alt in ["http://zalo-bridge:5055/webhook", "http://host.docker.internal:5055/webhook"]:
-                try:
-                    resp = requests.post(alt, json=body, headers=headers, timeout=8)
-                    if resp.status_code in (200, 201, 202, 204):
-                        return {"success": True, "status_code": resp.status_code, "message": f"Đã gửi tin nhắn thử nghiệm thành công tới Zalo Group (qua container link {alt})!"}
-                except Exception:
-                    pass
-        return {"success": False, "message": f"Không thể kết nối tới Zalo Webhook ({target_url}): {exc}"}
+    last_error = ""
+    for url in candidates:
+        try:
+            resp = requests.post(url, json=body, headers=headers, timeout=8)
+            if resp.status_code in (200, 201, 202, 204):
+                return {
+                    "success": True,
+                    "status_code": resp.status_code,
+                    "target_url": url,
+                    "message": "Đã gửi tin nhắn thử nghiệm thành công tới Zalo Group!",
+                }
+            # Bridge returned an explicit status message (e.g. 503 unauthenticated, 400 no group)
+            err_msg = ""
+            try:
+                res_data = resp.json()
+                err_msg = res_data.get("message") or res_data.get("error") or resp.text
+            except Exception:
+                err_msg = resp.text
+            return {
+                "success": False,
+                "status_code": resp.status_code,
+                "target_url": url,
+                "message": f"Zalo Bridge phản hồi ({resp.status_code}): {err_msg}",
+            }
+        except Exception as exc:
+            last_error = str(exc)
+            continue
+
+    return {
+        "success": False,
+        "message": f"Không thể kết nối tới Zalo Webhook Bridge trên cổng 5055: {last_error}",
+    }
 
 
 def send_email_alert(payload: Dict[str, Any]) -> bool:
@@ -320,7 +352,7 @@ def get_zalo_alert_config() -> Dict[str, Any]:
     """Retrieve Zalo alert configuration with behavior and camera filters."""
     config_file = config.STORAGE_DIR / "alert_config.json"
     cfg = {
-        "zalo_webhook_url": os.getenv("ZALO_WEBHOOK_URL", "").strip(),
+        "zalo_webhook_url": os.getenv("ZALO_WEBHOOK_URL", "").strip() or DEFAULT_ZALO_WEBHOOK_URL,
         "zalo_webhook_secret": os.getenv("ZALO_WEBHOOK_SECRET", "").strip(),
         "zalo_alert_events": list(DEFAULT_ZALO_ALERT_EVENTS),
         "zalo_alert_channels": list(DEFAULT_ZALO_ALERT_CHANNELS),
