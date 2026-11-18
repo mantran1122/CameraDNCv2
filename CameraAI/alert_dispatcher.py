@@ -17,6 +17,7 @@ import smtplib
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
@@ -175,7 +176,7 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
 
     for url in candidates:
         try:
-            resp = requests.post(url, json=body, headers=headers, timeout=35)
+            resp = requests.post(url, json=body, headers=headers, timeout=(4, 35))
             if resp.status_code in (200, 201, 202, 204):
                 logger.info(f"[AlertDispatcher] Sent Zalo Webhook alert for ch={channel}, code={event_code} via {url}")
                 return True
@@ -247,7 +248,7 @@ def test_zalo_webhook(webhook_url: Optional[str] = None, token: Optional[str] = 
     last_error = ""
     for url in candidates:
         try:
-            resp = requests.post(url, json=body, headers=headers, timeout=35)
+            resp = requests.post(url, json=body, headers=headers, timeout=(4, 35))
             if resp.status_code in (200, 201, 202, 204):
                 return {
                     "success": True,
