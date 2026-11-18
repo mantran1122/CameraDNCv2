@@ -115,8 +115,8 @@ class ClipCaptureWorker:
             )
             return
 
-        delay = config.POST_BUFFER_SEC + config.CLIP_READY_DELAY_SEC - age_sec
-        if 0 < delay <= 15:
+        delay = max(0.0, min(5.0, float(getattr(config, "POST_BUFFER_SEC", 5)) + 0.5 - age_sec))
+        if delay > 0:
             time.sleep(delay)
 
         print(f"[CLIP] alert={event_id} capturing 10s evidence")

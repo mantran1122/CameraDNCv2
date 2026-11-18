@@ -84,14 +84,14 @@ def send_telegram_alert(payload: Dict[str, Any]) -> bool:
     full_clip_url = urljoin(f"{app_base}/", clip_url.lstrip("/")) if (app_base and clip_url) else clip_url
 
     text = (
-        f"🚨 <b>[CẢNH BÁO ĐỎ - AN NINH DNC]</b>\n"
-        f"📹 <b>Vị trí:</b> {cam_name} (Kênh {channel:02d})\n"
-        f"⚠️ <b>Hành vi:</b> {label} (<code>{event_code}</code>)\n"
-        f"⏰ <b>Thời gian:</b> {ts}\n"
-        f"📝 <b>Chi tiết:</b> {desc}\n"
+        f"[CẢNH BÁO ĐỎ - AN NINH DNC]\n"
+        f"Vị trí: {cam_name} (Kênh {channel:02d})\n"
+        f"Hành vi: {label} ({event_code})\n"
+        f"Thời gian: {ts}\n"
+        f"Chi tiết: {desc}\n"
     )
     if full_clip_url:
-        text += f"🎬 <b>Xem clip:</b> <a href=\"{full_clip_url}\">Bấm vào đây để mở video</a>\n"
+        text += f"Xem clip: <a href=\"{full_clip_url}\">Mở video bằng chứng</a>\n"
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     body = {
@@ -148,7 +148,7 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
     app_base = os.getenv("CAMERAAI_BASE_URL", "").rstrip("/")
     full_clip_url = urljoin(f"{app_base}/", clip_url.lstrip("/")) if (app_base and clip_url) else clip_url
 
-    msg_text = f"🚨 [CẢNH BÁO ĐỎ] {label} tại {cam_name} lúc {ts}.\nChi tiết: {desc}"
+    msg_text = f"[CẢNH BÁO ĐỎ] {label} tại {cam_name} lúc {ts}.\nChi tiết: {desc}"
     if full_clip_url:
         msg_text += f"\nXem video clip: {full_clip_url}"
 
@@ -470,11 +470,11 @@ def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
         payload = dict(event_payload)
         ev_id = payload.get("id")
 
-        # Đợi tối đa 7s để clip_capture_worker hoàn thành việc trích xuất video thực tế từ đầu ghi NVR
+        # Đợi tối đa 13s để clip_capture_worker hoàn thành việc trích xuất video thực tế từ đầu ghi NVR
         if not payload.get("clip_filename") and ev_id:
             try:
                 import database
-                for _ in range(14):
+                for _ in range(26):
                     time.sleep(0.5)
                     ev_db = database.get_event_by_id(int(ev_id))
                     if ev_db and ev_db.get("clip_filename"):

@@ -230,6 +230,34 @@ def clip_event_video(
         if res_fb.returncode == 0 and os.path.exists(full_output_path) and _has_expected_duration(full_output_path):
             return output_filename
 
+        # Mode 3 Fallback: Live RTSP Stream (/cam/realmonitor) to capture real optical video
+        print(f"[VideoClipper] Playback stream failed for Ch {channel}, falling back to live stream capture...")
+        for subtype in [0, 1]:
+            live_rtsp_url = (
+                f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{config.RTSP_PORT}"
+                f"/cam/realmonitor?channel={channel}&subtype={subtype}"
+            )
+            cmd_live = [
+                config.FFMPEG_PATH,
+                "-y",
+                "-rtsp_transport", "tcp",
+                "-fflags", "+genpts",
+                "-i", live_rtsp_url,
+                "-t", str(min(6, config.CLIP_DURATION_SEC)),
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-c:a", "aac",
+                "-movflags", "+faststart",
+                full_output_path
+            ]
+            try:
+                res_live = subprocess.run(cmd_live, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+                if res_live.returncode == 0 and os.path.exists(full_output_path) and _has_expected_duration(full_output_path):
+                    print(f"[VideoClipper] Captured live optical camera video for channel {channel} (subtype={subtype})")
+                    return output_filename
+            except Exception as live_err:
+                print(f"[VideoClipper Warning] Live capture error (subtype={subtype}): {live_err}")
+
         print(
             "[FFmpeg Warning] WAN/RTSP clip extraction failed, timed out, or returned a short clip; "
             "no incomplete clip will be stored in production."

@@ -193,27 +193,47 @@ class DahuaNVRListener(threading.Thread):
         audio_db = None
 
         is_selected_abnormal = config.is_channel_anomaly(channel, code)
-        if is_selected_abnormal and code in config.AUDIO_EVENT_CODES:
+        is_zalo_alert = False
+        try:
+            from alert_dispatcher import get_zalo_alert_config
+            z_cfg = get_zalo_alert_config()
+            z_events = set(z_cfg.get("zalo_alert_events") or [])
+            z_channels = set(z_cfg.get("zalo_alert_channels") or [])
+            if not z_channels or channel in z_channels:
+                if code in z_events:
+                    is_zalo_alert = True
+                elif code in ("SoundDetection", "AudioAnomaly") and "AudioMutation" in z_events:
+                    is_zalo_alert = True
+                elif code == "SmartMotionHuman" and "HumanTrait" in z_events:
+                    is_zalo_alert = True
+        except Exception:
+            pass
+
+        is_alert_event = is_selected_abnormal or is_zalo_alert
+
+        code_vn_map = {
+            "Intrusion": "Xâm nhập trái phép",
+            "CrossLine": "Vượt vạch cấm",
+            "Fight": "Ẩu đả / Xô xát",
+            "VideoMotion": "Chuyển động bất thường",
+            "SoundDetection": "Âm thanh bất thường",
+            "AudioAnomaly": "Âm thanh đột biến",
+            "AudioMutation": "Âm thanh đột biến",
+            "HumanTrait": "Người di chuyển (Human Trait)",
+            "SmartMotionHuman": "Người di chuyển (Smart Motion)",
+            "FaceDetection": "Nhận diện khuôn mặt",
+            "VehicleTrait": "Phương tiện di chuyển",
+        }
+        vn_code = code_vn_map.get(code, code)
+
+        if is_alert_event and code in config.AUDIO_EVENT_CODES:
             event_type = "audio_anomaly"
             severity = "high"
             audio_db = float(event_data.get("AudioValue", 85.0))
-            description = f"Cảnh Báo Âm Thanh: {code} ({audio_db} dB) tại Cam {channel:02d}"
-        elif is_selected_abnormal:
+            description = f"Cảnh Báo Âm Thanh: {vn_code} ({audio_db} dB) tại Cam {channel:02d}"
+        elif is_alert_event:
             event_type = "video_anomaly"
-            severity = "medium" if code in ["HumanTrait", "SmartMotionHuman", "FaceDetection"] else "high"
-            code_vn_map = {
-                "Intrusion": "Xâm nhập trái phép",
-                "CrossLine": "Vượt vạch cấm",
-                "Fight": "Ẩu đả / Xô xát",
-                "VideoMotion": "Chuyển động bất thường",
-                "SoundDetection": "Âm thanh bất thường",
-                "AudioAnomaly": "Âm thanh đột biến",
-                "HumanTrait": "Người di chuyển (Human Trait)",
-                "SmartMotionHuman": "Người di chuyển (Smart Motion)",
-                "FaceDetection": "Nhận diện khuôn mặt",
-                "VehicleTrait": "Phương tiện di chuyển",
-            }
-            vn_code = code_vn_map.get(code, code)
+            severity = "high" if (code in config.CRITICAL_ANOMALY_CODES or is_zalo_alert) else "medium"
             description = f"Cảnh Báo ({vn_code}) tại Cam {channel:02d}"
         elif code in ["FaceDetection", "HumanTrait"]:
             description = f"Phát hiện người (Human Trait) tại Cam {channel:02d}"
@@ -236,11 +256,11 @@ class DahuaNVRListener(threading.Thread):
             self.last_event_time = time.time()
             self.total_events_received += 1
 
-            if event_type in {"audio_anomaly", "video_anomaly"}:
+            if event_type in {"audio_anomaly", "video_anomaly"} or is_alert_event:
                 now_ts = time.time()
                 last_queued_ts = self._last_clip_queued.get(channel, 0.0)
-                # Debounce / Cooldown 30s per camera to prevent queue flooding
-                if now_ts - last_queued_ts >= 30.0:
+                # Debounce / Cooldown 15s per camera to prevent queue flooding
+                if now_ts - last_queued_ts >= 15.0:
                     self._last_clip_queued[channel] = now_ts
                     database.create_audio_analysis(event_id, status="not_analyzed")
                     if self.audio_job_callback:
@@ -249,7 +269,7 @@ class DahuaNVRListener(threading.Thread):
                     database.create_audio_analysis(
                         event_id,
                         status="video_cooldown",
-                        error_message="Bỏ qua cắt clip do camera đang trong thời gian giãn cách 30s.",
+                        error_message="Bỏ qua cắt clip do camera đang trong thời gian giãn cách 15s.",
                     )
 
             event_obj = database.get_event_by_id(event_id)
