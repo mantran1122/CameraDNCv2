@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CAMERA AI DNC</title>
+    <!-- Favicon: Logo DNC -->
+    <link rel="icon" type="image/png" href="/static/logo_don.png">
+    <link rel="shortcut icon" type="image/png" href="/static/logo_don.png">
+    <link rel="apple-touch-icon" href="/static/logo_don.png">
     <script>
         (function() {
             try {
@@ -158,12 +162,13 @@
         .logo-wrap {
             display: flex;
             align-items: center;
-            height: 22px;
+            height: 32px;
         }
 
         .logo-wrap img {
-            height: 18px;
+            height: 28px;
             width: auto;
+            object-fit: contain;
         }
 
         .header-divider {
@@ -6011,7 +6016,10 @@
                     <line x1="3" y1="18" x2="21" y2="18"></line>
                 </svg>
             </button>
-
+            <div class="logo-wrap" title="Đại học Nam Cần Thơ">
+                <img src="/static/logo_don.png" alt="Logo DNC" onerror="this.src='/logo_don.png'">
+            </div>
+            <div class="header-divider"></div>
             <h1 class="header-title">CAMERA AI DNC</h1>
         </div>
 

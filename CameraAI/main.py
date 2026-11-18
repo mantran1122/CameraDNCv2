@@ -845,12 +845,16 @@ async def serve_admin_logo_truong():
     raise HTTPException(status_code=404, detail="Logo not found")
 
 
+@app.get("/favicon.ico")
 @app.get("/admin/favicon.ico")
 async def serve_admin_favicon():
+    logo_path = Path(__file__).resolve().parent / "static" / "logo_don.png"
+    if logo_path.is_file():
+        return FileResponse(logo_path, media_type="image/png")
     fav_path = quasar_spa_dir / "favicon.ico"
     if fav_path.is_file():
         return FileResponse(fav_path)
-    return FileResponse(Path(__file__).resolve().parent / "static" / "favicon.ico")
+    return FileResponse(logo_path)
 
 
 @app.get("/admin", response_class=HTMLResponse)
