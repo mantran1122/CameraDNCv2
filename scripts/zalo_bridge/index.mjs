@@ -391,18 +391,48 @@ app.post("/webhook", async (req, res) => {
         });
     } catch (sendErr) {
         console.error("[ZaloBridge] ❌ Lỗi gửi tin nhắn Zalo:", sendErr);
+        const errMsg = String(sendErr.message || sendErr);
+        if (errMsg.includes("zpw_sek") || errMsg.includes("1105") || errMsg.includes("không đúng")) {
+            console.warn("[ZaloBridge] ⚠️ Phiên Zalo (zpw_sek) đã hết hạn/bị đá do đăng nhập Web ở nơi khác. Đang tự động dọn dẹp để tạo mã QR mới...");
+            api = null;
+            try {
+                if (fs.existsSync(APPSTATE_FILE)) fs.unlinkSync(APPSTATE_FILE);
+            } catch (err) {}
+            setTimeout(() => { initZalo(); }, 1000);
+            return res.status(401).json({
+                status: "error",
+                message: "Phiên Zalo bị đá do tài khoản vừa đăng nhập Web ở nơi khác (zpw_sek bị thu hồi). Hãy mở http://192.168.100.40.nip.io:5055/login để quét mã QR lại. (Khuyên dùng SIM phụ làm Bot để không bao giờ bị đá)."
+            });
+        }
         return res.status(500).json({
             status: "error",
-            message: "Lỗi gửi tin nhắn Zalo: " + sendErr.message
+            message: "Lỗi gửi tin nhắn Zalo: " + errMsg
         });
     }
 });
 
 // Endpoint kiểm tra trạng thái
-app.get("/health", (req, res) => {
+app.get("/health", async (req, res) => {
+    let connected = !!api;
+    if (api) {
+        try {
+            await api.fetchAccountInfo();
+        } catch (checkErr) {
+            const checkMsg = String(checkErr.message || checkErr);
+            if (checkMsg.includes("zpw_sek") || checkMsg.includes("1105")) {
+                console.warn("[ZaloBridge] ⚠️ /health phát hiện zpw_sek đã hết hạn. Đang reset phiên...");
+                api = null;
+                connected = false;
+                try {
+                    if (fs.existsSync(APPSTATE_FILE)) fs.unlinkSync(APPSTATE_FILE);
+                } catch (err) {}
+                setTimeout(() => { initZalo(); }, 1000);
+            }
+        }
+    }
     res.json({
         status: "ok",
-        zalo_connected: !!api,
+        zalo_connected: connected,
         target_group_id: bridgeConfig.targetGroupId || "",
         group_name: bridgeConfig.groupName || "",
         invite_link: bridgeConfig.inviteLink
