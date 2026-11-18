@@ -489,6 +489,21 @@ def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
                 except Exception as loop_err:
                     logger.debug(f"[AlertDispatcher] Đang đợi clip event={ev_id}: {loop_err}")
 
+            # Fallback nếu sau thời gian chờ chưa kịp trích xuất clip mới: tự động lấy clip vừa ghi gần nhất của camera này
+            if not payload.get("clip_filename") and channel:
+                try:
+                    import database
+                    recent_clip = database.get_recent_clip_for_channel(channel, max_age_seconds=60)
+                    if recent_clip:
+                        payload["clip_filename"] = recent_clip
+                        app_base = os.getenv("CAMERAAI_BASE_URL", "").rstrip("/")
+                        rel_clip = str(recent_clip).replace("\\", "/").lstrip("/")
+                        full_url = f"{app_base}/clips/{rel_clip}" if app_base else f"/clips/{rel_clip}"
+                        payload["clip_url"] = full_url
+                        logger.info(f"[AlertDispatcher] Tự động gán clip gần nhất ({recent_clip}) cho cảnh báo event={ev_id}")
+                except Exception as fb_err:
+                    logger.debug(f"[AlertDispatcher] Lỗi gán clip gần nhất: {fb_err}")
+
         # 1. Telegram Group Bot
         send_telegram_alert(payload)
         # 2. Zalo Group Webhook

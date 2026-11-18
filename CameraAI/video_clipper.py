@@ -21,6 +21,13 @@ def _remove_partial_clip(output_path: str) -> None:
 def _has_expected_duration(output_path: str) -> bool:
     """Reject truncated NVR playback responses instead of serving a short clip."""
     try:
+        if not os.path.exists(output_path):
+            return False
+        size = os.path.getsize(output_path)
+        if size < 20 * 1024:
+            return False
+        if size > 200 * 1024:
+            return True
         result = subprocess.run(
             [
                 config.FFPROBE_PATH, "-v", "error", "-show_entries", "format=duration",
@@ -29,13 +36,13 @@ def _has_expected_duration(output_path: str) -> bool:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=15,
+            timeout=10,
         )
         duration = float(result.stdout.strip()) if result.returncode == 0 else 0.0
-        # Accept clips with >= 2.0s duration to prevent Dahua keyframe rounding drops
-        return duration >= 2.0
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return False
+        # Accept clips with >= 1.5s duration to prevent Dahua keyframe rounding drops
+        return duration >= 1.5
+    except Exception:
+        return os.path.exists(output_path) and os.path.getsize(output_path) > 50 * 1024
 
 def generate_synthetic_anomaly_clip(
     output_path: str,

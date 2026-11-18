@@ -530,6 +530,32 @@ def replace_event_clip_reference(event_id: int, old_reference: str, new_referenc
     return updated
 
 
+def get_recent_clip_for_channel(channel: int, max_age_seconds: int = 45) -> Optional[str]:
+    """Retrieve the most recent valid clip recorded for the specified camera channel within max_age_seconds."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT clip_filename, timestamp FROM events
+        WHERE channel = ? AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
+        ORDER BY id DESC LIMIT 1
+        """,
+        (channel,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if not row or not row["clip_filename"]:
+        return None
+    try:
+        ts_str = row["timestamp"]
+        ev_dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+        if (datetime.now() - ev_dt).total_seconds() <= max_age_seconds:
+            return row["clip_filename"]
+    except Exception:
+        return row["clip_filename"]
+    return None
+
+
 def get_protected_clip_filenames() -> set[str]:
     """Return the set of basenames for all clips that are protected (red labels/anomalies)."""
     conn = get_db_connection()

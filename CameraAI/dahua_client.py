@@ -258,14 +258,27 @@ class DahuaNVRListener(threading.Thread):
 
             if event_type in {"audio_anomaly", "video_anomaly"} or is_alert_event:
                 now_ts = time.time()
-                last_queued_ts = self._last_clip_queued.get(channel, 0.0)
-                # Debounce / Cooldown 15s per camera to prevent queue flooding
-                if now_ts - last_queued_ts >= 15.0:
-                    self._last_clip_queued[channel] = now_ts
+                # Phân loại độ ưu tiên: Cảnh báo âm thanh hoặc hành vi khẩn cấp KHÔNG bị chặn bởi sự kiện chuyển động thông thường
+                is_high_priority = (
+                    event_type == "audio_anomaly"
+                    or code in getattr(config, "AUDIO_EVENT_CODES", [])
+                    or code in getattr(config, "CRITICAL_ANOMALY_CODES", [])
+                    or severity == "high"
+                )
+                debounce_key = f"{channel}_{code}" if is_high_priority else f"{channel}_routine"
+                last_queued_ts = self._last_clip_queued.get(debounce_key, 0.0)
+                cooldown_limit = 8.0 if is_high_priority else 15.0
+
+                if now_ts - last_queued_ts >= cooldown_limit:
+                    self._last_clip_queued[debounce_key] = now_ts
                     database.create_audio_analysis(event_id, status="not_analyzed")
                     if self.audio_job_callback:
                         self.audio_job_callback(event_id)
                 else:
+                    # Nếu sự kiện cùng camera rơi vào giãn cách, tự động tái sử dụng clip vừa quay gần nhất (trong 45s)
+                    recent_clip = database.get_recent_clip_for_channel(channel, max_age_seconds=45)
+                    if recent_clip:
+                        database.update_event_clip(event_id, recent_clip)
                     database.create_audio_analysis(
                         event_id,
                         status="video_cooldown",
