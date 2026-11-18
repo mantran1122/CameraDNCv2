@@ -37,7 +37,9 @@ _cache_lock = threading.Lock()
 
 def _is_cooling_down(channel: int, event_code: str) -> bool:
     now = time.time()
-    key = (channel, str(event_code))
+    # Chuẩn hóa nhóm sự kiện âm thanh (AudioMutation, AudioAnomaly, SoundDetection) chung một cooldown để chống bắn trùng
+    norm_code = "AudioMutation" if event_code in ("AudioAnomaly", "AudioMutation", "SoundDetection") else str(event_code)
+    key = (channel, norm_code)
     with _cache_lock:
         last = _last_sent_cache.get(key, 0.0)
         if now - last < ALERT_COOLDOWN_SECONDS:
@@ -479,9 +481,9 @@ def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
         if event_code == "RtspSessionDisconnect":
             payload["clip_filename"] = ""
             payload["clip_url"] = ""
-        # Đợi tối đa 15s để clip_capture_worker hoàn thành việc trích xuất video thực tế từ đầu ghi NVR
+        # Đợi tối đa 25s để clip_capture_worker hoàn thành việc trích xuất video thực tế từ đầu ghi NVR
         elif not payload.get("clip_filename") and ev_id:
-            for _ in range(30):
+            for _ in range(50):
                 time.sleep(0.5)
                 try:
                     import database
@@ -502,7 +504,7 @@ def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
             if not payload.get("clip_filename") and channel:
                 try:
                     import database
-                    recent_clip = database.get_recent_clip_for_channel(channel, max_age_seconds=60)
+                    recent_clip = database.get_recent_clip_for_channel(channel, max_age_seconds=120)
                     if recent_clip:
                         payload["clip_filename"] = recent_clip
                         app_base = os.getenv("CAMERAAI_BASE_URL", "").rstrip("/")

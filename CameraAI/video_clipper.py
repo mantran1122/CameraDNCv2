@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import os
 from urllib.parse import quote
@@ -7,6 +8,8 @@ import numpy as np
 
 import config
 from clip_storage import resolve_clip_path
+
+logger = logging.getLogger("video_clipper")
 
 
 def _remove_partial_clip(output_path: str) -> None:
@@ -204,74 +207,77 @@ def clip_event_video(
         "-fflags", "+genpts",
         "-i", rtsp_url,
         "-t", str(config.CLIP_DURATION_SEC),
+        "-map", "0:v:0",
+        "-map", "0:a?",
         "-c:v", "copy",
-        "-c:a", "aac",
+        "-c:a", "copy",
         "-movflags", "+faststart",
         full_output_path
     ]
 
     try:
-        res = subprocess.run(cmd_fast, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=25)
+        res = subprocess.run(cmd_fast, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=8)
         if res.returncode == 0 and os.path.exists(full_output_path) and _has_expected_duration(full_output_path):
             return output_filename
+    except Exception as m1_err:
+        logger.debug(f"[VideoClipper] Mode 1 (stream copy) failed: {m1_err}")
 
-        # Mode 2 Fallback: Re-encode with libx264 if stream copy failed or produced truncated file
-        cmd_fallback = [
+    # Mode 2 Fallback: Re-encode with libx264 if stream copy failed or produced truncated file
+    cmd_fallback = [
+        config.FFMPEG_PATH,
+        "-y",
+        "-rtsp_transport", "tcp",
+        "-fflags", "+genpts",
+        "-i", rtsp_url,
+        "-t", str(config.CLIP_DURATION_SEC),
+        "-map", "0:v:0",
+        "-map", "0:a?",
+        "-c:v", "libx264",
+        "-c:a", "aac",
+        "-preset", "ultrafast",
+        "-movflags", "+faststart",
+        full_output_path
+    ]
+    try:
+        res_fb = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=8)
+        if res_fb.returncode == 0 and os.path.exists(full_output_path) and _has_expected_duration(full_output_path):
+            return output_filename
+    except Exception as m2_err:
+        logger.debug(f"[VideoClipper] Mode 2 (re-encode) failed: {m2_err}")
+
+    # Mode 3 Fallback: Live RTSP Stream (/cam/realmonitor) to capture real optical video immediately
+    print(f"[VideoClipper] Playback stream unavailable for Ch {channel}, falling back to live stream capture...")
+    for subtype in [1, 0]:
+        live_rtsp_url = (
+            f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{config.RTSP_PORT}"
+            f"/cam/realmonitor?channel={channel}&subtype={subtype}"
+        )
+        cmd_live = [
             config.FFMPEG_PATH,
             "-y",
             "-rtsp_transport", "tcp",
             "-fflags", "+genpts",
-            "-i", rtsp_url,
-            "-t", str(config.CLIP_DURATION_SEC),
+            "-i", live_rtsp_url,
+            "-t", str(min(6, config.CLIP_DURATION_SEC)),
+            "-map", "0:v:0",
+            "-map", "0:a?",
             "-c:v", "libx264",
-            "-c:a", "aac",
-            "-ar", "44100",
-            "-ac", "2",
-            "-b:a", "128k",
-            "-af", "volume=2.0",
             "-preset", "ultrafast",
+            "-c:a", "aac",
             "-movflags", "+faststart",
             full_output_path
         ]
-        res_fb = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45)
-        if res_fb.returncode == 0 and os.path.exists(full_output_path) and _has_expected_duration(full_output_path):
-            return output_filename
+        try:
+            res_live = subprocess.run(cmd_live, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=12)
+            if res_live.returncode == 0 and os.path.exists(full_output_path) and _has_expected_duration(full_output_path):
+                print(f"[VideoClipper] Captured live optical camera video for channel {channel} (subtype={subtype})")
+                return output_filename
+        except Exception as live_err:
+            print(f"[VideoClipper Warning] Live capture error (subtype={subtype}): {live_err}")
 
-        # Mode 3 Fallback: Live RTSP Stream (/cam/realmonitor) to capture real optical video
-        print(f"[VideoClipper] Playback stream failed for Ch {channel}, falling back to live stream capture...")
-        for subtype in [0, 1]:
-            live_rtsp_url = (
-                f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{config.RTSP_PORT}"
-                f"/cam/realmonitor?channel={channel}&subtype={subtype}"
-            )
-            cmd_live = [
-                config.FFMPEG_PATH,
-                "-y",
-                "-rtsp_transport", "tcp",
-                "-fflags", "+genpts",
-                "-i", live_rtsp_url,
-                "-t", str(min(6, config.CLIP_DURATION_SEC)),
-                "-c:v", "libx264",
-                "-preset", "ultrafast",
-                "-c:a", "aac",
-                "-movflags", "+faststart",
-                full_output_path
-            ]
-            try:
-                res_live = subprocess.run(cmd_live, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
-                if res_live.returncode == 0 and os.path.exists(full_output_path) and _has_expected_duration(full_output_path):
-                    print(f"[VideoClipper] Captured live optical camera video for channel {channel} (subtype={subtype})")
-                    return output_filename
-            except Exception as live_err:
-                print(f"[VideoClipper Warning] Live capture error (subtype={subtype}): {live_err}")
-
-        print(
-            "[FFmpeg Warning] WAN/RTSP clip extraction failed, timed out, or returned a short clip; "
-            "no incomplete clip will be stored in production."
-        )
-        _remove_partial_clip(full_output_path)
-        return None
-    except Exception as e:
-        print(f"[FFmpeg Exception] {e}. No clip will be stored in production.")
-        _remove_partial_clip(full_output_path)
-        return None
+    print(
+        "[FFmpeg Warning] WAN/RTSP clip extraction failed, timed out, or returned a short clip; "
+        "no incomplete clip will be stored in production."
+    )
+    _remove_partial_clip(full_output_path)
+    return None

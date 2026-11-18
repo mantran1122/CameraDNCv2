@@ -317,13 +317,21 @@ class DahuaNVRListener(threading.Thread):
             if event_type in {"audio_anomaly", "video_anomaly"} or is_alert_event:
                 now_ts = time.time()
                 # Phân loại độ ưu tiên: Cảnh báo âm thanh hoặc hành vi khẩn cấp KHÔNG bị chặn bởi sự kiện chuyển động thông thường
-                is_high_priority = (
+                is_audio_group = (
                     event_type == "audio_anomaly"
                     or code in getattr(config, "AUDIO_EVENT_CODES", [])
+                )
+                is_high_priority = (
+                    is_audio_group
                     or code in getattr(config, "CRITICAL_ANOMALY_CODES", [])
                     or severity == "high"
                 )
-                debounce_key = f"{channel}_{code}" if is_high_priority else f"{channel}_routine"
+                if is_audio_group:
+                    debounce_key = f"{channel}_AudioMutation"
+                elif is_high_priority:
+                    debounce_key = f"{channel}_{code}"
+                else:
+                    debounce_key = f"{channel}_routine"
                 last_queued_ts = self._last_clip_queued.get(debounce_key, 0.0)
                 cooldown_limit = 8.0 if is_high_priority else 15.0
 
