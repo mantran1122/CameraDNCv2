@@ -388,7 +388,7 @@ function findAnyMp4(dir) {
 }
 
 // Hàm tìm kiếm chính xác hoặc tìm kiếm fallback cho file video MP4 trên server
-function resolveVideoFile(payload) {
+async function resolveVideoFile(payload) {
     const rawCandidates = [];
     if (payload.clip_filename) rawCandidates.push(payload.clip_filename);
     if (payload.clip_url) {
@@ -403,6 +403,8 @@ function resolveVideoFile(payload) {
     const searchRoots = [
         CLIPS_DIR,
         "/app/clips",
+        "/app/storage/clips",
+        "/app/data/clips",
         "./clips",
         path.resolve("../CameraAI/storage/clips"),
         path.resolve("./storage/clips")
@@ -413,7 +415,7 @@ function resolveVideoFile(payload) {
         clean = clean.replace(/^\/?(storage\/)?clips\/?/, "");
         if (!clean) continue;
 
-        // 1. Kiểm tra trực tiếp đường dẫn
+        // 1. Kiểm tra trực tiếp đường dẫn trên ổ đĩa
         for (const root of searchRoots) {
             if (!fs.existsSync(root)) continue;
             const full = path.resolve(root, clean);
@@ -435,7 +437,44 @@ function resolveVideoFile(payload) {
         }
     }
 
-    // 3. Fallback: CHỈ khi là tin thử nghiệm (test_alert), mới lấy file mẫu có sẵn
+    // 3. HTTP Fallback: Tự động tải file MP4 trực tiếp từ container camera-ai qua API nội bộ
+    for (const raw of rawCandidates) {
+        let clean = String(raw).trim().replace(/\\/g, "/");
+        clean = clean.replace(/^\/?(storage\/)?clips\/?/, "");
+        if (!clean) continue;
+
+        const internalHosts = [
+            "http://camera-ai:8000",
+            "http://127.0.0.1:8000",
+            "http://host.docker.internal:8000"
+        ];
+        const outDir = path.resolve(DATA_DIR, "clips");
+        if (!fs.existsSync(outDir)) {
+            try { fs.mkdirSync(outDir, { recursive: true }); } catch (e) {}
+        }
+        const outPath = path.resolve(outDir, path.basename(clean));
+
+        for (const host of internalHosts) {
+            try {
+                const fetchUrl = `${host}/api/internal/clip?path=${encodeURIComponent(clean)}`;
+                console.log(`[ZaloBridge] Đang tải clip từ backend: ${fetchUrl}...`);
+                const res = await fetch(fetchUrl, { signal: AbortSignal.timeout(8000) });
+                if (res.ok) {
+                    const arrayBuf = await res.arrayBuffer();
+                    const buf = Buffer.from(arrayBuf);
+                    if (buf.length > 1000) {
+                        fs.writeFileSync(outPath, buf);
+                        console.log(`[ZaloBridge] Tải clip thành công qua HTTP nội bộ (${(buf.length / (1024 * 1024)).toFixed(2)} MB): ${outPath}`);
+                        return outPath;
+                    }
+                }
+            } catch (err) {
+                // Thử host tiếp theo
+            }
+        }
+    }
+
+    // 4. Fallback: CHỈ khi là tin thử nghiệm (test_alert), mới lấy file mẫu có sẵn
     if (payload.event_type === "test_alert") {
         for (const root of searchRoots) {
             if (!fs.existsSync(root)) continue;
@@ -479,12 +518,13 @@ app.post("/webhook", async (req, res) => {
 
     try {
         let msgToSend = text;
-        if (clipUrl && !msgToSend.includes(clipUrl)) {
+        // Chỉ đính kèm URL nếu là liên kết web hợp lệ có domain/IP công khai (không đính kèm đường dẫn nội bộ /clips/...)
+        if (clipUrl && (clipUrl.startsWith("http://") || clipUrl.startsWith("https://")) && !msgToSend.includes(clipUrl)) {
             msgToSend += `\nVideo trực tuyến: ${clipUrl}`;
         }
 
-        // Tự động phân giải file video MP4 trên hệ thống
-        const localVideoFile = resolveVideoFile(payload);
+        // Tự động phân giải file video MP4 trên hệ thống (tìm trên đĩa hoặc tải qua HTTP nội bộ)
+        const localVideoFile = await resolveVideoFile(payload);
         const targetId = String(groupId).trim();
 
         // Ưu tiên 1: Gửi đính kèm file video MP4 trực tiếp vào Zalo nếu tìm thấy file

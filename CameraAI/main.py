@@ -87,6 +87,7 @@ async def require_login_session(request: Request, call_next):
         or path.startswith("/admin/assets/")
         or path.startswith("/admin/icons/")
         or path.startswith("/admin/img/")
+        or path.startswith("/api/internal/")
     )
     username = request.session.get("username")
     if not public and not username:
@@ -645,6 +646,21 @@ async def shutdown_event():
         postgres_sync_thread.join(timeout=2)
         postgres_sync_thread = None
     server_event_loop = None
+
+
+@app.get("/api/internal/clip")
+async def get_internal_clip_api(path: str):
+    """Internal endpoint for Zalo Bridge and workers to download MP4 clips directly."""
+    from clip_storage import resolve_clip_path
+    try:
+        clean = path.strip().replace("\\", "/").lstrip("/")
+        clean = clean.replace("storage/clips/", "").replace("clips/", "")
+        file_path = resolve_clip_path(clean, fetch_remote=True)
+        if file_path and file_path.is_file():
+            return FileResponse(path=str(file_path), media_type="video/mp4", filename=os.path.basename(file_path))
+    except Exception as e:
+        print(f"[Internal Clip API Error]: {e}")
+    raise HTTPException(status_code=404, detail="Clip not found")
 
 
 def broadcast_audio_analysis_update(event_id: int):

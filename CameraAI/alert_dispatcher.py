@@ -149,8 +149,8 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
     full_clip_url = urljoin(f"{app_base}/", clip_url.lstrip("/")) if (app_base and clip_url) else clip_url
 
     msg_text = f"[CẢNH BÁO ĐỎ] {label} tại {cam_name} lúc {ts}.\nChi tiết: {desc}"
-    if full_clip_url:
-        msg_text += f"\nXem video clip: {full_clip_url}"
+    if full_clip_url and (full_clip_url.startswith("http://") or full_clip_url.startswith("https://")):
+        msg_text += f"\nXem video trực tuyến: {full_clip_url}"
 
     body = {
         "event_type": "high_security_alert",
@@ -484,8 +484,6 @@ def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
                         rel_clip = str(captured_filename).replace("\\", "/").lstrip("/")
                         full_url = f"{app_base}/clips/{rel_clip}" if app_base else f"/clips/{rel_clip}"
                         payload["clip_url"] = full_url
-                        if payload.get("message") and "Xem video clip:" not in payload["message"]:
-                            payload["message"] += f"\nXem video clip: {full_url}"
                         logger.info(f"[AlertDispatcher] Video clip ready for event={ev_id}: {captured_filename}")
                         break
                 except Exception as loop_err:
