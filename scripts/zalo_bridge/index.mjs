@@ -372,17 +372,37 @@ app.post("/webhook", async (req, res) => {
             msgToSend += `\n🎬 Xem video: ${clipUrl}`;
         }
 
-        await api.sendMessage(
-            { msg: msgToSend },
-            groupId,
-            ThreadType.Group
-        );
+        const targetId = String(groupId).trim();
+        try {
+            await api.sendMessage(
+                msgToSend,
+                targetId,
+                ThreadType.Group
+            );
+        } catch (groupSendErr) {
+            // Nếu lỗi Tham số không hợp lệ, thử gọi joinGroupLink rồi gửi lại
+            if (String(groupSendErr.message).includes("Tham số không hợp lệ") && bridgeConfig.inviteLink) {
+                console.log(`[ZaloBridge] Gửi tin thất bại do chưa vào nhóm, đang thử tự động tham gia nhóm: ${bridgeConfig.inviteLink}...`);
+                try {
+                    await api.joinGroupLink(bridgeConfig.inviteLink);
+                    await new Promise(r => setTimeout(r, 1000));
+                } catch (jErr) {}
+                // Thử gửi lại lần 2
+                await api.sendMessage(
+                    msgToSend,
+                    targetId,
+                    ThreadType.Group
+                );
+            } else {
+                throw groupSendErr;
+            }
+        }
 
-        console.log(`[ZaloBridge] ✅ Đã gửi cảnh báo vào nhóm Zalo (${groupId})!`);
+        console.log(`[ZaloBridge] ✅ Đã gửi cảnh báo vào nhóm Zalo (${targetId})!`);
         return res.json({
             status: "success",
             message: "Đã gửi cảnh báo đỏ vào Zalo Group thành công!",
-            group_id: groupId
+            group_id: targetId
         });
     } catch (sendErr) {
         console.error("[ZaloBridge] ❌ Lỗi gửi tin nhắn Zalo:", sendErr);
@@ -402,7 +422,7 @@ app.post("/webhook", async (req, res) => {
         if (errMsg.includes("Tham số không hợp lệ") || errMsg.includes("Invalid parameter")) {
             return res.status(400).json({
                 status: "error",
-                message: "Tài khoản Bot chưa tham gia vào Nhóm Cảnh Báo (hoặc đang chờ duyệt). Hãy dùng nick Bot này mở link https://zalo.me/g/libazgippahcfbk99qkc để Tham Gia Nhóm!"
+                message: "Tài khoản Bot chưa có trong nhóm hoặc đang chờ duyệt. Bạn chỉ cần vào Zalo lấy nick chính bấm [Thêm Thành Viên] rồi add nick Bot này vào nhóm là xong ngay!"
             });
         }
         return res.status(500).json({
