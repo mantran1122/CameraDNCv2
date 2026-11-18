@@ -49,8 +49,20 @@ const zalo = new Zalo({ selfListen: true });
 async function resolveGroupTarget() {
     if (!api) return;
 
-    // 1. Nếu có link mời và chưa có targetGroupId, thử phân giải qua getGroupLinkInfo
-    if (bridgeConfig.inviteLink && !bridgeConfig.targetGroupId) {
+    // 0. Tự động tham gia nhóm nếu có link mời
+    if (bridgeConfig.inviteLink) {
+        try {
+            console.log(`[ZaloBridge] Đang tự động tham gia nhóm qua link: ${bridgeConfig.inviteLink}...`);
+            await api.joinGroupLink(bridgeConfig.inviteLink);
+            console.log(`[ZaloBridge] ✅ Đã tự động tham gia nhóm Zalo thành công!`);
+        } catch (joinErr) {
+            // Code 178: Đã là thành viên; Code 240: Chờ duyệt thành viên
+            console.log(`[ZaloBridge] Trạng thái tham gia nhóm: ${joinErr.message}`);
+        }
+    }
+
+    // 1. Nếu có link mời, lấy thông tin nhóm
+    if (bridgeConfig.inviteLink) {
         try {
             console.log(`[ZaloBridge] Đang kiểm tra liên kết nhóm từ link: ${bridgeConfig.inviteLink}...`);
             const linkInfo = await api.getGroupLinkInfo({ link: bridgeConfig.inviteLink });
@@ -59,45 +71,28 @@ async function resolveGroupTarget() {
                 bridgeConfig.groupName = linkInfo.name || "Nhóm Cảnh Báo Camera DNC";
                 saveConfig();
                 console.log(`[ZaloBridge] 🔗 Tự động liên kết thành công với nhóm: "${bridgeConfig.groupName}" (ID: ${bridgeConfig.targetGroupId})`);
-                await api.sendMessage(
-                    {
-                        msg: `✅ ĐÃ LIÊN KẾT NHÓM CẢNH BÁO CAMERA DNC THÀNH CÔNG!\nKể từ bây giờ, mọi cảnh báo đỏ từ hệ thống Camera AI DNC sẽ tự động được gửi vào nhóm "${bridgeConfig.groupName}".`
-                    },
-                    bridgeConfig.targetGroupId,
-                    ThreadType.Group
-                ).catch(() => {});
-                return;
             }
         } catch (e) {
             console.warn("[ZaloBridge] Không thể tự động phân giải group link:", e.message);
         }
     }
 
-    // 2. Nếu vẫn chưa có targetGroupId, quét danh sách các nhóm mà Bot đã tham gia
-    if (!bridgeConfig.targetGroupId) {
-        try {
-            const allGroups = await api.getAllGroups();
-            const groupIds = Object.keys(allGroups?.gridVerMap || {});
-            console.log(`[ZaloBridge] Bot hiện đang tham gia ${groupIds.length} nhóm Zalo.`);
-            if (groupIds.length === 1) {
-                bridgeConfig.targetGroupId = groupIds[0];
-                try {
-                    const gInfo = await api.getGroupInfo(groupIds[0]);
-                    bridgeConfig.groupName = gInfo?.gridInfoMap?.[groupIds[0]]?.name || "Nhóm Cảnh Báo DNC";
-                } catch (e) {}
-                saveConfig();
-                console.log(`[ZaloBridge] 🔗 Tự động liên kết nhóm duy nhất của Bot: "${bridgeConfig.groupName}" (ID: ${bridgeConfig.targetGroupId})`);
-                await api.sendMessage(
-                    {
-                        msg: `✅ ĐÃ LIÊN KẾT NHÓM CẢNH BÁO CAMERA DNC THÀNH CÔNG!\nKể từ bây giờ, mọi cảnh báo đỏ từ hệ thống Camera AI DNC sẽ tự động được gửi vào nhóm này.`
-                    },
-                    bridgeConfig.targetGroupId,
-                    ThreadType.Group
-                ).catch(() => {});
-            }
-        } catch (e) {
-            console.warn("[ZaloBridge] Không thể quét danh sách nhóm của bot:", e.message);
+    // 2. Quét danh sách các nhóm mà Bot đã tham gia thực tế
+    try {
+        const allGroups = await api.getAllGroups();
+        const groupIds = Object.keys(allGroups?.gridVerMap || {});
+        console.log(`[ZaloBridge] Bot hiện đang có mặt trong ${groupIds.length} nhóm Zalo.`);
+        if (groupIds.length === 1 && !bridgeConfig.targetGroupId) {
+            bridgeConfig.targetGroupId = groupIds[0];
+            try {
+                const gInfo = await api.getGroupInfo(groupIds[0]);
+                bridgeConfig.groupName = gInfo?.gridInfoMap?.[groupIds[0]]?.name || "Nhóm Cảnh Báo DNC";
+            } catch (e) {}
+            saveConfig();
+            console.log(`[ZaloBridge] 🔗 Tự động liên kết nhóm duy nhất của Bot: "${bridgeConfig.groupName}" (ID: ${bridgeConfig.targetGroupId})`);
         }
+    } catch (e) {
+        console.warn("[ZaloBridge] Không thể quét danh sách nhóm của bot:", e.message);
     }
 }
 
@@ -402,6 +397,12 @@ app.post("/webhook", async (req, res) => {
             return res.status(401).json({
                 status: "error",
                 message: "Phiên Zalo bị đá do tài khoản vừa đăng nhập Web ở nơi khác (zpw_sek bị thu hồi). Hãy mở http://192.168.100.40.nip.io:5055/login để quét mã QR lại. (Khuyên dùng SIM phụ làm Bot để không bao giờ bị đá)."
+            });
+        }
+        if (errMsg.includes("Tham số không hợp lệ") || errMsg.includes("Invalid parameter")) {
+            return res.status(400).json({
+                status: "error",
+                message: "Tài khoản Bot chưa tham gia vào Nhóm Cảnh Báo (hoặc đang chờ duyệt). Hãy dùng nick Bot này mở link https://zalo.me/g/libazgippahcfbk99qkc để Tham Gia Nhóm!"
             });
         }
         return res.status(500).json({
