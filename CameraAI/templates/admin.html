@@ -852,9 +852,6 @@
                                     </q-card-section>
                                     <q-separator dark></q-separator>
                                     <q-card-section>
-                                        <div class="text-caption text-grey-4 q-mb-md">
-                                            Tự động lọc và chuyển tiếp các sự kiện bất thường đã chọn vào nhóm Zalo của Ban Giám hiệu / Đội An ninh. Bạn có toàn quyền chọn loại sự kiện (chỉ báo động đỏ, tắt thông báo người vào) và chỉ định các phòng camera muốn theo dõi.
-                                        </div>
                                         <q-form @submit.prevent="saveZaloConfig" class="q-gutter-md">
                                             <div class="row q-col-gutter-sm">
                                                 <div class="col-12 col-md-8">
@@ -865,8 +862,7 @@
                                                         dark
                                                         dense
                                                         color="cyan-4"
-                                                        placeholder="Ví dụ: http://zalo-bridge:5055/webhook"
-                                                        hint="Dùng http://zalo-bridge:5055/webhook (trong Docker) hoặc cổng 5055"
+                                                        placeholder="http://zalo-bridge:5055/webhook"
                                                     >
                                                         <template v-slot:prepend>
                                                             <q-icon name="link" color="cyan-4"></q-icon>
@@ -905,9 +901,6 @@
                                                         <q-btn flat dense size="xs" color="cyan-3" label="Chọn tất cả" @click="selectAllEvents"></q-btn>
                                                         <q-btn flat dense size="xs" color="grey-5" label="Bỏ chọn hết" @click="clearAllEvents"></q-btn>
                                                     </div>
-                                                </div>
-                                                <div class="text-caption text-grey-5 q-mb-sm">
-                                                    💡 <i>Mẹo: Để không bị spam tin nhắn "người vào", hãy bỏ tick <b>"Phát hiện người (Human Trait)"</b> và <b>"Chuyển động"</b>.</i>
                                                 </div>
                                                 <div class="row q-col-gutter-xs" style="background: rgba(15, 23, 42, 0.6); padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
                                                     <div v-for="ev in availableAlertEvents" :key="ev.code" class="col-12 col-sm-6 col-md-4">

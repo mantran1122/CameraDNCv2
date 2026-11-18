@@ -252,12 +252,12 @@ app.get("/login", (req, res) => {
 </head>
 <body>
     <div class="card">
-        <h1>📲 Zalo Bot Alert Bridge</h1>
+        <h1>Zalo Bot Alert Bridge</h1>
         <div id="content">
             <p>Đang kiểm tra kết nối tới Bot Zalo...</p>
         </div>
         <div class="instruction">
-            <b>👉 Các bước kích hoạt:</b>
+            <b>Các bước kích hoạt:</b>
             <ol style="margin: 8px 0 0 18px; padding: 0; line-height: 1.6;">
                 <li>Dùng Zalo trên điện thoại quét mã QR và chọn <b>Đăng nhập</b>.</li>
                 <li>Vào nhóm Zalo nhận cảnh báo và gửi: <code>/setalert</code>.</li>
@@ -277,7 +277,7 @@ app.get("/login", (req, res) => {
                         '<p style="color:#fbbf24;">Bot đã đăng nhập! Vui lòng vào nhóm Zalo gửi <code>/setalert</code> để liên kết.</p>';
                     container.innerHTML = \`
                         <div class="success-box">
-                            <h2 style="margin:0 0 8px 0;font-size:18px;color:#34d399;">✅ Đã Đăng Nhập Zalo Thành Công!</h2>
+                            <h2 style="margin:0 0 8px 0;font-size:18px;color:#34d399;">Đã Đăng Nhập Zalo Thành Công</h2>
                             \${groupInfo}
                         </div>
                     \`;
@@ -345,7 +345,7 @@ app.post("/set-group", (req, res) => {
 // Endpoint nhận Webhook từ Camera AI
 app.post("/webhook", async (req, res) => {
     const payload = req.body || {};
-    const text = payload.message || payload.text || payload.content || "🚨 Cảnh báo an ninh từ Camera AI!";
+    const text = payload.message || payload.text || payload.content || "[Cảnh báo an ninh] Camera AI";
     const camName = payload.camera_name || "Camera";
     const clipUrl = payload.clip_url || "";
     const eventCode = payload.event_code || "Alert";
@@ -370,7 +370,7 @@ app.post("/webhook", async (req, res) => {
     try {
         let msgToSend = text;
         if (clipUrl && !msgToSend.includes(clipUrl)) {
-            msgToSend += `\n🎬 Xem video trên web: ${clipUrl}`;
+            msgToSend += `\nVideo trực tuyến: ${clipUrl}`;
         }
 
         // Tìm file video MP4 trên hệ thống để gửi đính kèm trực tiếp vào Zalo
