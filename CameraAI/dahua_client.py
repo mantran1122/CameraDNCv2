@@ -269,7 +269,6 @@ class DahuaNVRListener(threading.Thread):
                     database.create_audio_analysis(
                         event_id,
                         status="video_cooldown",
-                        error_message="Bỏ qua cắt clip do camera đang trong thời gian giãn cách 15s.",
                     )
 
             event_obj = database.get_event_by_id(event_id)

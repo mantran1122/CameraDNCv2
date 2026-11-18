@@ -470,12 +470,12 @@ def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
         payload = dict(event_payload)
         ev_id = payload.get("id")
 
-        # Đợi tối đa 13s để clip_capture_worker hoàn thành việc trích xuất video thực tế từ đầu ghi NVR
+        # Đợi tối đa 15s để clip_capture_worker hoàn thành việc trích xuất video thực tế từ đầu ghi NVR
         if not payload.get("clip_filename") and ev_id:
-            try:
-                import database
-                for _ in range(26):
-                    time.sleep(0.5)
+            for _ in range(30):
+                time.sleep(0.5)
+                try:
+                    import database
                     ev_db = database.get_event_by_id(int(ev_id))
                     if ev_db and ev_db.get("clip_filename"):
                         captured_filename = ev_db["clip_filename"]
@@ -486,9 +486,10 @@ def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
                         payload["clip_url"] = full_url
                         if payload.get("message") and "Xem video clip:" not in payload["message"]:
                             payload["message"] += f"\nXem video clip: {full_url}"
+                        logger.info(f"[AlertDispatcher] Video clip ready for event={ev_id}: {captured_filename}")
                         break
-            except Exception as e:
-                logger.debug(f"[AlertDispatcher] Lỗi chờ clip: {e}")
+                except Exception as loop_err:
+                    logger.debug(f"[AlertDispatcher] Đang đợi clip event={ev_id}: {loop_err}")
 
         # 1. Telegram Group Bot
         send_telegram_alert(payload)

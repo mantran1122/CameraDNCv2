@@ -115,7 +115,7 @@ class ClipCaptureWorker:
             )
             return
 
-        delay = max(0.0, min(5.0, float(getattr(config, "POST_BUFFER_SEC", 5)) + 0.5 - age_sec))
+        delay = max(0.0, min(3.0, 3.0 - age_sec))
         if delay > 0:
             time.sleep(delay)
 
