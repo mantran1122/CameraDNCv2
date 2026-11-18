@@ -66,9 +66,11 @@ services:
       - "5055:5055"
     volumes:
       - ./scripts/zalo_bridge/data:/app/data
+      - ./CameraAI/storage/clips:/app/clips:ro
     environment:
       - PORT=5055
       - DATA_DIR=/app/data
+      - CLIPS_DIR=/app/clips
       - ZALO_GROUP_LINK=https://zalo.me/g/libazgippahcfbk99qkc
 
 volumes:

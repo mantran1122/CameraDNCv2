@@ -161,6 +161,7 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
         "timestamp": ts,
         "description": desc,
         "clip_url": full_clip_url,
+        "clip_filename": payload.get("clip_filename") or os.path.basename(payload.get("clip_url", "")),
         "message": msg_text,
         "text": msg_text,
         "content": msg_text,

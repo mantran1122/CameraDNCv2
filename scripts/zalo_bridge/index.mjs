@@ -13,6 +13,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const APPSTATE_FILE = path.resolve(DATA_DIR, "appstate.json");
 const CONFIG_FILE = path.resolve(DATA_DIR, "zalo_config.json");
 const QR_FILE = path.resolve(DATA_DIR, "qr.png");
+const CLIPS_DIR = process.env.CLIPS_DIR || "/app/clips";
 
 // Đọc cấu hình nhóm mục tiêu (nếu đã lưu từ trước)
 let bridgeConfig = {
@@ -369,10 +370,65 @@ app.post("/webhook", async (req, res) => {
     try {
         let msgToSend = text;
         if (clipUrl && !msgToSend.includes(clipUrl)) {
-            msgToSend += `\n🎬 Xem video: ${clipUrl}`;
+            msgToSend += `\n🎬 Xem video trên web: ${clipUrl}`;
+        }
+
+        // Tìm file video MP4 trên hệ thống để gửi đính kèm trực tiếp vào Zalo
+        let localVideoFile = null;
+        const clipFilename = payload.clip_filename || "";
+        if (clipFilename) {
+            const candidatePaths = [
+                path.resolve(CLIPS_DIR, clipFilename),
+                path.resolve("/app/clips", clipFilename),
+                path.resolve("./clips", clipFilename)
+            ];
+            for (const c of candidatePaths) {
+                if (fs.existsSync(c)) {
+                    localVideoFile = c;
+                    break;
+                }
+            }
+        }
+        if (!localVideoFile && clipUrl) {
+            try {
+                const u = new URL(clipUrl, "http://localhost");
+                const rel = u.pathname.replace(/^\/clips\//, "").replace(/^\/storage\/clips\//, "");
+                const c = path.resolve(CLIPS_DIR, rel);
+                if (fs.existsSync(c)) {
+                    localVideoFile = c;
+                }
+            } catch (e) {}
         }
 
         const targetId = String(groupId).trim();
+        let sentWithVideo = false;
+
+        // Ưu tiên 1: Gửi đính kèm file video MP4 trực tiếp vào Zalo nếu tìm thấy file
+        if (localVideoFile) {
+            console.log(`[ZaloBridge] 📹 Tìm thấy video clip: ${localVideoFile}, đang đính kèm gửi vào Zalo...`);
+            try {
+                await api.sendMessage(
+                    {
+                        msg: msgToSend,
+                        attachments: [localVideoFile]
+                    },
+                    targetId,
+                    ThreadType.Group
+                );
+                sentWithVideo = true;
+                console.log(`[ZaloBridge] ✅ Đã gửi cảnh báo kèm VIDEO MP4 vào nhóm Zalo (${targetId})!`);
+                return res.json({
+                    status: "success",
+                    message: "Đã gửi cảnh báo đỏ kèm VIDEO MP4 vào Zalo Group thành công!",
+                    group_id: targetId,
+                    video_attached: true
+                });
+            } catch (videoErr) {
+                console.warn("[ZaloBridge] Gửi đính kèm video lỗi, fallback sang gửi văn bản:", videoErr.message);
+            }
+        }
+
+        // Ưu tiên 2: Gửi tin nhắn văn bản kèm link xem clip
         try {
             await api.sendMessage(
                 msgToSend,
