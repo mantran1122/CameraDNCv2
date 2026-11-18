@@ -175,7 +175,7 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
 
     for url in candidates:
         try:
-            resp = requests.post(url, json=body, headers=headers, timeout=8)
+            resp = requests.post(url, json=body, headers=headers, timeout=35)
             if resp.status_code in (200, 201, 202, 204):
                 logger.info(f"[AlertDispatcher] Sent Zalo Webhook alert for ch={channel}, code={event_code} via {url}")
                 return True
@@ -189,12 +189,39 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
 
 
 def test_zalo_webhook(webhook_url: Optional[str] = None, token: Optional[str] = None) -> Dict[str, Any]:
-    """Test connectivity to Zalo webhook bridge."""
+    """Test connectivity to Zalo webhook bridge with sample MP4 clip attachment."""
     raw_url = webhook_url or os.getenv("ZALO_WEBHOOK_URL", "")
     candidates = _get_candidate_webhook_urls(raw_url)
 
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    msg_text = f"🚨 [TEST CẢNH BÁO] Hệ thống Camera AI DNC kết nối thành công tới Zalo Group lúc {now_str}."
+    msg_text = f"[TEST CẢNH BÁO] Hệ thống Camera AI DNC kết nối thành công tới Zalo Group lúc {now_str}."
+
+    # Tự động tìm video clip MP4 có sẵn trong storage/clips để đính kèm thử nghiệm
+    test_clip_file = ""
+    test_clip_url = ""
+    app_base = os.getenv("CAMERAAI_BASE_URL", "").rstrip("/")
+    clips_dir = getattr(config, "CLIPS_DIR", Path(__file__).resolve().parent / "storage" / "clips")
+
+    # Ưu tiên các file sample có sẵn
+    for sample_name in ["sample_h264.mp4", "test_compressed_h264.mp4", "sample_valid.mp4"]:
+        if (clips_dir / sample_name).is_file():
+            test_clip_file = sample_name
+            test_clip_url = f"/clips/{sample_name}"
+            break
+
+    if not test_clip_file and clips_dir.is_dir():
+        mp4_files = list(clips_dir.rglob("*.mp4"))
+        if mp4_files:
+            valid_mp4s = [p for p in mp4_files if p.stat().st_size > 1000]
+            if valid_mp4s:
+                chosen = min(valid_mp4s, key=lambda p: p.stat().st_size)
+                test_clip_file = str(chosen.relative_to(clips_dir)).replace("\\", "/")
+                test_clip_url = f"/clips/{test_clip_file}"
+
+    full_clip_url = urljoin(f"{app_base}/", test_clip_url.lstrip("/")) if (app_base and test_clip_url) else test_clip_url
+    if full_clip_url:
+        msg_text += f"\nVideo trực tuyến: {full_clip_url}"
+
     body = {
         "event_type": "test_alert",
         "severity": "high",
@@ -203,7 +230,9 @@ def test_zalo_webhook(webhook_url: Optional[str] = None, token: Optional[str] = 
         "event_code": "AudioMutation",
         "label": "Âm thanh bất thường (Test)",
         "timestamp": now_str,
-        "description": "Thử nghiệm kết nối bắn cảnh báo đỏ tự động vào Zalo Group",
+        "description": "Thử nghiệm kết nối bắn cảnh báo đỏ tự động kèm video MP4 vào Zalo Group",
+        "clip_filename": test_clip_file,
+        "clip_url": full_clip_url,
         "message": msg_text,
         "text": msg_text,
         "content": msg_text,
@@ -218,13 +247,13 @@ def test_zalo_webhook(webhook_url: Optional[str] = None, token: Optional[str] = 
     last_error = ""
     for url in candidates:
         try:
-            resp = requests.post(url, json=body, headers=headers, timeout=8)
+            resp = requests.post(url, json=body, headers=headers, timeout=35)
             if resp.status_code in (200, 201, 202, 204):
                 return {
                     "success": True,
                     "status_code": resp.status_code,
                     "target_url": url,
-                    "message": "Đã gửi tin nhắn thử nghiệm thành công tới Zalo Group!",
+                    "message": "Đã gửi tin nhắn thử nghiệm kèm video clip thành công tới Zalo Group!",
                 }
             # Bridge returned an explicit status message (e.g. 503 unauthenticated, 400 no group)
             err_msg = ""

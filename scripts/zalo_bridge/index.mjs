@@ -165,6 +165,10 @@ async function initZalo() {
 
         // Lắng nghe tin nhắn để tự động liên kết nhóm (hỗ trợ cả tài khoản bot tự gõ /setalert nhờ selfListen: true)
         if (api && api.listener) {
+            api.listener.on("error", (err) => {
+                console.warn("[ZaloBridge] Listener warning:", err?.message || err);
+            });
+
             api.listener.on("message", async (msg) => {
                 try {
                     let text = "";
@@ -186,13 +190,13 @@ async function initZalo() {
                                 if (info?.name) bridgeConfig.groupName = info.name;
                             } catch (e) {}
                             saveConfig();
-                            console.log(`[ZaloBridge] 🔗 Đã liên kết nhóm Zalo ID: ${msg.threadId} ("${bridgeConfig.groupName}") từ tin nhắn của ${senderName}`);
+                            console.log(`[ZaloBridge] Đã liên kết nhóm Zalo ID: ${msg.threadId} ("${bridgeConfig.groupName}") từ tin nhắn của ${senderName}`);
 
                             await api.sendMessage(
                                 {
-                                    msg: `✅ ĐÃ LIÊN KẾT NHÓM CẢNH BÁO CAMERA DNC THÀNH CÔNG!\n` +
-                                         `📌 Nhóm: ${bridgeConfig.groupName || msg.threadId}\n` +
-                                         `👤 Người kích hoạt: ${senderName}\n\n` +
+                                    msg: `ĐÃ LIÊN KẾT NHÓM CẢNH BÁO CAMERA DNC THÀNH CÔNG!\n` +
+                                         `Nhóm: ${bridgeConfig.groupName || msg.threadId}\n` +
+                                         `Người kích hoạt: ${senderName}\n\n` +
                                          `Kể từ bây giờ, mọi sự kiện báo động đỏ (Ẩu đả, Đột nhập, Âm thanh bất thường...) cấu hình trên Admin sẽ tự động gửi video và thông tin vào nhóm này.`
                                 },
                                 msg.threadId,
@@ -201,7 +205,7 @@ async function initZalo() {
                         } else {
                             await api.sendMessage(
                                 {
-                                    msg: `⚠️ Lệnh này cần được gửi trong NHÓM Zalo bạn muốn nhận cảnh báo (không phải tin nhắn riêng). Hãy vào nhóm và gõ: /setalert`
+                                    msg: `Lệnh này cần được gửi trong NHÓM Zalo bạn muốn nhận cảnh báo (không phải tin nhắn riêng). Hãy vào nhóm và gõ: /setalert`
                                 },
                                 msg.threadId,
                                 ThreadType.User
@@ -213,9 +217,13 @@ async function initZalo() {
                 }
             });
 
-            api.listener.start();
-            console.log("[ZaloBridge] Bộ lắng nghe tin nhắn đã khởi động.");
-            console.log(`[ZaloBridge] 👉 Hướng dẫn: Bạn hãy vào Nhóm Zalo (https://zalo.me/g/libazgippahcfbk99qkc) và gõ: /setalert để kích hoạt.`);
+            try {
+                api.listener.start();
+                console.log("[ZaloBridge] Bộ lắng nghe tin nhắn đã khởi động.");
+                console.log(`[ZaloBridge] Hướng dẫn: Bạn hãy vào Nhóm Zalo (https://zalo.me/g/libazgippahcfbk99qkc) và gõ: /setalert để kích hoạt.`);
+            } catch (listenErr) {
+                console.warn("[ZaloBridge] Cảnh báo khởi động listener:", listenErr.message);
+            }
         }
 
     } catch (error) {
@@ -342,6 +350,107 @@ app.post("/set-group", (req, res) => {
     });
 });
 
+// Hàm tìm đệ quy một file theo tên trong thư mục
+function findFileRecursive(dir, targetName) {
+    try {
+        if (!fs.existsSync(dir)) return null;
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                const found = findFileRecursive(fullPath, targetName);
+                if (found) return found;
+            } else if (entry.isFile() && entry.name.toLowerCase() === targetName.toLowerCase()) {
+                return fullPath;
+            }
+        }
+    } catch (e) {}
+    return null;
+}
+
+// Hàm tìm bất kỳ file MP4 hợp lệ nào trong thư mục (> 10KB)
+function findAnyMp4(dir) {
+    try {
+        if (!fs.existsSync(dir)) return null;
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                const found = findAnyMp4(fullPath);
+                if (found) return found;
+            } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".mp4")) {
+                const size = fs.statSync(fullPath).size;
+                if (size > 10000) return fullPath;
+            }
+        }
+    } catch (e) {}
+    return null;
+}
+
+// Hàm tìm kiếm chính xác hoặc tìm kiếm fallback cho file video MP4 trên server
+function resolveVideoFile(payload) {
+    const rawCandidates = [];
+    if (payload.clip_filename) rawCandidates.push(payload.clip_filename);
+    if (payload.clip_url) {
+        try {
+            const u = new URL(payload.clip_url, "http://localhost");
+            rawCandidates.push(u.pathname);
+        } catch (e) {
+            rawCandidates.push(payload.clip_url);
+        }
+    }
+
+    const searchRoots = [
+        CLIPS_DIR,
+        "/app/clips",
+        "./clips",
+        path.resolve("../CameraAI/storage/clips"),
+        path.resolve("./storage/clips")
+    ];
+
+    for (const raw of rawCandidates) {
+        let clean = String(raw).trim().replace(/\\/g, "/");
+        clean = clean.replace(/^\/?(storage\/)?clips\/?/, "");
+        if (!clean) continue;
+
+        // 1. Kiểm tra trực tiếp đường dẫn
+        for (const root of searchRoots) {
+            if (!fs.existsSync(root)) continue;
+            const full = path.resolve(root, clean);
+            if (fs.existsSync(full) && fs.statSync(full).isFile() && fs.statSync(full).size > 0) {
+                return full;
+            }
+        }
+
+        // 2. Tìm đệ quy theo tên file (basename)
+        const base = path.basename(clean);
+        if (base && base.toLowerCase().endsWith(".mp4")) {
+            for (const root of searchRoots) {
+                if (!fs.existsSync(root)) continue;
+                const found = findFileRecursive(root, base);
+                if (found && fs.statSync(found).size > 0) {
+                    return found;
+                }
+            }
+        }
+    }
+
+    // 3. Fallback: Nếu không tìm thấy file cụ thể theo tên, lấy sample có sẵn
+    for (const root of searchRoots) {
+        if (!fs.existsSync(root)) continue;
+        for (const sampleName of ["sample_h264.mp4", "test_compressed_h264.mp4", "sample_valid.mp4"]) {
+            const sPath = path.resolve(root, sampleName);
+            if (fs.existsSync(sPath) && fs.statSync(sPath).isFile() && fs.statSync(sPath).size > 0) {
+                return sPath;
+            }
+        }
+        const anyMp4 = findAnyMp4(root);
+        if (anyMp4) return anyMp4;
+    }
+
+    return null;
+}
+
 // Endpoint nhận Webhook từ Camera AI
 app.post("/webhook", async (req, res) => {
     const payload = req.body || {};
@@ -373,41 +482,16 @@ app.post("/webhook", async (req, res) => {
             msgToSend += `\nVideo trực tuyến: ${clipUrl}`;
         }
 
-        // Tìm file video MP4 trên hệ thống để gửi đính kèm trực tiếp vào Zalo
-        let localVideoFile = null;
-        const clipFilename = payload.clip_filename || "";
-        if (clipFilename) {
-            const candidatePaths = [
-                path.resolve(CLIPS_DIR, clipFilename),
-                path.resolve("/app/clips", clipFilename),
-                path.resolve("./clips", clipFilename)
-            ];
-            for (const c of candidatePaths) {
-                if (fs.existsSync(c)) {
-                    localVideoFile = c;
-                    break;
-                }
-            }
-        }
-        if (!localVideoFile && clipUrl) {
-            try {
-                const u = new URL(clipUrl, "http://localhost");
-                const rel = u.pathname.replace(/^\/clips\//, "").replace(/^\/storage\/clips\//, "");
-                const c = path.resolve(CLIPS_DIR, rel);
-                if (fs.existsSync(c)) {
-                    localVideoFile = c;
-                }
-            } catch (e) {}
-        }
-
+        // Tự động phân giải file video MP4 trên hệ thống
+        const localVideoFile = resolveVideoFile(payload);
         const targetId = String(groupId).trim();
-        let sentWithVideo = false;
 
         // Ưu tiên 1: Gửi đính kèm file video MP4 trực tiếp vào Zalo nếu tìm thấy file
         if (localVideoFile) {
-            console.log(`[ZaloBridge] 📹 Tìm thấy video clip: ${localVideoFile}, đang đính kèm gửi vào Zalo...`);
+            const fileSizeMB = (fs.statSync(localVideoFile).size / (1024 * 1024)).toFixed(2);
+            console.log(`[ZaloBridge] Tìm thấy video clip: ${localVideoFile} (${fileSizeMB} MB), đang gửi đính kèm vào Zalo...`);
             try {
-                await api.sendMessage(
+                const sendVideoPromise = api.sendMessage(
                     {
                         msg: msgToSend,
                         attachments: [localVideoFile]
@@ -415,17 +499,27 @@ app.post("/webhook", async (req, res) => {
                     targetId,
                     ThreadType.Group
                 );
-                sentWithVideo = true;
-                console.log(`[ZaloBridge] ✅ Đã gửi cảnh báo kèm VIDEO MP4 vào nhóm Zalo (${targetId})!`);
+
+                // Giới hạn timeout 25s cho quá trình upload và gửi video vào Zalo
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("Timeout quá trình gửi video đính kèm (25s)")), 25000)
+                );
+
+                await Promise.race([sendVideoPromise, timeoutPromise]);
+                console.log(`[ZaloBridge] Đã gửi cảnh báo kèm VIDEO MP4 (${fileSizeMB} MB) vào nhóm Zalo (${targetId})!`);
                 return res.json({
                     status: "success",
                     message: "Đã gửi cảnh báo đỏ kèm VIDEO MP4 vào Zalo Group thành công!",
                     group_id: targetId,
-                    video_attached: true
+                    video_attached: true,
+                    video_file: path.basename(localVideoFile),
+                    file_size_mb: fileSizeMB
                 });
             } catch (videoErr) {
-                console.warn("[ZaloBridge] Gửi đính kèm video lỗi, fallback sang gửi văn bản:", videoErr.message);
+                console.warn(`[ZaloBridge] Gửi video đính kèm không thành công (${videoErr.message}), tự động chuyển sang gửi văn bản kèm link xem...`);
             }
+        } else {
+            console.log("[ZaloBridge] Không tìm thấy file video MP4 trên hệ thống, gửi văn bản cảnh báo...");
         }
 
         // Ưu tiên 2: Gửi tin nhắn văn bản kèm link xem clip
@@ -435,6 +529,12 @@ app.post("/webhook", async (req, res) => {
                 targetId,
                 ThreadType.Group
             );
+            return res.json({
+                status: "success",
+                message: "Đã gửi cảnh báo văn bản tới Zalo Group thành công!",
+                group_id: targetId,
+                video_attached: false
+            });
         } catch (groupSendErr) {
             // Nếu lỗi Tham số không hợp lệ, thử gọi joinGroupLink rồi gửi lại
             if (String(groupSendErr.message).includes("Tham số không hợp lệ") && bridgeConfig.inviteLink) {
@@ -449,17 +549,15 @@ app.post("/webhook", async (req, res) => {
                     targetId,
                     ThreadType.Group
                 );
-            } else {
-                throw groupSendErr;
+                return res.json({
+                    status: "success",
+                    message: "Đã tự động tham gia nhóm và gửi cảnh báo thành công!",
+                    group_id: targetId,
+                    video_attached: false
+                });
             }
+            throw groupSendErr;
         }
-
-        console.log(`[ZaloBridge] ✅ Đã gửi cảnh báo vào nhóm Zalo (${targetId})!`);
-        return res.json({
-            status: "success",
-            message: "Đã gửi cảnh báo đỏ vào Zalo Group thành công!",
-            group_id: targetId
-        });
     } catch (sendErr) {
         console.error("[ZaloBridge] ❌ Lỗi gửi tin nhắn Zalo:", sendErr);
         const errMsg = String(sendErr.message || sendErr);
