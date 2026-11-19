@@ -2228,27 +2228,24 @@
         .camera-status-overlay {
             position: absolute;
             inset: 0;
-            background: rgba(10, 14, 23, 0.75);
-            backdrop-filter: blur(6px);
+            background: rgba(0, 0, 0, 0.8);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 0.65rem;
-            color: #f4f4f5;
-            font-size: 0.8125rem;
-            font-weight: 500;
+            gap: 0.6rem;
+            color: #e4e4e7;
+            font-size: 0.78125rem;
             z-index: 10;
-            transition: opacity 0.25s ease;
         }
 
         .camera-spinner {
-            width: 28px;
-            height: 28px;
+            width: 26px;
+            height: 26px;
             border: 2.5px solid rgba(255, 255, 255, 0.15);
             border-top-color: var(--nv-green);
             border-radius: 50%;
-            animation: spin 0.75s linear infinite;
+            animation: spin 0.8s linear infinite;
         }
 
         /* WorkflowDiagram Component Styles */
@@ -7168,7 +7165,7 @@
     </div>
 
     <!-- Component Scripts -->
-    <script src="/static/js/components/CameraView.js?v=2.6.0"></script>
+    <script src="/static/js/components/CameraView.js"></script>
     <script src="/static/js/components/WorkflowDiagram.js"></script>
     <!-- Interactive Logic & State Handling -->
     <script>

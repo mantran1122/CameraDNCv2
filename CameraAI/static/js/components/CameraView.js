@@ -51,9 +51,8 @@
         const chNum = parseInt(channel, 10);
         const code = `D${String(chNum).padStart(2, '0')}`;
         const name = rawName || OFFICIAL_CAMERA_NAMES[chNum] || `Kênh ${String(chNum).padStart(2, '0')}`;
-        const liveTag = [3, 11, 18].includes(chNum) ? " • Live" : "";
-        if (name.startsWith(code)) return `${name}${liveTag}`;
-        return `${code} - ${name}${liveTag}`;
+        if (name.startsWith(code)) return name;
+        return `${code} - ${name}`;
     }
 
     class CameraView {
@@ -244,47 +243,41 @@
         bindPlayerEvents() {
             const video = this.container.querySelector('#camera-video-player');
             if (video) {
-                video.addEventListener('waiting', () => this.showStatus('Đang tải bộ đệm video...'));
+                video.addEventListener('waiting', () => this.showStatus('Buffering...'));
                 video.addEventListener('playing', () => this.hideStatus());
                 video.addEventListener('error', () => {
-                    this.showStatus('Đang kết nối lại luồng video...');
+                    this.showStatus('Stream reconnecting...');
                     setTimeout(() => this.hideStatus(), 1500);
                 });
             }
 
             const img = this.container.querySelector('#camera-mjpeg-player');
             if (img) {
-                let firstFrameReceived = false;
-                const checkFirstFrame = () => {
-                    if (!firstFrameReceived && img.naturalWidth > 0) {
-                        firstFrameReceived = true;
+                let checkLoadedInterval = setInterval(() => {
+                    if (img.naturalWidth > 0) {
                         this.hideStatus();
-                        if (checkLoadedInterval) clearInterval(checkLoadedInterval);
+                        clearInterval(checkLoadedInterval);
                     }
-                };
-
-                let checkLoadedInterval = setInterval(checkFirstFrame, 150);
+                }, 400);
                 setTimeout(() => {
-                    if (checkLoadedInterval) clearInterval(checkLoadedInterval);
+                    clearInterval(checkLoadedInterval);
                     this.hideStatus();
-                }, 8000);
+                }, 6000);
 
-                img.onload = checkFirstFrame;
+                img.onload = () => this.hideStatus();
                 img.onerror = () => {
-                    this.showStatus('Đang kết nối lại luồng NVR RTSP...');
+                    this.showStatus('Đang kết nối luồng NVR RTSP...');
                     setTimeout(() => {
                         if (this.source && (this.source.type === 'mjpeg' || this.source.url.includes('/api/stream/live/'))) {
                             img.src = this.source.url + (this.source.url.includes('?') ? '&' : '?') + 't=' + Date.now();
                         }
-                    }, 1500);
+                    }, 2000);
                 };
             }
         }
 
         setSource(newSource) {
             this.source = newSource;
-            const ch = this.getCurrentChannel();
-            const chLabel = newSource.label || `Camera D${String(ch).padStart(2, '0')}`;
             const frame = this.container.querySelector('#camera-media-frame');
             const badge = this.container.querySelector('#stream-badge-overlay');
 
@@ -293,36 +286,28 @@
             }
 
             if (frame) {
-                const streamUrl = newSource.url + (newSource.url.includes('?') ? '&' : '?') + 't=' + Date.now();
-
-                // Luôn render giao diện với màn hình chờ hiển thị rõ ràng ngay từ millisecond đầu tiên (0% màn hình đen)
-                frame.innerHTML = `
-                    <img id="camera-mjpeg-player" class="camera-player-element" src="${streamUrl}" alt="${this.escapeHtml(chLabel)}" style="background: #0f131a; min-height: 100%; object-fit: contain;" />
-                    <div class="camera-stream-badge-overlay" id="stream-badge-overlay">${newSource.type === 'mjpeg' ? 'LIVE RTSP' : newSource.type.toUpperCase()}</div>
-                    <div class="camera-status-overlay" id="camera-status-overlay" style="display: flex;">
-                        <div class="camera-spinner"></div>
-                        <span id="camera-status-text" style="font-weight: 600; font-size: 0.85rem; color: #f4f4f5;">Đang kết nối ${this.escapeHtml(chLabel)}...</span>
-                        <span style="font-size: 0.72rem; color: #a1a1aa;">Đang thiết lập luồng NVR RTSP (Port 33554)...</span>
-                    </div>
-                `;
-
-                const img = frame.querySelector('#camera-mjpeg-player');
-                const overlay = frame.querySelector('#camera-status-overlay');
-
-                let loadTimer = setTimeout(() => {
-                    if (overlay) overlay.style.display = 'none';
-                }, 1500);
-
-                if (img) {
-                    img.onload = () => {
-                        clearTimeout(loadTimer);
-                        if (overlay) overlay.style.display = 'none';
-                    };
-                    img.onerror = () => {
-                        const text = frame.querySelector('#camera-status-text');
-                        if (text) text.innerText = 'Đang chờ luồng tín hiệu từ NVR...';
-                    };
+                const oldImg = frame.querySelector('#camera-mjpeg-player');
+                if (oldImg) {
+                    oldImg.onload = null;
+                    oldImg.onerror = null;
+                    oldImg.src = '';
+                    oldImg.removeAttribute('src');
                 }
+                const oldVideo = frame.querySelector('#camera-video-player');
+                if (oldVideo) {
+                    try {
+                        oldVideo.pause();
+                        oldVideo.removeAttribute('src');
+                        oldVideo.load();
+                    } catch (e) {}
+                }
+
+                const overlay = frame.querySelector('#camera-status-overlay');
+                const overlayHtml = overlay ? overlay.outerHTML : '';
+                const badgeHtml = badge ? badge.outerHTML : '';
+
+                frame.innerHTML = this.buildMediaElement(newSource) + badgeHtml + overlayHtml;
+                this.bindPlayerEvents();
             }
         }
 
