@@ -51,8 +51,9 @@
         const chNum = parseInt(channel, 10);
         const code = `D${String(chNum).padStart(2, '0')}`;
         const name = rawName || OFFICIAL_CAMERA_NAMES[chNum] || `Kênh ${String(chNum).padStart(2, '0')}`;
-        if (name.startsWith(code)) return name;
-        return `${code} - ${name}`;
+        const liveTag = [3, 11, 18].includes(chNum) ? " • Live" : "";
+        if (name.startsWith(code)) return `${name}${liveTag}`;
+        return `${code} - ${name}${liveTag}`;
     }
 
     class CameraView {
@@ -292,40 +293,36 @@
             }
 
             if (frame) {
-                // 1. Kích hoạt ngay màn hình chờ (Loading Screen) - triệt tiêu hoàn toàn màn hình đen
-                this.showStatus(`Đang kết nối ${chLabel}...`);
+                const streamUrl = newSource.url + (newSource.url.includes('?') ? '&' : '?') + 't=' + Date.now();
 
-                const oldImg = frame.querySelector('#camera-mjpeg-player');
-                if (oldImg && (newSource.type === 'mjpeg' || (newSource.url && newSource.url.includes('/api/stream/live/')))) {
-                    // Giữ khung hình cũ làm nền mờ (backdrop blur) trong khi luồng mới đang nạp
-                    oldImg.style.filter = 'blur(6px) brightness(0.5)';
-                    oldImg.style.transition = 'filter 0.25s ease';
-                    const streamUrl = newSource.url + (newSource.url.includes('?') ? '&' : '?') + 't=' + Date.now();
-                    oldImg.src = streamUrl;
-                    oldImg.alt = chLabel;
-                    this.bindPlayerEvents();
-                    return;
-                }
-
-                // Chuyển đổi giữa video và mjpeg
-                const oldVideo = frame.querySelector('#camera-video-player');
-                if (oldVideo) {
-                    try {
-                        oldVideo.pause();
-                        oldVideo.removeAttribute('src');
-                        oldVideo.load();
-                    } catch (e) {}
-                }
-
-                frame.innerHTML = this.buildMediaElement(newSource) +
-                    `<div class="camera-stream-badge-overlay" id="stream-badge-overlay">${newSource.type === 'mjpeg' ? 'LIVE RTSP' : newSource.type.toUpperCase()}</div>` +
-                    `<div class="camera-status-overlay" id="camera-status-overlay">
+                // Luôn render giao diện với màn hình chờ hiển thị rõ ràng ngay từ millisecond đầu tiên (0% màn hình đen)
+                frame.innerHTML = `
+                    <img id="camera-mjpeg-player" class="camera-player-element" src="${streamUrl}" alt="${this.escapeHtml(chLabel)}" style="background: #0f131a; min-height: 100%; object-fit: contain;" />
+                    <div class="camera-stream-badge-overlay" id="stream-badge-overlay">${newSource.type === 'mjpeg' ? 'LIVE RTSP' : newSource.type.toUpperCase()}</div>
+                    <div class="camera-status-overlay" id="camera-status-overlay" style="display: flex;">
                         <div class="camera-spinner"></div>
-                        <span id="camera-status-text">Đang kết nối ${this.escapeHtml(chLabel)}...</span>
-                    </div>`;
+                        <span id="camera-status-text" style="font-weight: 600; font-size: 0.85rem; color: #f4f4f5;">Đang kết nối ${this.escapeHtml(chLabel)}...</span>
+                        <span style="font-size: 0.72rem; color: #a1a1aa;">Đang thiết lập luồng NVR RTSP (Port 33554)...</span>
+                    </div>
+                `;
 
-                this.showStatus(`Đang kết nối ${chLabel}...`);
-                this.bindPlayerEvents();
+                const img = frame.querySelector('#camera-mjpeg-player');
+                const overlay = frame.querySelector('#camera-status-overlay');
+
+                let loadTimer = setTimeout(() => {
+                    if (overlay) overlay.style.display = 'none';
+                }, 1500);
+
+                if (img) {
+                    img.onload = () => {
+                        clearTimeout(loadTimer);
+                        if (overlay) overlay.style.display = 'none';
+                    };
+                    img.onerror = () => {
+                        const text = frame.querySelector('#camera-status-text');
+                        if (text) text.innerText = 'Đang chờ luồng tín hiệu từ NVR...';
+                    };
+                }
             }
         }
 
@@ -342,10 +339,6 @@
             const overlay = this.container.querySelector('#camera-status-overlay');
             if (overlay) {
                 overlay.style.display = 'none';
-            }
-            const img = this.container.querySelector('#camera-mjpeg-player');
-            if (img) {
-                img.style.filter = 'none';
             }
         }
 

@@ -2232,8 +2232,33 @@ def _create_live_loading_frame(channel: int) -> bytes:
     return buffer.tobytes() if ret else b""
 
 
+def _create_standby_frame(channel: int) -> bytes:
+    """Tạo khung hình báo trạng thái trực quan rõ ràng cho các kênh chưa cấp quyền hoặc mất tín hiệu (0% màn hình đen)."""
+    cam_names = getattr(config, "CAMERA_NAMES", {}) or {}
+    raw_name = cam_names.get(str(channel)) or cam_names.get(channel) or f"Kênh {channel:02d}"
+    frame = np.full((360, 640, 3), (16, 20, 28), dtype=np.uint8)
+
+    # Khung viền và dải tiêu đề
+    cv2.rectangle(frame, (16, 16), (624, 344), (45, 55, 72), 1)
+    cv2.rectangle(frame, (16, 16), (624, 52), (24, 30, 42), -1)
+    cv2.putText(frame, "DNC CAMERA AI - TRANG THAI LUONG TRUC TIEP", (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (118, 185, 0), 1, cv2.LINE_AA)
+
+    # Tiêu đề kênh và vị trí
+    cv2.putText(frame, f"CAMERA D{channel:02d} - {str(raw_name)[:30]}", (35, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+
+    # Cảnh báo 403 / Không có tín hiệu
+    cv2.circle(frame, (45, 160), 6, (0, 165, 255), -1)
+    cv2.putText(frame, "CHUA PHAN QUYEN RTSP HOAC MAT TIN HIEU (403)", (62, 165), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1, cv2.LINE_AA)
+
+    cv2.putText(frame, "Tai khoan NVR (user2) hien tai duoc phan quyen Live o cac kenh:", (35, 210), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (200, 220, 240), 1, cv2.LINE_AA)
+    cv2.putText(frame, "-> Vui long chon D11 (Quan ly HSSV), D18 (Sanh 1), hoac D03", (35, 245), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (118, 185, 0), 1, cv2.LINE_AA)
+    cv2.putText(frame, f"NVR WAN: {config.NVR_HOST}:{config.RTSP_PORT} | Server AI Live", (35, 310), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (100, 116, 139), 1, cv2.LINE_AA)
+
+    ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    return buffer.tobytes() if ret else b""
+
+
 async def generate_frames(channel: int, request: Optional[Request] = None):
-    consecutive_failures = 0
     cap = None
 
     # 1. Phản hồi HTTP 200 StreamingResponse ngay lập tức (< 5ms) với khung hình chờ chuyên nghiệp
@@ -2245,40 +2270,33 @@ async def generate_frames(channel: int, request: Optional[Request] = None):
     if not config.DEMO_MODE:
         rtsp_user = quote(str(config.NVR_USER), safe="")
         rtsp_password = quote(str(config.NVR_PASSWORD), safe="")
-        # Tối ưu timeout kết nối RTSP: stimeout 2.5s (2500000 microsecond) thay vì mặc định 30s
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;2500000|max_delay;500000"
+        # Tối ưu timeout kết nối RTSP: stimeout 2.0s thay vì mặc định 30s
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;2000000|max_delay;500000"
 
-        # Ưu tiên cổng RTSP thật (33554) trước tiên, tránh dò quét cổng rác gây nghẽn luồng
-        active_port = config.RTSP_PORT if config.RTSP_PORT not in (36677, 37777, 8080, 4443) else 33554
-        candidate_ports = [active_port]
-        if active_port != 33554:
-            candidate_ports.append(33554)
-        if 554 not in candidate_ports:
-            candidate_ports.append(554)
+        # CHỈ KẾT NỐI CỔNG RTSP THỰC TẾ (33554), tuyệt đối không dò cổng 554 đã bị firewall chặn gây treo 60s
+        active_port = 33554 if config.RTSP_PORT in (36677, 37777, 8080, 4443) else int(config.RTSP_PORT or 33554)
 
-        # Ưu tiên luồng phụ subtype=1 trước (nhẹ và bắt hình siêu tốc < 0.5s), nếu không có mới sang subtype=0
+        # Thử subtype=1 (nhẹ, nhanh), nếu không được mới thử subtype=0
         for subtype in [1, 0]:
             if cap is not None and cap.isOpened():
                 break
-            for port in candidate_ports:
-                if request is not None and await request.is_disconnected():
-                    return
-                rtsp_url = f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{port}/cam/realmonitor?channel={channel}&subtype={subtype}"
-                try:
-                    test_cap = await asyncio.to_thread(cv2.VideoCapture, rtsp_url, cv2.CAP_FFMPEG)
-                    if test_cap is not None and test_cap.isOpened():
-                        cap = test_cap
-                        if port != config.RTSP_PORT:
-                            config.RTSP_PORT = port
-                        break
-                    elif test_cap is not None:
-                        await asyncio.to_thread(test_cap.release)
-                except Exception:
-                    pass
+            if request is not None and await request.is_disconnected():
+                return
+            rtsp_url = f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{active_port}/cam/realmonitor?channel={channel}&subtype={subtype}"
+            try:
+                test_cap = await asyncio.to_thread(cv2.VideoCapture, rtsp_url, cv2.CAP_FFMPEG)
+                if test_cap is not None and test_cap.isOpened():
+                    cap = test_cap
+                    break
+                elif test_cap is not None:
+                    await asyncio.to_thread(test_cap.release)
+            except Exception:
+                pass
 
     try:
+        standby_bytes = None
         while True:
-            if await request.is_disconnected():
+            if request is not None and await request.is_disconnected():
                 break
 
             if config.DEMO_MODE:
@@ -2287,6 +2305,10 @@ async def generate_frames(channel: int, request: Optional[Request] = None):
                 cv2.putText(frame, f"NVR: {config.NVR_HOST}:{config.RTSP_PORT}", (50, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 200), 2)
                 if int(time.time() * 2) % 2 == 0:
                     cv2.circle(frame, (600, 30), 10, (0, 0, 255), -1)
+                ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                frame_bytes = buffer.tobytes()
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
                 await asyncio.sleep(0.25)
             else:
                 frame = None
@@ -2294,33 +2316,20 @@ async def generate_frames(channel: int, request: Optional[Request] = None):
                     ret, raw_frame = await asyncio.to_thread(cap.read)
                     if ret and raw_frame is not None:
                         frame = raw_frame
-                        consecutive_failures = 0
-                    else:
-                        consecutive_failures += 1
-                else:
-                    consecutive_failures += 1
 
-                if frame is None:
-                    # Standby screen for channels with 403 Forbidden or no signal
-                    frame = np.full((360, 640, 3), (12, 16, 26), dtype=np.uint8)
-                    cv2.rectangle(frame, (20, 20), (620, 340), (30, 41, 59), 1)
-                    cv2.putText(frame, f"CAMERA KENH {channel:02d} - TIN HIEU KHONG KHA DUNG", (40, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 165, 255), 2)
-                    cv2.putText(frame, "Goi y: Vui long chon Camera Kenh 11 hoac 18 tren menu", (40, 195), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (200, 220, 240), 1)
-                    cv2.putText(frame, f"NVR: {config.NVR_HOST}:{config.RTSP_PORT} (RTSP 403 Access Denied)", (40, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 116, 139), 1)
+                if frame is not None:
                     ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
                     frame_bytes = buffer.tobytes()
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-                    await asyncio.sleep(1.5)
-                    if consecutive_failures >= 5:
-                        break
-                    continue
-
-            ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-            frame_bytes = buffer.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-            await asyncio.sleep(0.04)
+                    await asyncio.sleep(0.04)
+                else:
+                    # Kênh không có quyền (403) hoặc mất tín hiệu: Phát liên tục màn hình standby hướng dẫn, KHÔNG BAO GIỜ để màn hình đen
+                    if standby_bytes is None:
+                        standby_bytes = _create_standby_frame(channel)
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + standby_bytes + b'\r\n')
+                    await asyncio.sleep(1.0)
     finally:
         if cap is not None:
             try:
