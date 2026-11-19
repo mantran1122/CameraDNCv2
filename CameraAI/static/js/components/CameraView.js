@@ -243,41 +243,47 @@
         bindPlayerEvents() {
             const video = this.container.querySelector('#camera-video-player');
             if (video) {
-                video.addEventListener('waiting', () => this.showStatus('Buffering...'));
+                video.addEventListener('waiting', () => this.showStatus('Đang tải bộ đệm video...'));
                 video.addEventListener('playing', () => this.hideStatus());
                 video.addEventListener('error', () => {
-                    this.showStatus('Stream reconnecting...');
+                    this.showStatus('Đang kết nối lại luồng video...');
                     setTimeout(() => this.hideStatus(), 1500);
                 });
             }
 
             const img = this.container.querySelector('#camera-mjpeg-player');
             if (img) {
-                let checkLoadedInterval = setInterval(() => {
-                    if (img.naturalWidth > 0) {
+                let firstFrameReceived = false;
+                const checkFirstFrame = () => {
+                    if (!firstFrameReceived && img.naturalWidth > 0) {
+                        firstFrameReceived = true;
                         this.hideStatus();
-                        clearInterval(checkLoadedInterval);
+                        if (checkLoadedInterval) clearInterval(checkLoadedInterval);
                     }
-                }, 400);
-                setTimeout(() => {
-                    clearInterval(checkLoadedInterval);
-                    this.hideStatus();
-                }, 6000);
+                };
 
-                img.onload = () => this.hideStatus();
+                let checkLoadedInterval = setInterval(checkFirstFrame, 150);
+                setTimeout(() => {
+                    if (checkLoadedInterval) clearInterval(checkLoadedInterval);
+                    this.hideStatus();
+                }, 8000);
+
+                img.onload = checkFirstFrame;
                 img.onerror = () => {
-                    this.showStatus('Đang kết nối luồng NVR RTSP...');
+                    this.showStatus('Đang kết nối lại luồng NVR RTSP...');
                     setTimeout(() => {
                         if (this.source && (this.source.type === 'mjpeg' || this.source.url.includes('/api/stream/live/'))) {
                             img.src = this.source.url + (this.source.url.includes('?') ? '&' : '?') + 't=' + Date.now();
                         }
-                    }, 2000);
+                    }, 1500);
                 };
             }
         }
 
         setSource(newSource) {
             this.source = newSource;
+            const ch = this.getCurrentChannel();
+            const chLabel = newSource.label || `Camera D${String(ch).padStart(2, '0')}`;
             const frame = this.container.querySelector('#camera-media-frame');
             const badge = this.container.querySelector('#stream-badge-overlay');
 
@@ -286,13 +292,22 @@
             }
 
             if (frame) {
+                // 1. Kích hoạt ngay màn hình chờ (Loading Screen) - triệt tiêu hoàn toàn màn hình đen
+                this.showStatus(`Đang kết nối ${chLabel}...`);
+
                 const oldImg = frame.querySelector('#camera-mjpeg-player');
-                if (oldImg) {
-                    oldImg.onload = null;
-                    oldImg.onerror = null;
-                    oldImg.src = '';
-                    oldImg.removeAttribute('src');
+                if (oldImg && (newSource.type === 'mjpeg' || (newSource.url && newSource.url.includes('/api/stream/live/')))) {
+                    // Giữ khung hình cũ làm nền mờ (backdrop blur) trong khi luồng mới đang nạp
+                    oldImg.style.filter = 'blur(6px) brightness(0.5)';
+                    oldImg.style.transition = 'filter 0.25s ease';
+                    const streamUrl = newSource.url + (newSource.url.includes('?') ? '&' : '?') + 't=' + Date.now();
+                    oldImg.src = streamUrl;
+                    oldImg.alt = chLabel;
+                    this.bindPlayerEvents();
+                    return;
                 }
+
+                // Chuyển đổi giữa video và mjpeg
                 const oldVideo = frame.querySelector('#camera-video-player');
                 if (oldVideo) {
                     try {
@@ -302,11 +317,14 @@
                     } catch (e) {}
                 }
 
-                const overlay = frame.querySelector('#camera-status-overlay');
-                const overlayHtml = overlay ? overlay.outerHTML : '';
-                const badgeHtml = badge ? badge.outerHTML : '';
+                frame.innerHTML = this.buildMediaElement(newSource) +
+                    `<div class="camera-stream-badge-overlay" id="stream-badge-overlay">${newSource.type === 'mjpeg' ? 'LIVE RTSP' : newSource.type.toUpperCase()}</div>` +
+                    `<div class="camera-status-overlay" id="camera-status-overlay">
+                        <div class="camera-spinner"></div>
+                        <span id="camera-status-text">Đang kết nối ${this.escapeHtml(chLabel)}...</span>
+                    </div>`;
 
-                frame.innerHTML = this.buildMediaElement(newSource) + badgeHtml + overlayHtml;
+                this.showStatus(`Đang kết nối ${chLabel}...`);
                 this.bindPlayerEvents();
             }
         }
@@ -324,6 +342,10 @@
             const overlay = this.container.querySelector('#camera-status-overlay');
             if (overlay) {
                 overlay.style.display = 'none';
+            }
+            const img = this.container.querySelector('#camera-mjpeg-player');
+            if (img) {
+                img.style.filter = 'none';
             }
         }
 

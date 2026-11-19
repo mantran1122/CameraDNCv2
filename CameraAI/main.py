@@ -2208,33 +2208,73 @@ async def vss_search_api(req: VSSSearchRequest, request: Request):
     return await asyncio.to_thread(search_vss_archive, req.query, filters)
 
 
+def _create_live_loading_frame(channel: int) -> bytes:
+    """Tạo khung hình chờ trực quan hiển thị ngay lập tức khi người dùng chuyển camera (0% màn hình đen)."""
+    cam_names = getattr(config, "CAMERA_NAMES", {}) or {}
+    raw_name = cam_names.get(str(channel)) or cam_names.get(channel) or f"Camera Kênh {channel:02d}"
+    frame = np.full((360, 640, 3), (15, 18, 25), dtype=np.uint8)
+
+    # Khung viền và dải tiêu đề
+    cv2.rectangle(frame, (16, 16), (624, 344), (32, 42, 58), 1)
+    cv2.rectangle(frame, (16, 16), (624, 52), (22, 28, 40), -1)
+    cv2.putText(frame, "DNC CAMERA AI - VSS BLUEPRINT LIVE", (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (118, 185, 0), 1, cv2.LINE_AA)
+
+    # Tiêu đề kênh và vị trí
+    cv2.putText(frame, f"CAMERA D{channel:02d}", (40, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.85, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(frame, str(raw_name)[:45], (40, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 220, 240), 1, cv2.LINE_AA)
+
+    # Trạng thái kết nối
+    cv2.circle(frame, (48, 230), 6, (0, 210, 100), -1)
+    cv2.putText(frame, "DANG KET NOI TIN HIEU TRUC TIEP...", (68, 235), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 210, 100), 1, cv2.LINE_AA)
+    cv2.putText(frame, f"NVR: {config.NVR_HOST}:{config.RTSP_PORT} | Luong RTSP toc do cao", (40, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (100, 116, 139), 1, cv2.LINE_AA)
+
+    ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    return buffer.tobytes() if ret else b""
+
+
 async def generate_frames(channel: int, request: Optional[Request] = None):
     consecutive_failures = 0
     cap = None
+
+    # 1. Phản hồi HTTP 200 StreamingResponse ngay lập tức (< 5ms) với khung hình chờ chuyên nghiệp
+    initial_loading = _create_live_loading_frame(channel)
+    if initial_loading:
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + initial_loading + b'\r\n')
+
     if not config.DEMO_MODE:
         rtsp_user = quote(str(config.NVR_USER), safe="")
         rtsp_password = quote(str(config.NVR_PASSWORD), safe="")
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
-        candidate_ports = []
-        for p in (config.RTSP_PORT, 33554, 554):
-            if p and int(p) not in (36677, 37777, 8080, 4443) and int(p) not in candidate_ports:
-                candidate_ports.append(int(p))
-        if not candidate_ports:
-            candidate_ports = [33554, 554]
+        # Tối ưu timeout kết nối RTSP: stimeout 2.5s (2500000 microsecond) thay vì mặc định 30s
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;2500000|max_delay;500000"
 
-        for port in candidate_ports:
-            rtsp_url = f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{port}/cam/realmonitor?channel={channel}&subtype=1"
-            try:
-                test_cap = await asyncio.to_thread(cv2.VideoCapture, rtsp_url, cv2.CAP_FFMPEG)
-                if test_cap is not None and test_cap.isOpened():
-                    cap = test_cap
-                    if port != config.RTSP_PORT:
-                        config.RTSP_PORT = port
-                    break
-                elif test_cap is not None:
-                    await asyncio.to_thread(test_cap.release)
-            except Exception:
-                pass
+        # Ưu tiên cổng RTSP thật (33554) trước tiên, tránh dò quét cổng rác gây nghẽn luồng
+        active_port = config.RTSP_PORT if config.RTSP_PORT not in (36677, 37777, 8080, 4443) else 33554
+        candidate_ports = [active_port]
+        if active_port != 33554:
+            candidate_ports.append(33554)
+        if 554 not in candidate_ports:
+            candidate_ports.append(554)
+
+        # Ưu tiên luồng phụ subtype=1 trước (nhẹ và bắt hình siêu tốc < 0.5s), nếu không có mới sang subtype=0
+        for subtype in [1, 0]:
+            if cap is not None and cap.isOpened():
+                break
+            for port in candidate_ports:
+                if request is not None and await request.is_disconnected():
+                    return
+                rtsp_url = f"rtsp://{rtsp_user}:{rtsp_password}@{config.NVR_HOST}:{port}/cam/realmonitor?channel={channel}&subtype={subtype}"
+                try:
+                    test_cap = await asyncio.to_thread(cv2.VideoCapture, rtsp_url, cv2.CAP_FFMPEG)
+                    if test_cap is not None and test_cap.isOpened():
+                        cap = test_cap
+                        if port != config.RTSP_PORT:
+                            config.RTSP_PORT = port
+                        break
+                    elif test_cap is not None:
+                        await asyncio.to_thread(test_cap.release)
+                except Exception:
+                    pass
 
     try:
         while True:
