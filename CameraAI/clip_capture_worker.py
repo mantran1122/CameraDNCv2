@@ -104,38 +104,35 @@ class ClipCaptureWorker:
         except Exception:
             event_time = datetime.now()
 
-        # Stale Drop Policy: Drop events older than 15 minutes to prevent queue backlog
+        # Stale Drop Policy: Drop events older than 60s to prevent queue backlog
         age_sec = (datetime.now() - event_time).total_seconds()
-        if age_sec > 15 * 60:
-            print(f"[CLIP] alert={event_id} skipped (stale event: {age_sec / 60:.1f} mins old)")
+        if age_sec > 60:
+            print(f"[CLIP] alert={event_id} skipped (stale event: {age_sec:.1f}s old)")
             database.update_audio_analysis(
                 event_id,
                 status="video_expired",
-                error_message="Sự kiện quá hạn (>15 phút) trước khi kịp cắt video.",
+                error_message="Sự kiện quá hạn (>60 giây) trước khi kịp cắt video.",
             )
             return
 
-        delay = max(0.0, min(3.0, 3.0 - age_sec))
+        delay = max(0.0, min(1.0, 1.0 - age_sec))
         if delay > 0:
             time.sleep(delay)
 
         print(f"[CLIP] alert={event_id} capturing 10s evidence")
         filename = build_clip_reference(event["channel"], storage_timestamp(), event_id)
         captured_file = None
-        for attempt in range(1, 4):
-            print(f"[CLIP] alert={event_id} capture attempt={attempt}/3")
-            captured = video_clipper.clip_event_video(
-                channel=event["channel"],
-                event_timestamp=event_time,
-                output_filename=filename,
-                event_type=event.get("event_type", "video_anomaly"),
-                event_code=event.get("event_code", "Intrusion"),
-            )
-            if captured:
-                captured_file = filename
-                break
-            if attempt < 3:
-                time.sleep(2)
+        # Single pass: video_clipper.clip_event_video internally already executes
+        # 4 different modes (stream copy -> re-encode -> live sub-stream -> live main-stream)
+        captured = video_clipper.clip_event_video(
+            channel=event["channel"],
+            event_timestamp=event_time,
+            output_filename=filename,
+            event_type=event.get("event_type", "video_anomaly"),
+            event_code=event.get("event_code", "Intrusion"),
+        )
+        if captured:
+            captured_file = filename
 
         if captured_file:
             # 1. Update DB immediately so users and AI can view video instantly (< 5s)

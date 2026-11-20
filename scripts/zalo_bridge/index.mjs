@@ -160,76 +160,121 @@ async function initZalo() {
             console.log("✅ Đăng nhập Zalo thành công!");
         }
 
-        // Tự động giải quyết nhóm mục tiêu
+// Tự động giải quyết nhóm mục tiêu
         await resolveGroupTarget();
 
-        // Lắng nghe tin nhắn để tự động liên kết nhóm (hỗ trợ cả tài khoản bot tự gõ /setalert nhờ selfListen: true)
-        if (api && api.listener) {
-            api.listener.on("error", (err) => {
-                console.warn("[ZaloBridge] Listener warning:", err?.message || err);
-            });
-
-            api.listener.on("message", async (msg) => {
-                try {
-                    let text = "";
-                    if (typeof msg.data?.content === "string") {
-                        text = msg.data.content.trim();
-                    } else if (msg.data?.content && typeof msg.data.content === "object") {
-                        text = String(msg.data.content.title || msg.data.content.description || "").trim();
-                    }
-                    const lower = text.toLowerCase();
-                    const senderName = msg.data?.dName || "Người dùng";
-
-                    // Khi người dùng (hoặc chính bot) gõ /setalert, /start, /link
-                    if (lower.startsWith("/setalert") || lower.startsWith("/start") || lower.startsWith("/link") || lower === "setalert") {
-                        if (msg.type === ThreadType.Group) {
-                            bridgeConfig.targetGroupId = String(msg.threadId);
-                            try {
-                                const groupInfo = await api.getGroupInfo(msg.threadId);
-                                const info = groupInfo?.gridInfoMap?.[msg.threadId];
-                                if (info?.name) bridgeConfig.groupName = info.name;
-                            } catch (e) {}
-                            saveConfig();
-                            console.log(`[ZaloBridge] Đã liên kết nhóm Zalo ID: ${msg.threadId} ("${bridgeConfig.groupName}") từ tin nhắn của ${senderName}`);
-
-                            await api.sendMessage(
-                                {
-                                    msg: `ĐÃ LIÊN KẾT NHÓM CẢNH BÁO CAMERA DNC THÀNH CÔNG!\n` +
-                                         `Nhóm: ${bridgeConfig.groupName || msg.threadId}\n` +
-                                         `Người kích hoạt: ${senderName}\n\n` +
-                                         `Kể từ bây giờ, mọi sự kiện báo động đỏ (Ẩu đả, Đột nhập, Âm thanh bất thường...) cấu hình trên Admin sẽ tự động gửi video và thông tin vào nhóm này.`
-                                },
-                                msg.threadId,
-                                ThreadType.Group
-                            ).catch(console.error);
-                        } else {
-                            await api.sendMessage(
-                                {
-                                    msg: `Lệnh này cần được gửi trong NHÓM Zalo bạn muốn nhận cảnh báo (không phải tin nhắn riêng). Hãy vào nhóm và gõ: /setalert`
-                                },
-                                msg.threadId,
-                                ThreadType.User
-                            ).catch(console.error);
-                        }
-                    }
-                } catch (msgErr) {
-                    console.error("[ZaloBridge] Lỗi xử lý tin nhắn lắng nghe:", msgErr);
-                }
-            });
-
-            try {
-                api.listener.start();
-                console.log("[ZaloBridge] Bộ lắng nghe tin nhắn đã khởi động.");
-                console.log(`[ZaloBridge] Hướng dẫn: Bạn hãy vào Nhóm Zalo (https://zalo.me/g/libazgippahcfbk99qkc) và gõ: /setalert để kích hoạt.`);
-            } catch (listenErr) {
-                console.warn("[ZaloBridge] Cảnh báo khởi động listener:", listenErr.message);
-            }
-        }
+        // Lắng nghe tin nhắn để tự động liên kết nhóm
+        setupListener(api);
 
     } catch (error) {
         console.error("❌ Lỗi khởi tạo Zalo:", error);
     }
 }
+
+function setupListener(apiInstance) {
+    if (!apiInstance || !apiInstance.listener) return;
+    try {
+        apiInstance.listener.removeAllListeners();
+    } catch (e) {}
+
+    apiInstance.listener.on("error", (err) => {
+        console.warn("[ZaloBridge] Listener warning:", err?.message || err);
+    });
+
+    apiInstance.listener.on("message", async (msg) => {
+        try {
+            let text = "";
+            if (typeof msg.data?.content === "string") {
+                text = msg.data.content.trim();
+            } else if (msg.data?.content && typeof msg.data.content === "object") {
+                text = String(msg.data.content.title || msg.data.content.description || "").trim();
+            }
+            const lower = text.toLowerCase();
+            const senderName = msg.data?.dName || "Người dùng";
+
+            // Khi người dùng (hoặc chính bot) gõ /setalert, /start, /link
+            if (lower.startsWith("/setalert") || lower.startsWith("/start") || lower.startsWith("/link") || lower === "setalert") {
+                if (msg.type === ThreadType.Group) {
+                    bridgeConfig.targetGroupId = String(msg.threadId);
+                    try {
+                        const groupInfo = await apiInstance.getGroupInfo(msg.threadId);
+                        const info = groupInfo?.gridInfoMap?.[msg.threadId];
+                        if (info?.name) bridgeConfig.groupName = info.name;
+                    } catch (e) {}
+                    saveConfig();
+                    console.log(`[ZaloBridge] Đã liên kết nhóm Zalo ID: ${msg.threadId} ("${bridgeConfig.groupName}") từ tin nhắn của ${senderName}`);
+
+                    await apiInstance.sendMessage(
+                        {
+                            msg: `ĐÃ LIÊN KẾT NHÓM CẢNH BÁO CAMERA DNC THÀNH CÔNG!\n` +
+                                 `Nhóm: ${bridgeConfig.groupName || msg.threadId}\n` +
+                                 `Người kích hoạt: ${senderName}\n\n` +
+                                 `Kể từ bây giờ, mọi sự kiện báo động đỏ (Ẩu đả, Đột nhập, Âm thanh bất thường...) cấu hình trên Admin sẽ tự động gửi video và thông tin vào nhóm này.`
+                        },
+                        msg.threadId,
+                        ThreadType.Group
+                    ).catch(console.error);
+                } else {
+                    await apiInstance.sendMessage(
+                        {
+                            msg: `Lệnh này cần được gửi trong NHÓM Zalo bạn muốn nhận cảnh báo (không phải tin nhắn riêng). Hãy vào nhóm và gõ: /setalert`
+                        },
+                        msg.threadId,
+                        ThreadType.User
+                    ).catch(console.error);
+                }
+            }
+        } catch (msgErr) {
+            console.error("[ZaloBridge] Lỗi xử lý tin nhắn lắng nghe:", msgErr);
+        }
+    });
+
+    try {
+        apiInstance.listener.start();
+        console.log("[ZaloBridge] Bộ lắng nghe tin nhắn đã khởi động.");
+        console.log(`[ZaloBridge] Hướng dẫn: Bạn hãy vào Nhóm Zalo (https://zalo.me/g/libazgippahcfbk99qkc) và gõ: /setalert để kích hoạt.`);
+    } catch (listenErr) {
+        console.warn("[ZaloBridge] Cảnh báo khởi động listener:", listenErr.message);
+    }
+}
+
+let isRefreshing = false;
+async function refreshZaloSession() {
+    if (isRefreshing) return false;
+    if (!fs.existsSync(APPSTATE_FILE)) {
+        console.log("[ZaloBridge] Không tìm thấy appstate.json, không thể tự làm mới phiên.");
+        return false;
+    }
+    isRefreshing = true;
+    try {
+        console.log("[ZaloBridge] 🔄 Đang tự động làm mới phiên Zalo từ appstate.json (làm mới token & websocket)...");
+        const appstate = JSON.parse(fs.readFileSync(APPSTATE_FILE, "utf-8"));
+        const newApi = await zalo.login(appstate);
+        if (newApi) {
+            if (api && api.listener && typeof api.listener.stop === "function") {
+                try { api.listener.stop(); } catch (e) {}
+            }
+            api = newApi;
+            setupListener(api);
+            await resolveGroupTarget();
+            console.log("✅ [ZaloBridge] Đã làm mới phiên đăng nhập Zalo thành công!");
+            return true;
+        }
+    } catch (err) {
+        console.warn("[ZaloBridge] ⚠️ Lỗi làm mới phiên Zalo:", err.message);
+    } finally {
+        isRefreshing = false;
+    }
+    return false;
+}
+
+// Định kỳ mỗi 2 tiếng làm mới phiên Zalo để giữ upload session và WebSocket hoạt động 24/7
+setInterval(async () => {
+    if (api && fs.existsSync(APPSTATE_FILE)) {
+        console.log("[ZaloBridge] ⏰ Kích hoạt định kỳ duy trì phiên Zalo (chu kỳ 2 giờ)...");
+        await refreshZaloSession();
+    }
+}, 2 * 60 * 60 * 1000);
 
 // Khởi tạo Express HTTP Webhook Server
 const app = express();
@@ -491,6 +536,30 @@ async function resolveVideoFile(payload) {
     return null;
 }
 
+// Bộ đệm chống gửi trùng lặp webhook trong cửa sổ 20 giây
+const recentWebhooks = new Map();
+
+function isDuplicateWebhook(payload) {
+    const channel = payload.channel || 0;
+    const eventCode = payload.event_code || payload.event_type || "";
+    const ts = payload.timestamp || "";
+    const key = `${channel}_${eventCode}_${ts}`;
+
+    const now = Date.now();
+    const last = recentWebhooks.get(key) || 0;
+    if (now - last < 20000) {
+        return true;
+    }
+    recentWebhooks.set(key, now);
+
+    if (recentWebhooks.size > 200) {
+        for (const [k, v] of recentWebhooks.entries()) {
+            if (now - v > 300000) recentWebhooks.delete(k);
+        }
+    }
+    return false;
+}
+
 // Endpoint nhận Webhook từ Camera AI
 app.post("/webhook", async (req, res) => {
     const payload = req.body || {};
@@ -500,6 +569,15 @@ app.post("/webhook", async (req, res) => {
     const eventCode = payload.event_code || "Alert";
 
     console.log(`[Webhook] Nhận cảnh báo: ${camName} [${eventCode}]`);
+
+    // Chống bắn trùng lặp tin nhắn vào Zalo
+    if (isDuplicateWebhook(payload)) {
+        console.log(`[Webhook] ⏭️ Bỏ qua webhook trùng lặp trong 20s cho cam=${camName} [${eventCode}]`);
+        return res.json({
+            status: "ignored",
+            message: "Cảnh báo trùng lặp trong 20s cooldown được bỏ qua an toàn."
+        });
+    }
 
     if (!api) {
         return res.status(503).json({
@@ -531,33 +609,50 @@ app.post("/webhook", async (req, res) => {
         if (localVideoFile) {
             const fileSizeMB = (fs.statSync(localVideoFile).size / (1024 * 1024)).toFixed(2);
             console.log(`[ZaloBridge] Tìm thấy video clip: ${localVideoFile} (${fileSizeMB} MB), đang gửi đính kèm vào Zalo...`);
-            try {
-                const sendVideoPromise = api.sendMessage(
-                    {
-                        msg: msgToSend,
-                        attachments: [localVideoFile]
-                    },
-                    targetId,
-                    ThreadType.Group
-                );
+            let videoSent = false;
 
-                // Giới hạn timeout 25s cho quá trình upload và gửi video vào Zalo
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("Timeout quá trình gửi video đính kèm (25s)")), 25000)
-                );
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                try {
+                    const sendVideoPromise = api.sendMessage(
+                        {
+                            msg: msgToSend,
+                            attachments: [localVideoFile]
+                        },
+                        targetId,
+                        ThreadType.Group
+                    );
 
-                await Promise.race([sendVideoPromise, timeoutPromise]);
-                console.log(`[ZaloBridge] Đã gửi cảnh báo kèm VIDEO MP4 (${fileSizeMB} MB) vào nhóm Zalo (${targetId})!`);
-                return res.json({
-                    status: "success",
-                    message: "Đã gửi cảnh báo đỏ kèm VIDEO MP4 vào Zalo Group thành công!",
-                    group_id: targetId,
-                    video_attached: true,
-                    video_file: path.basename(localVideoFile),
-                    file_size_mb: fileSizeMB
-                });
-            } catch (videoErr) {
-                console.warn(`[ZaloBridge] Gửi video đính kèm không thành công (${videoErr.message}), tự động chuyển sang gửi văn bản kèm link xem...`);
+                    // Giới hạn timeout 35s cho quá trình upload và gửi video vào Zalo
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error("Timeout quá trình gửi video đính kèm (35s)")), 35000)
+                    );
+
+                    await Promise.race([sendVideoPromise, timeoutPromise]);
+                    console.log(`[ZaloBridge] ✅ Đã gửi cảnh báo kèm VIDEO MP4 (${fileSizeMB} MB) vào nhóm Zalo (${targetId})!`);
+                    videoSent = true;
+                    return res.json({
+                        status: "success",
+                        message: "Đã gửi cảnh báo đỏ kèm VIDEO MP4 vào Zalo Group thành công!",
+                        group_id: targetId,
+                        video_attached: true,
+                        video_file: path.basename(localVideoFile),
+                        file_size_mb: fileSizeMB
+                    });
+                } catch (videoErr) {
+                    console.warn(`[ZaloBridge] Gửi video đính kèm lần ${attempt}/2 không thành công: ${videoErr.message}`);
+                    if (attempt === 1) {
+                        console.log("[ZaloBridge] 🔄 Đang tự động làm mới phiên Zalo và thử gửi lại video lần 2...");
+                        const refreshed = await refreshZaloSession();
+                        if (!refreshed) {
+                            console.warn("[ZaloBridge] Không thể làm mới phiên Zalo, bỏ qua lần gửi video 2.");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!videoSent) {
+                console.warn("[ZaloBridge] ⚠️ Gửi video đính kèm thất bại sau khi thử lại, tự động chuyển sang gửi văn bản kèm link xem...");
             }
         } else {
             console.log("[ZaloBridge] Không tìm thấy file video MP4 trên hệ thống, gửi văn bản cảnh báo...");

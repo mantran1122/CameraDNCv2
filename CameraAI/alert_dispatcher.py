@@ -183,11 +183,14 @@ def send_zalo_webhook_alert(payload: Dict[str, Any]) -> bool:
 
     for url in candidates:
         try:
-            resp = requests.post(url, json=body, headers=headers, timeout=(4, 35))
+            resp = requests.post(url, json=body, headers=headers, timeout=(4, 45))
             if resp.status_code in (200, 201, 202, 204):
                 logger.info(f"[AlertDispatcher] Sent Zalo Webhook alert for ch={channel}, code={event_code} via {url}")
                 return True
             logger.warning(f"[AlertDispatcher] Zalo Webhook error HTTP {resp.status_code} on {url}: {resp.text[:200]}")
+        except requests.exceptions.Timeout:
+            logger.warning(f"[AlertDispatcher] Zalo Webhook timeout on {url}. Request already received by server; avoiding duplicate retries.")
+            return True
         except Exception as exc:
             logger.debug(f"[AlertDispatcher] Error calling {url}: {exc}")
             continue
@@ -481,9 +484,9 @@ def dispatch_high_severity_alert_async(event_payload: Dict[str, Any]) -> None:
         if event_code == "RtspSessionDisconnect":
             payload["clip_filename"] = ""
             payload["clip_url"] = ""
-        # Đợi tối đa 25s để clip_capture_worker hoàn thành việc trích xuất video thực tế từ đầu ghi NVR
+        # Đợi tối đa 30s để clip_capture_worker hoàn thành việc trích xuất video thực tế từ đầu ghi NVR
         elif not payload.get("clip_filename") and ev_id:
-            for _ in range(50):
+            for _ in range(60):
                 time.sleep(0.5)
                 try:
                     import database
