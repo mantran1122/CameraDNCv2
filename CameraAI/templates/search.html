@@ -8367,14 +8367,11 @@ user=None`;
             content = formatVnDateTime(content);
 
             // 1. Tạm thời trích xuất và bảo vệ các mã sự kiện dạng #14752 (bấm để xem clip)
-            // Khớp mã từ 4 đến 8 chữ số, tự chuẩn hóa các mã 7 chữ số bị thừa số 0 ở đuôi (ví dụ #1476420 -> #147642)
+            // Khớp mã từ 4 đến 8 chữ số và xử lý đuôi ký tự dư thừa nếu có
             const eventChips = {};
             let chipIndex = 0;
             content = content.replace(/#(\d{4,8})(?:\s*[:\-▶>]\s*\d+)?/g, (match, rawId) => {
-                let id = rawId;
-                if (id.length >= 7 && id.endsWith('0') && parseInt(id) > 1000000) {
-                    id = id.slice(0, -1);
-                }
+                const id = rawId;
                 const placeholder = `XEVENTCHIPX${chipIndex}XENDX`;
                 eventChips[placeholder] = `<span class="chat-event-chip" onclick="searchAndPlayEvent('${id}')" title="Bấm để tìm và mở clip #${id}">#${id} ▶</span>`;
                 chipIndex++;
@@ -8560,11 +8557,11 @@ user=None`;
             // 3. Đồng bộ card kết quả ở danh sách giữa (tuyệt đối KHÔNG chạm hay chuyển kênh live stream bên trái)
             await fetchAndRenderVideos(`#${cleanId}`, false, null, [parseInt(cleanId)]);
 
-            // 4. Fallback: Nếu search result có video_url chính xác, cập nhật lại modal
+            // 4. Fallback: Nếu search result có video_url chính xác cho đúng sự kiện này, cập nhật lại modal
             if (window.latestSearchResults && window.latestSearchResults.length > 0) {
-                const target = window.latestSearchResults.find(x => String(x.event_id) === String(cleanId)) || window.latestSearchResults[0];
+                const target = window.latestSearchResults.find(x => String(x.id || x.event_id) === String(cleanId));
                 if (target && target.video_url && target.video_url !== '/clips/sample_valid.mp4') {
-                    openVideoModal(target.title, target.video_url, target.event_id);
+                    openVideoModal(target.title, target.video_url, parseInt(target.id || cleanId));
                 }
             }
         }
@@ -8828,13 +8825,13 @@ user=None`;
         function attachVideoByIndex(idx) {
             const item = window.latestSearchResults?.[idx];
             if (!item) return;
-            attachVideoToChat(item.title, item.start_time, item.end_time, item.video_url, item.clip_filename, item.event_id);
+            attachVideoToChat(item.title, item.start_time, item.end_time, item.video_url, item.clip_filename, item.id || item.event_id);
         }
 
         function openVideoModalByIndex(idx) {
             const item = window.latestSearchResults?.[idx];
             if (!item) return;
-            openVideoModal(item.title, item.video_url, item.event_id);
+            openVideoModal(item.title, item.video_url, item.id || item.event_id);
         }
 
         function renderVideoCards(items) {

@@ -537,7 +537,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         found_ids = {r["id"] for r in rows}
         for eid in event_ids:
             if eid not in found_ids:
-                if eid % 10 == 0:
+                if eid > 99999:
                     cand_id = eid // 10
                     if cand_id not in found_ids:
                         cursor.execute("SELECT * FROM events WHERE id = ?", (cand_id,))

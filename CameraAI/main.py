@@ -2016,6 +2016,82 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
         w_start = report_data.get("window_start", "")
         w_end = report_data.get("window_end", "")
 
+        def _to_iso(dt_str: str) -> str:
+            if not dt_str:
+                return ""
+            m_iso = re.match(r"^\d{4}-\d{2}-\d{2}", dt_str)
+            if m_iso:
+                return dt_str
+            m_vn = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})\s*(.*)", dt_str)
+            if m_vn:
+                return f"{m_vn.group(3)}-{int(m_vn.group(2)):02d}-{int(m_vn.group(1)):02d} {m_vn.group(4)}".strip()
+            return dt_str
+
+        w_start_iso = _to_iso(report_data.get("window_start_iso") or w_start)
+        w_end_iso = _to_iso(report_data.get("window_end_iso") or w_end)
+
+        report_events: List[Dict[str, Any]] = []
+        conn_rep = database.get_db_connection()
+        try:
+            # 1. Trích xuất trực tiếp mọi mã #ID được nêu trong văn bản báo cáo (executive_summary, shifts, active_cameras)
+            rep_text_dump = json.dumps(report_data, ensure_ascii=False)
+            rep_cited_ids = [int(x) for x in re.findall(r"#(\d{4,8})", rep_text_dump)]
+            for rcid in rep_cited_ids:
+                if not any(m.get("id") == rcid for m in report_events):
+                    rev = database.get_event_by_id(rcid)
+                    if rev:
+                        c_clip = _resolve_playable_clip_for_event(conn_rep, rev) or "sample_valid.mp4"
+                        rev["clip_filename"] = c_clip
+                        rev["clip_url"] = f"/clips/{c_clip}"
+                        report_events.append(rev)
+
+            # 2. Lấy các sự kiện tiêu biểu từ cấu trúc notable_events
+            for ne in (report_data.get("notable_events") or []):
+                ne_id = ne.get("id")
+                if ne_id and not any(m.get("id") == ne_id for m in report_events):
+                    rev = database.get_event_by_id(ne_id)
+                    if rev:
+                        c_clip = _resolve_playable_clip_for_event(conn_rep, rev) or "sample_valid.mp4"
+                        rev["clip_filename"] = c_clip
+                        rev["clip_url"] = f"/clips/{c_clip}"
+                        report_events.append(rev)
+
+            # 3. Truy xuất sự kiện trong khung giờ báo cáo (ưu tiên ca đêm 22h-06h nếu người dùng hỏi ca đêm)
+            active_channels = report_data.get("high_risk_channels") or [ac["channel"] for ac in report_data.get("active_cameras_detail", [])[:5]]
+            if not active_channels and ch:
+                active_channels = [ch]
+
+            if active_channels and w_start_iso and w_end_iso:
+                cur_m = conn_rep.cursor()
+                placeholders = ",".join(["?"] * len(active_channels))
+                night_focus = ""
+                if any(k in lowered for k in ["đêm", "dem", "tối", "toi", "night"]):
+                    night_focus = "AND (strftime('%H', timestamp) >= '22' OR strftime('%H', timestamp) < '06') "
+
+                cur_m.execute(f"""
+                    SELECT * FROM events
+                    WHERE channel IN ({placeholders})
+                      AND timestamp >= ? AND timestamp <= ?
+                      {night_focus}
+                    ORDER BY (CASE WHEN severity='high' THEN 1 WHEN severity='medium' THEN 2 ELSE 3 END), id DESC
+                    LIMIT 12
+                """, list(active_channels) + [w_start_iso, w_end_iso])
+                for row in cur_m.fetchall():
+                    ev_d = dict(row)
+                    if not any(m.get("id") == ev_d["id"] for m in report_events):
+                        clip_fn = _resolve_playable_clip_for_event(conn_rep, ev_d) or "sample_valid.mp4"
+                        ev_d["clip_filename"] = clip_fn
+                        ev_d["clip_url"] = f"/clips/{clip_fn}"
+                        report_events.append(ev_d)
+        except Exception as e_master:
+            logger.warning("[NightlyReport master summary notable events]: %s", e_master)
+        finally:
+            conn_rep.close()
+
+        if report_events:
+            # Đảm bảo danh sách clip tương ứng chỉ chứa đúng sự kiện của báo cáo, loại bỏ clip duyệt vãng lai
+            matched_events = report_events
+
         if r_type == "single_camera":
             shift_lines = []
             for s in report_data.get("shifts", []):
@@ -2030,22 +2106,6 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
                 f"- Tóm tắt điều hành: {report_data.get('executive_summary', '')}\n"
                 f"- Diễn biến chi tiết theo 4 ca trực nối tiếp (từ 22:00 hôm trước đến 22:00 hôm nay):\n" + "\n".join(shift_lines)
             )
-
-            notable = report_data.get("notable_events") or []
-            if notable:
-                conn_res = database.get_db_connection()
-                try:
-                    for ne in notable:
-                        ne_id = ne.get("id")
-                        if ne_id and not any(m.get("id") == ne_id for m in matched_events):
-                            db_ev = database.get_event_by_id(ne_id)
-                            if db_ev:
-                                clip_fn = _resolve_playable_clip_for_event(conn_res, db_ev) or "sample_valid.mp4"
-                                db_ev["clip_filename"] = clip_fn
-                                db_ev["clip_url"] = f"/clips/{clip_fn}"
-                                matched_events.insert(0, db_ev)
-                finally:
-                    conn_res.close()
 
         elif r_type == "master_summary":
             active_lines = []
@@ -2062,32 +2122,6 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
                 f"- Các camera có phát sinh hoạt động/cảnh báo:\n" + ("\n".join(active_lines) if active_lines else "  + Toàn bộ hệ thống camera an toàn tuyệt đối, không ghi nhận bất thường.") + "\n"
                 f"- Trạng thái nhanh các camera:\n{all_summary_brief}"
             )
-            # Retrieve notable events across active channels in rolling window
-            try:
-                high_chans = report_data.get("high_risk_channels") or [ac["channel"] for ac in report_data.get("active_cameras_detail", [])[:4]]
-                if high_chans:
-                    conn_master = database.get_db_connection()
-                    try:
-                        cur_m = conn_master.cursor()
-                        placeholders = ",".join(["?"] * len(high_chans))
-                        cur_m.execute(f"""
-                            SELECT * FROM events
-                            WHERE channel IN ({placeholders})
-                              AND timestamp >= ? AND timestamp <= ?
-                            ORDER BY (CASE WHEN severity='high' THEN 1 WHEN severity='medium' THEN 2 ELSE 3 END), id DESC
-                            LIMIT 8
-                        """, list(high_chans) + [w_start, w_end])
-                        for row in cur_m.fetchall():
-                            ev_d = dict(row)
-                            if not any(m.get("id") == ev_d["id"] for m in matched_events):
-                                clip_fn = _resolve_playable_clip_for_event(conn_master, ev_d) or "sample_valid.mp4"
-                                ev_d["clip_filename"] = clip_fn
-                                ev_d["clip_url"] = f"/clips/{clip_fn}"
-                                matched_events.append(ev_d)
-                    finally:
-                        conn_master.close()
-            except Exception as e_master:
-                logger.warning("[NightlyReport master summary notable events]: %s", e_master)
 
     if matched_events:
         context_lines.append(f"DANH SÁCH CÁC SỰ KIỆN CÓ VIDEO CLIP MP4 THỰC TẾ (Người dùng sẽ click vào mã #ID để phát video):")
@@ -2139,8 +2173,8 @@ async def agent_query_api(req: AgentQueryModel, request: Request):
                     cev = valid_event_map.get(cid)
                     if not cev:
                         cev = database.get_event_by_id(cid)
-                    # Detect and normalize trailing zero hallucinated by LLM (e.g. #1476420 -> #147642)
-                    if not cev and cid % 10 == 0:
+                    # Detect and normalize trailing digit hallucinated by LLM (e.g. #1476420 -> #147642 or #1468756 -> #146875)
+                    if not cev and cid > 99999:
                         candidate_id = cid // 10
                         if candidate_id in valid_event_map:
                             actual_id = candidate_id

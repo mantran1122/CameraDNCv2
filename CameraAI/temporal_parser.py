@@ -30,7 +30,7 @@ def parse_query_temporal(text: str, default_date: Optional[str] = None) -> Dict[
     target_date = today_str
     is_date_filtered = False
 
-    if any(k in lowered for k in ["hôm qua", "hom qua", "yesterday"]):
+    if any(k in lowered for k in ["hôm qua", "hom qua", "homoi qua", "hôm trc", "hom truoc", "đêm qua", "dem qua", "tối qua", "toi qua", "yesterday"]):
         target_date = (now - timedelta(days=1)).strftime("%Y-%m-%d")
         is_date_filtered = True
     elif any(k in lowered for k in ["hôm nay", "hom nay", "today", "ngày nay"]):
