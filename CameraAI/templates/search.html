@@ -2409,6 +2409,7 @@
             width: 410px;
             min-width: 280px;
             max-width: 75vw;
+            height: 100%;
             background-color: var(--bg-surface);
             display: flex;
             flex-direction: column;
@@ -2482,8 +2483,9 @@
         /* Chat Messages Stream Area */
         .chat-messages-container {
             flex: 1 1 0%;
+            min-height: 0;
             overflow-y: auto;
-            padding: 1.25rem 1rem 6rem;
+            padding: 1.25rem 1rem 1rem;
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
@@ -2791,14 +2793,13 @@
             text-decoration: underline;
         }
 
-        /* Floating Bottom Controls Area in Chat (matching ChatInput.tsx) */
+        /* Floating Bottom Controls Area in Chat (Docked naturally via flexbox) */
         .chat-floating-controls-dock {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            position: relative;
+            flex-shrink: 0;
             padding: 0.75rem 1rem 0.85rem;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 85%, rgba(0, 0, 0, 0) 100%);
+            background: var(--bg-surface, #090a0f);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
             flex-direction: column;
             gap: 0.6rem;
@@ -2806,7 +2807,8 @@
         }
 
         html:not(.dark) .chat-floating-controls-dock {
-            background: linear-gradient(to top, rgba(255, 255, 255, 0.95) 85%, rgba(255, 255, 255, 0) 100%);
+            background: var(--bg-surface, #f8fafc);
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
         }
 
         .chat-status-pill-wrap {
@@ -7607,6 +7609,13 @@
                 }, 50);
                 input.focus();
             }
+
+            const msgContainer = document.getElementById('chat-messages-container');
+            if (msgContainer) {
+                setTimeout(() => {
+                    msgContainer.scrollTop = msgContainer.scrollHeight;
+                }, 60);
+            }
         }
 
         function clearAttachedVideo() {
@@ -8358,10 +8367,14 @@ user=None`;
             content = formatVnDateTime(content);
 
             // 1. Tạm thời trích xuất và bảo vệ các mã sự kiện dạng #14752 (bấm để xem clip)
-            // Khớp mã từ 4 đến 8 chữ số và xử lý triệt để các đuôi trùng lặp sub-index (: 6, ▶ 6, - 6) từ AI
+            // Khớp mã từ 4 đến 8 chữ số, tự chuẩn hóa các mã 7 chữ số bị thừa số 0 ở đuôi (ví dụ #1476420 -> #147642)
             const eventChips = {};
             let chipIndex = 0;
-            content = content.replace(/#(\d{4,8})(?:\s*[:\-▶]\s*\d+)?/g, (match, id) => {
+            content = content.replace(/#(\d{4,8})(?:\s*[:\-▶>]\s*\d+)?/g, (match, rawId) => {
+                let id = rawId;
+                if (id.length >= 7 && id.endsWith('0') && parseInt(id) > 1000000) {
+                    id = id.slice(0, -1);
+                }
                 const placeholder = `XEVENTCHIPX${chipIndex}XENDX`;
                 eventChips[placeholder] = `<span class="chat-event-chip" onclick="searchAndPlayEvent('${id}')" title="Bấm để tìm và mở clip #${id}">#${id} ▶</span>`;
                 chipIndex++;

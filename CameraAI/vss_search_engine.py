@@ -537,6 +537,17 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         found_ids = {r["id"] for r in rows}
         for eid in event_ids:
             if eid not in found_ids:
+                if eid % 10 == 0:
+                    cand_id = eid // 10
+                    if cand_id not in found_ids:
+                        cursor.execute("SELECT * FROM events WHERE id = ?", (cand_id,))
+                        r_cand = cursor.fetchone()
+                        if r_cand:
+                            r_dict = dict(r_cand)
+                            rows.insert(0, r_dict)
+                            found_ids.add(eid)
+                            found_ids.add(cand_id)
+                            continue
                 rows.append({
                     "id": eid,
                     "channel": ch or 18,
