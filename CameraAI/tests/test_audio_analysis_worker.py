@@ -30,7 +30,10 @@ class AudioAnalysisWorkerTest(unittest.TestCase):
         config.POST_BUFFER_SEC = self.original_post_buffer
         config.CLIPS_DIR = self.original_clips_dir
         config.AUDIO_SUGGESTION_API_URL = self.original_suggestion_url
-        self.temp_dir.cleanup()
+        try:
+            self.temp_dir.cleanup()
+        except Exception:
+            pass
 
     def test_clip_without_audio_is_recorded_as_no_audio_track(self):
         event_id = database.save_event(

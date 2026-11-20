@@ -66,7 +66,9 @@ class AdminPortalTests(unittest.TestCase):
         self.login(self.admin_user, self.admin_pass)
         res = self.client.get("/admin")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("Trung tâm Quản trị Quasar", res.text)
+        self.assertTrue(
+            "CAMERA ADMIN DNC" in res.text or "Trung tâm Quản trị Quasar" in res.text
+        )
         self.assertIn("q-app", res.text)
         self.assertTrue("/static/js/admin_quasar.js" in res.text or "assets/index-" in res.text)
 

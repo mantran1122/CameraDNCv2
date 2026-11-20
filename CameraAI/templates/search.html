@@ -2248,6 +2248,15 @@
             animation: spin 0.8s linear infinite;
         }
 
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
         /* WorkflowDiagram Component Styles */
         
         .workflow-header-strip {
@@ -8527,18 +8536,28 @@ user=None`;
             }, intervalMs);
         }
 
-        // Bấm vào chip sự kiện #14752 trong chat để tìm và phát clip trực tiếp
+        // Bấm vào chip sự kiện #14752 trong chat để phát clip trực tiếp (giữ nguyên kết quả tìm kiếm đã có)
         async function searchAndPlayEvent(eventId) {
             const cleanId = String(eventId || '').replace(/\D/g, '');
             if (!cleanId) return;
 
-            const searchInput = document.getElementById('search-input');
-            if (searchInput) searchInput.value = `#${cleanId}`;
+            // 1. Kiểm tra xem sự kiện này đã có sẵn trong danh sách kết quả đang hiển thị hay chưa:
+            let existingItem = null;
+            if (window.latestSearchResults && window.latestSearchResults.length > 0) {
+                existingItem = window.latestSearchResults.find(x => String(x.id || x.event_id) === String(cleanId));
+            }
 
-            // 1. Phản hồi tức thì: mở video modal ngay lập tức để người dùng xem video ngay
+            if (existingItem) {
+                const title = existingItem.title || existingItem.video_name || `Sự kiện #${cleanId}`;
+                const clipUrl = existingItem.video_url || existingItem.clip_url || '/clips/sample_valid.mp4';
+                openVideoModal(title, clipUrl, parseInt(cleanId));
+                highlightVideoCard(cleanId);
+                return;
+            }
+
+            // 2. Nếu chưa có trong danh sách hiện tại (sự kiện lịch sử/báo cáo): mở modal ngay từ API
             openVideoModal(`Đang mở video clip sự kiện #${cleanId}...`, '/clips/sample_valid.mp4', parseInt(cleanId));
 
-            // 2. Lấy thông tin sự kiện chi tiết và cập nhật URL video chính xác
             try {
                 const res = await fetch(`/api/events/${cleanId}`);
                 if (res.ok) {
@@ -8548,21 +8567,29 @@ user=None`;
                         const title = `Cam ${chStr} - ${ev.event_code || 'Sự kiện'} (#${cleanId})`;
                         const clipUrl = ev.clip_url || (ev.clip_filename ? `/clips/${ev.clip_filename.replace(/\\/g, '/')}` : '/clips/sample_valid.mp4');
                         openVideoModal(title, clipUrl, parseInt(cleanId));
+                        highlightVideoCard(cleanId);
                     }
                 }
             } catch (directErr) {
                 console.warn('[searchAndPlayEvent] Direct event fetch warning:', directErr);
             }
+        }
 
-            // 3. Đồng bộ card kết quả ở danh sách giữa (tuyệt đối KHÔNG chạm hay chuyển kênh live stream bên trái)
-            await fetchAndRenderVideos(`#${cleanId}`, false, null, [parseInt(cleanId)]);
-
-            // 4. Fallback: Nếu search result có video_url chính xác cho đúng sự kiện này, cập nhật lại modal
-            if (window.latestSearchResults && window.latestSearchResults.length > 0) {
-                const target = window.latestSearchResults.find(x => String(x.id || x.event_id) === String(cleanId));
-                if (target && target.video_url && target.video_url !== '/clips/sample_valid.mp4') {
-                    openVideoModal(target.title, target.video_url, parseInt(target.id || cleanId));
-                }
+        // Tạo hiệu ứng viền sáng nhẹ và cuộn đến card video trên danh sách (nếu có)
+        function highlightVideoCard(eventId) {
+            if (!eventId) return;
+            const card = document.querySelector(`.vss-video-card[data-event-id="${eventId}"]`) || document.getElementById(`video-card-${eventId}`);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                card.style.transition = 'box-shadow 0.3s ease, border-color 0.3s ease';
+                const origBorder = card.style.borderColor;
+                const origShadow = card.style.boxShadow;
+                card.style.borderColor = 'var(--nv-green)';
+                card.style.boxShadow = '0 0 16px rgba(118, 185, 0, 0.75)';
+                setTimeout(() => {
+                    card.style.borderColor = origBorder;
+                    card.style.boxShadow = origShadow;
+                }, 2200);
             }
         }
 
@@ -8886,8 +8913,9 @@ user=None`;
                 const videoUrl = item.video_url || item.screenshot_url || '';
                 const cardTitle = item.title || item.video_name || `Event #${idx + 1}`;
 
+                const eventIdAttr = String(item.id || item.event_id || '');
                 const cardHtml = `
-                    <div class="vss-video-card ${borderClass}" onclick="openVideoModalByIndex(${idx})">
+                    <div class="vss-video-card ${borderClass}" id="video-card-${eventIdAttr || idx}" data-event-id="${eventIdAttr}" onclick="openVideoModalByIndex(${idx})">
                         <div class="card-thumb-area">
                             <video src="${escapeHtml(videoUrl)}" muted playsinline preload="metadata" style="width: 100%; height: 100%; object-fit: cover;" onmouseover="this.play().catch(()=>{})" onmouseout="this.pause()"></video>
                             <div class="thumb-bbox"></div>

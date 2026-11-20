@@ -17,7 +17,10 @@ class MetadataRetentionTest(unittest.TestCase):
 
     def tearDown(self):
         database.DB_PATH = self.original_db_path
-        self.temp_dir.cleanup()
+        try:
+            self.temp_dir.cleanup()
+        except Exception:
+            pass
 
     def test_removes_old_event_and_keeps_recent_event(self):
         old_time = (datetime.now() - timedelta(days=4)).strftime("%Y-%m-%d %H:%M:%S")
