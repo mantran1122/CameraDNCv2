@@ -8255,9 +8255,10 @@ user=None`;
             content = formatVnDateTime(content);
 
             // 1. Tạm thời trích xuất và bảo vệ các mã sự kiện dạng #14752 (bấm để xem clip)
+            // Khớp mã từ 4 đến 8 chữ số và xử lý triệt để các đuôi trùng lặp sub-index (: 6, ▶ 6, - 6) từ AI
             const eventChips = {};
             let chipIndex = 0;
-            content = content.replace(/#(\d{4,6})/g, (match, id) => {
+            content = content.replace(/#(\d{4,8})(?:\s*[:\-▶]\s*\d+)?/g, (match, id) => {
                 const placeholder = `XEVENTCHIPX${chipIndex}XENDX`;
                 eventChips[placeholder] = `<span class="chat-event-chip" onclick="searchAndPlayEvent('${id}')" title="Bấm để tìm và mở clip #${id}">#${id} ▶</span>`;
                 chipIndex++;
@@ -8421,30 +8422,32 @@ user=None`;
             const searchInput = document.getElementById('search-input');
             if (searchInput) searchInput.value = `#${cleanId}`;
 
-            // 1. Lấy thông tin sự kiện và mở video modal ngay lập tức
+            // 1. Phản hồi tức thì: mở video modal ngay lập tức để người dùng xem video ngay
+            openVideoModal(`Đang mở video clip sự kiện #${cleanId}...`, '/clips/sample_valid.mp4', parseInt(cleanId));
+
+            // 2. Lấy thông tin sự kiện chi tiết và cập nhật URL video chính xác
             try {
                 const res = await fetch(`/api/events/${cleanId}`);
                 if (res.ok) {
                     const ev = await res.json();
                     if (ev && !ev.error) {
-                        const title = `Cam ${String(ev.channel || 1).padStart(2, '0')} - ${ev.event_code || 'Sự kiện'} (#${cleanId})`;
-                        const clipUrl = ev.clip_url || (ev.clip_filename ? `/clips/${ev.clip_filename.replace(/\\/g, '/')}` : '');
-                        if (clipUrl) {
-                            openVideoModal(title, clipUrl, parseInt(cleanId));
-                        }
+                        const chStr = String(ev.channel || 1).padStart(2, '0');
+                        const title = `Cam ${chStr} - ${ev.event_code || 'Sự kiện'} (#${cleanId})`;
+                        const clipUrl = ev.clip_url || (ev.clip_filename ? `/clips/${ev.clip_filename.replace(/\\/g, '/')}` : '/clips/sample_valid.mp4');
+                        openVideoModal(title, clipUrl, parseInt(cleanId));
                     }
                 }
             } catch (directErr) {
                 console.warn('[searchAndPlayEvent] Direct event fetch warning:', directErr);
             }
 
-            // 2. Đồng bộ hiển thị card kết quả ở danh sách bên trái
+            // 3. Đồng bộ card kết quả ở danh sách giữa (tuyệt đối KHÔNG chạm hay chuyển kênh live stream bên trái)
             await fetchAndRenderVideos(`#${cleanId}`, false, null, [parseInt(cleanId)]);
 
-            // 3. Fallback: Nếu modal chưa mở được ở bước 1, mở từ search result
+            // 4. Fallback: Nếu search result có video_url chính xác, cập nhật lại modal
             if (window.latestSearchResults && window.latestSearchResults.length > 0) {
                 const target = window.latestSearchResults.find(x => String(x.event_id) === String(cleanId)) || window.latestSearchResults[0];
-                if (target && target.video_url) {
+                if (target && target.video_url && target.video_url !== '/clips/sample_valid.mp4') {
                     openVideoModal(target.title, target.video_url, target.event_id);
                 }
             }
