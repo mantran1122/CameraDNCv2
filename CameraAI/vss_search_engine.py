@@ -233,6 +233,7 @@ def decompose_query(query: str, filters: Optional[Dict[str, Any]] = None) -> Dic
 
     return {
         "raw_query": query,
+        "source_type": filters.get("source_type") or "video_file",
         "channel": channel,
         "channels": channels,
         "target_event_id": target_event_id,
@@ -293,11 +294,14 @@ def evaluate_critic(event: Dict[str, Any], criteria: Dict[str, Any], base_simila
             "criteria_met": {attr: True for attr in criteria.get("attributes", [])}
         }
 
+    raw_q = (criteria.get("raw_query") or "").strip()
+    is_filter_only = not raw_q
+
     criteria_met = {}
     total_matched = 0
 
-    event_attrs = [a for a in criteria["attributes"] if a.startswith("event:")]
-    visual_attrs = [a for a in criteria["attributes"] if not a.startswith("event:")]
+    event_attrs = [a for a in criteria.get("attributes", []) if a.startswith("event:")]
+    visual_attrs = [a for a in criteria.get("attributes", []) if not a.startswith("event:")]
 
     event_met = False
     if event_attrs:
@@ -313,7 +317,9 @@ def evaluate_critic(event: Dict[str, Any], criteria: Dict[str, Any], base_simila
 
     for attr in visual_attrs:
         met = False
-        if "person" in attr and ("human" in code or "người" in desc):
+        if attr == "general:activity":
+            met = True
+        elif "person" in attr and ("human" in code or "người" in desc):
             met = True
         elif "gear" in attr and ("human" in code or "bảo hộ" in desc):
             met = True
@@ -328,15 +334,18 @@ def evaluate_critic(event: Dict[str, Any], criteria: Dict[str, Any], base_simila
         elif "box" in attr:
             met = "human" in code or severity in ("high", "medium")
         else:
-            met = base_similarity >= 0.70
+            met = is_filter_only or (base_similarity >= 0.70)
 
         criteria_met[attr] = met
         if met:
             total_matched += 1
 
-    # Determination: event tags must match if specified, and visual ratio >= 0.5
-    ratio = (total_matched / len(visual_attrs)) if visual_attrs else 1.0
-    confirmed = event_met and (ratio >= 0.5) and base_similarity >= 0.65
+    # Determination: for filter-driven queries, meeting event criteria confirms the match
+    if is_filter_only:
+        confirmed = event_met
+    else:
+        ratio = (total_matched / len(visual_attrs)) if visual_attrs else 1.0
+        confirmed = event_met and (ratio >= 0.5) and base_similarity >= 0.65
 
     return {
         "result": "confirmed" if confirmed else "rejected",
@@ -541,52 +550,122 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
                 })
         total_matches = max(len(event_ids), len(rows))
     else:
-        if not (decomp.get("from_time") or decomp.get("to_time") or decomp.get("target_date") or decomp.get("event_codes") or decomp.get("raw_query") or decomp.get("severity")):
-            sql += " AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''"
+        is_video_mode = decomp.get("source_type", "video_file") == "video_file"
+
+        # Build filter criteria
+        filter_conds = []
+        filter_params = []
+
         # Enforce channel filter strictly so other cameras are never accidentally leaked
         if len(chs) == 1:
-            sql += " AND channel = ?"
-            params.append(chs[0])
+            filter_conds.append("channel = ?")
+            filter_params.append(chs[0])
         elif len(chs) > 1:
             placeholders = ",".join(["?"] * len(chs))
-            sql += f" AND channel IN ({placeholders})"
-            params.extend(chs)
+            filter_conds.append(f"channel IN ({placeholders})")
+            filter_params.extend(chs)
 
         # Enforce strict time range and date if requested
         if decomp.get("from_time"):
-            sql += " AND timestamp >= ?"
-            params.append(decomp["from_time"])
+            filter_conds.append("timestamp >= ?")
+            filter_params.append(decomp["from_time"])
         if decomp.get("to_time"):
-            sql += " AND timestamp <= ?"
-            params.append(decomp["to_time"])
+            filter_conds.append("timestamp <= ?")
+            filter_params.append(decomp["to_time"])
         if decomp.get("target_date") and not decomp.get("from_time"):
-            sql += " AND timestamp LIKE ?"
-            params.append(f"{decomp['target_date']}%")
+            filter_conds.append("timestamp LIKE ?")
+            filter_params.append(f"{decomp['target_date']}%")
 
-        if decomp["event_codes"]:
+        if decomp.get("event_codes"):
             placeholders = ",".join(["?"] * len(decomp["event_codes"]))
-            sql += f" AND event_code IN ({placeholders})"
-            params.extend(decomp["event_codes"])
+            filter_conds.append(f"event_code IN ({placeholders})")
+            filter_params.extend(decomp["event_codes"])
 
         # Severity filter (e.g. 'high' for Red Alerts, 'medium', 'info')
         if decomp.get("severity"):
-            sql += " AND severity = ?"
-            params.append(decomp["severity"].lower())
+            filter_conds.append("severity = ?")
+            filter_params.append(decomp["severity"].lower())
 
-        # Exact total matches for Google-style multi-page navigation
-        count_sql = "SELECT COUNT(*) FROM events WHERE " + sql.split("WHERE", 1)[1]
-        cursor.execute(count_sql, params)
-        total_matches = cursor.fetchone()[0]
+        if is_video_mode:
+            # Video mode: strictly prioritize real recorded video clips (mp4)
+            clip_filter_conds = list(filter_conds) + ["clip_filename IS NOT NULL AND TRIM(clip_filename) != ''"]
+            clip_filter_params = list(filter_params)
+
+            where_sql = " WHERE 1=1"
+            if allowed_clause:
+                where_sql += allowed_clause
+            if clip_filter_conds:
+                where_sql += " AND " + " AND ".join(clip_filter_conds)
+
+            cursor.execute(f"SELECT COUNT(*) FROM events {where_sql}", allowed_params + clip_filter_params)
+            clip_matches = cursor.fetchone()[0]
+
+            if clip_matches > 0:
+                filter_conds = clip_filter_conds
+                filter_params = clip_filter_params
+                total_matches = clip_matches
+            else:
+                # If no clips found in this range: check if there are notable anomaly alerts (high/medium)
+                alert_filter_conds = list(filter_conds) + ["severity IN ('high', 'medium')"]
+                alert_where_sql = " WHERE 1=1"
+                if allowed_clause:
+                    alert_where_sql += allowed_clause
+                if alert_filter_conds:
+                    alert_where_sql += " AND " + " AND ".join(alert_filter_conds)
+                cursor.execute(f"SELECT COUNT(*) FROM events {alert_where_sql}", allowed_params + filter_params)
+                alert_matches = cursor.fetchone()[0]
+                if alert_matches > 0:
+                    filter_conds = alert_filter_conds
+                    total_matches = alert_matches
+                else:
+                    filter_conds = clip_filter_conds
+                    filter_params = clip_filter_params
+                    total_matches = 0
+        else:
+            # RTSP / Stream mode: deduplicate consecutive pings per camera per minute
+            where_sql = " WHERE 1=1"
+            if allowed_clause:
+                where_sql += allowed_clause
+            if filter_conds:
+                where_sql += " AND " + " AND ".join(filter_conds)
+
+            count_sql = f"SELECT COUNT(*) FROM (SELECT 1 FROM events {where_sql} GROUP BY channel, substr(timestamp, 1, 16), event_code)"
+            cursor.execute(count_sql, allowed_params + filter_params)
+            total_matches = cursor.fetchone()[0]
 
         # Google / YouTube Pagination: fetch only page_size rows for current page
         page = max(1, int(decomp.get("page") or 1))
         page_size = max(1, min(100, int(decomp.get("page_size") or decomp.get("top_k") or 24)))
         offset = (page - 1) * page_size
 
-        sql += " ORDER BY id DESC LIMIT ? OFFSET ?"
-        page_params = list(params) + [page_size, offset]
-        cursor.execute(sql, page_params)
-        rows = [dict(r) for r in cursor.fetchall()]
+        if total_matches == 0:
+            rows = []
+        else:
+            where_sql = " WHERE 1=1"
+            if allowed_clause:
+                where_sql += allowed_clause
+            if filter_conds:
+                where_sql += " AND " + " AND ".join(filter_conds)
+
+            if is_video_mode:
+                paged_sql = f"""
+                    SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec
+                    FROM events
+                    {where_sql}
+                    ORDER BY id DESC LIMIT ? OFFSET ?
+                """
+            else:
+                paged_sql = f"""
+                    SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec
+                    FROM events
+                    {where_sql}
+                    GROUP BY channel, substr(timestamp, 1, 16), event_code
+                    ORDER BY id DESC LIMIT ? OFFSET ?
+                """
+
+            page_params = allowed_params + filter_params + [page_size, offset]
+            cursor.execute(paged_sql, page_params)
+            rows = [dict(r) for r in cursor.fetchall()]
 
     # ONLY do generic browsing fallback if user gave NO specific criteria at all (e.g. empty search or "tất cả video")
     has_specific_filter = bool(
@@ -647,10 +726,21 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         desc = (row["description"] or "").lower()
         code = (row["event_code"] or "").lower()
         
-        sim = 0.60
         if (target_id and row["id"] == target_id) or (event_ids and row["id"] in event_ids):
             sim = 0.99
+        elif not lowered_q:
+            # Filter-driven browse without free text query: all matched records satisfy user's filter
+            sim = 0.85
+            if row.get("clip_filename") and str(row.get("clip_filename")).strip():
+                sim += 0.08
+            if row.get("severity") == "high":
+                sim += 0.05
+            elif row.get("severity") == "medium":
+                sim += 0.03
+            if ch and row["channel"] == ch:
+                sim += 0.01
         else:
+            sim = 0.60
             if ch and row["channel"] == ch:
                 sim += 0.15
 
