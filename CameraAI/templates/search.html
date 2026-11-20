@@ -3082,6 +3082,24 @@
             transform: scale(1.05);
         }
 
+        .chat-send-arrow-btn.is-generating {
+            background: #18181b;
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            color: #ffffff;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-send-arrow-btn.is-generating:hover {
+            background: #ef4444;
+            border-color: #ef4444;
+            color: #ffffff;
+            transform: scale(1.08);
+        }
+
+        .chat-status-pill-wrap {
+            display: none !important;
+        }
+
         /* Centered Time Divider like Grok Bot */
         .chat-time-divider {
             text-align: center;
@@ -7055,7 +7073,7 @@
 
                     <textarea class="chat-input-text" id="chat-query-input" rows="1" placeholder="Message Vision Agent..." aria-label="Nội dung chat Vision Agent" oninput="handleChatInputAutoGrow(this)" onkeydown="handleChatInputKeydown(event, this)"></textarea>
 
-                    <button class="chat-send-arrow-btn" id="chat-send-btn" onclick="sendNewChatMessage()" title="Gửi tin nhắn (Enter)">
+                    <button class="chat-send-arrow-btn" id="chat-send-btn" onclick="handleChatSendClick()" title="Gửi tin nhắn (Enter)">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="12" y1="19" x2="12" y2="5"></line>
                             <polyline points="5 12 12 5 19 12"></polyline>
@@ -7722,6 +7740,77 @@ user=None`;
             }
         }
 
+        let currentChatAbortController = null;
+        let currentChatTimerInterval = null;
+        let currentChatThinkingId = null;
+
+        function setChatGeneratingState(isGenerating) {
+            window.isChatActive = isGenerating;
+            const sendBtn = document.getElementById('chat-send-btn');
+            if (!sendBtn) return;
+
+            if (isGenerating) {
+                sendBtn.classList.add('is-generating');
+                sendBtn.title = 'Dừng phân tích (Stop)';
+                // Biểu tượng Stop (hình ô vuông), bỏ chữ Stop Generating
+                sendBtn.innerHTML = `
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+                    </svg>
+                `;
+            } else {
+                sendBtn.classList.remove('is-generating');
+                sendBtn.title = 'Gửi tin nhắn (Enter)';
+                // Biểu tượng gửi (mũi tên lên)
+                sendBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="19" x2="12" y2="5"></line>
+                        <polyline points="5 12 12 5 19 12"></polyline>
+                    </svg>
+                `;
+            }
+        }
+
+        function stopChatGeneration() {
+            if (currentChatAbortController) {
+                try {
+                    currentChatAbortController.abort('stop_requested');
+                } catch (e) {}
+            }
+            if (currentChatTimerInterval) {
+                clearInterval(currentChatTimerInterval);
+                currentChatTimerInterval = null;
+            }
+            if (currentChatThinkingId) {
+                const thinkingEl = document.getElementById(currentChatThinkingId);
+                if (thinkingEl) {
+                    thinkingEl.outerHTML = `
+                        <div class="chat-msg-row">
+                            <div class="bot-avatar-box">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            </div>
+                            <div class="assistant-msg-content-wrap">
+                                <div style="color: #94a3b8; font-size: 0.8125rem; background: #1c1917; padding: 0.65rem 0.85rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1); font-style: italic;">
+                                    Đã dừng phân tích theo yêu cầu.
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                currentChatThinkingId = null;
+            }
+            setChatGeneratingState(false);
+            syncWorkflowStage('agent_planning', 'ĐÃ DỪNG PHÂN TÍCH');
+        }
+
+        function handleChatSendClick() {
+            if (window.isChatActive) {
+                stopChatGeneration();
+            } else {
+                sendNewChatMessage();
+            }
+        }
+
         function handleChatInputKeydown(e, textarea) {
             if (e.key === 'Enter') {
                 if (e.shiftKey) {
@@ -7730,6 +7819,9 @@ user=None`;
                 } else {
                     // Enter: Gửi câu hỏi ngay lập tức!
                     e.preventDefault();
+                    if (window.isChatActive) {
+                        return;
+                    }
                     sendNewChatMessage();
                 }
             }
@@ -7807,6 +7899,9 @@ user=None`;
             // 2. Append Assistant Thinking Placeholder with Live Timer & Mini Pipeline
             const thinkingId = 'thinking-' + Date.now();
             const timerId = 'timer-' + Date.now();
+            currentChatAbortController = new AbortController();
+            currentChatThinkingId = thinkingId;
+            setChatGeneratingState(true);
             const thinkingHtml = `
                 <div class="chat-msg-row" id="${thinkingId}">
                     <div class="bot-avatar-box">
@@ -7853,6 +7948,7 @@ user=None`;
                     wfStatus.innerText = `BƯỚC 2: SERVER AI PHÂN TÍCH THỊ GIÁC & ÂM THANH... [${min}:${sec}s]`;
                 }
             }, 1000);
+            currentChatTimerInterval = videoTimerInterval;
 
             // GIAI ĐOẠN 1 THỰC TẾ: VIOS trích xuất frame từ file video clip
             syncWorkflowStage('vios', 'BƯỚC 1: VIOS CẮT 8 FRAMES & LỌC NHIỄU ÂM THANH...');
@@ -7868,6 +7964,7 @@ user=None`;
                 const res = await fetch('/api/vss/chat-video', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    signal: currentChatAbortController ? currentChatAbortController.signal : undefined,
                     body: JSON.stringify({
                         video_url: videoContext.videoUrl,
                         clip_filename: videoContext.clipFilename,
@@ -7992,6 +8089,10 @@ user=None`;
                     typewriteAssistantReply(textEl, replyText, container);
                 }
             } catch (err) {
+                if (err.name === 'AbortError' || err === 'stop_requested') {
+                    // Người dùng đã bấm dừng phân tích video
+                    return;
+                }
                 console.error('[Video Chat Error]:', err);
                 syncWorkflowStage('error', 'LỖI PHÂN TÍCH VIDEO TỪ SERVER AI');
                 const thinkingEl = document.getElementById(thinkingId);
@@ -8011,7 +8112,9 @@ user=None`;
                 }
             } finally {
                 clearInterval(videoTimerInterval);
-                window.isChatActive = false;
+                currentChatTimerInterval = null;
+                currentChatThinkingId = null;
+                setChatGeneratingState(false);
                 const pillWrap = document.getElementById('chat-status-pill-wrap');
                 if (pillWrap) pillWrap.style.display = 'none';
 
@@ -8477,6 +8580,9 @@ user=None`;
             // 2. Append Assistant Thinking Placeholder with Live Timer & Mini Pipeline
             const thinkingId = 'thinking-' + Date.now();
             const timerId = 'timer-' + Date.now();
+            currentChatAbortController = new AbortController();
+            currentChatThinkingId = thinkingId;
+            setChatGeneratingState(true);
             const thinkingHtml = `
                 <div class="chat-msg-row" id="${thinkingId}">
                     <div class="bot-avatar-box">
@@ -8523,6 +8629,7 @@ user=None`;
                     wfStatus.innerText = `BƯỚC 3: SERVER AI ĐANG SUY LUẬN... [${min}:${sec}s]`;
                 }
             }, 1000);
+            currentChatTimerInterval = chatTimerInterval;
 
             // Xác định Kênh: nếu câu hỏi nhắc đích danh cam nào thì dùng kênh đó, nếu hỏi chung/toàn bộ thì dùng null (đa camera)
             let ch = null;
@@ -8579,6 +8686,7 @@ user=None`;
                 const res = await fetch('/api/agent/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    signal: currentChatAbortController ? currentChatAbortController.signal : undefined,
                     body: JSON.stringify({ query: queryText, channel: ch, top_k: topKVal })
                 });
 
@@ -8663,6 +8771,10 @@ user=None`;
                     syncWorkflowStage('output', `BƯỚC 4: HOÀN TẤT PHẢN HỒI (${channelDisplay.toUpperCase()})`);
                 }
             } catch (err) {
+                if (err.name === 'AbortError' || err === 'stop_requested') {
+                    // Người dùng đã bấm dừng phân tích
+                    return;
+                }
                 console.error('[Chat Error]:', err);
                 syncWorkflowStage('error', 'LỖI KẾT NỐI SERVER AI');
                 const thinkingEl = document.getElementById(thinkingId);
@@ -8682,7 +8794,9 @@ user=None`;
                 }
             } finally {
                 clearInterval(chatTimerInterval);
-                window.isChatActive = false;
+                currentChatTimerInterval = null;
+                currentChatThinkingId = null;
+                setChatGeneratingState(false);
                 const pillWrap = document.getElementById('chat-status-pill-wrap');
                 if (pillWrap) pillWrap.style.display = 'none';
 
