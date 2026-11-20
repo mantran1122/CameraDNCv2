@@ -443,26 +443,36 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
         if valid_rows:
             rows = valid_rows
         else:
-            # If target_id has no clip file, locate the nearest real clip on the same channel
+            # If target_id has no clip file, resolve playable clip or locate nearest clip
             cursor.execute("SELECT * FROM events WHERE id = ?", (target_id,))
             target_ev = cursor.fetchone()
             if target_ev:
                 t_dict = dict(target_ev)
                 t_time = t_dict.get("timestamp")
                 t_ch = t_dict.get("channel")
-                if allowed_channels is None or t_ch in allowed_channels:
-                    cursor.execute("""
-                        SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec,
-                               ABS(strftime('%s', timestamp) - strftime('%s', ?)) as time_diff
-                        FROM events
-                        WHERE channel = ? AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
-                        ORDER BY time_diff ASC LIMIT 5
-                    """, (t_time, t_ch))
-                    nearby_rows = [dict(r) for r in cursor.fetchall()]
-                    if not nearby_rows and (allowed_channels is None or not allowed_params):
+                resolved_clip = None
+                try:
+                    from main import _resolve_playable_clip_for_event
+                    resolved_clip = _resolve_playable_clip_for_event(conn, t_dict)
+                except Exception:
+                    pass
+                if resolved_clip:
+                    t_dict["clip_filename"] = resolved_clip
+                    rows = [t_dict]
+                else:
+                    if allowed_channels is None or t_ch in allowed_channels:
                         cursor.execute("""
                             SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec,
                                    ABS(strftime('%s', timestamp) - strftime('%s', ?)) as time_diff
+                            FROM events
+                            WHERE channel = ? AND clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
+                            ORDER BY time_diff ASC LIMIT 5
+                        """, (t_time, t_ch))
+                        nearby_rows = [dict(r) for r in cursor.fetchall()]
+                        if not nearby_rows and (allowed_channels is None or not allowed_params):
+                            cursor.execute("""
+                                SELECT id, event_code, event_type, channel, timestamp, description, severity, clip_filename, clip_duration_sec,
+                                       ABS(strftime('%s', timestamp) - strftime('%s', ?)) as time_diff
                             FROM events
                             WHERE clip_filename IS NOT NULL AND TRIM(clip_filename) != ''
                             ORDER BY time_diff ASC LIMIT 5
@@ -472,8 +482,11 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
                         if nr.get("clip_filename") and str(nr.get("clip_filename")).strip():
                             nr["title"] = f"Event #{target_id} (Clip #{nr['id']})"
                             nr["description"] = f"[Clip tương ứng lúc {nr.get('timestamp')} trên Cam {nr.get('channel')}] {nr.get('description', '')}"
+                            nr["id"] = target_id
                             rows = [nr]
                             break
+                    if not rows:
+                        rows = [t_dict]
         total_matches = len(rows)
     elif event_ids:
         # Highest precision: prioritize specific event IDs grounded by Agent RAG across any cameras
@@ -631,7 +644,7 @@ def search_vss_archive(query: str, filters: Optional[Dict[str, Any]] = None) -> 
 
         sim = round(min(0.99, max(0.40, sim)), 2)
 
-        if sim < decomp["min_similarity"]:
+        if not (target_id or (event_ids and row["id"] in event_ids)) and sim < decomp["min_similarity"]:
             continue
 
         # Critic evaluation

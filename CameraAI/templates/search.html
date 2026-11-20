@@ -8069,24 +8069,25 @@ user=None`;
                 }
             }
 
-            const fromVal = getFilterTimeInputValue('filter-from', flatpickrFromInstance);
-            const toVal = getFilterTimeInputValue('filter-to', flatpickrToInstance);
-            let videoSrc = (specificEventIds && specificEventIds.length > 0) ? '' : (document.getElementById('filter-video-sources')?.value || '');
-            if (!videoSrc && typeof selectedPlaybackChannels !== 'undefined' && selectedPlaybackChannels.size > 0) {
+            const isSpecificEvent = Boolean(specificEventIds && specificEventIds.length > 0);
+            const fromVal = isSpecificEvent ? '' : getFilterTimeInputValue('filter-from', flatpickrFromInstance);
+            const toVal = isSpecificEvent ? '' : getFilterTimeInputValue('filter-to', flatpickrToInstance);
+            let videoSrc = isSpecificEvent ? '' : (document.getElementById('filter-video-sources')?.value || '');
+            if (!videoSrc && typeof selectedPlaybackChannels !== 'undefined' && selectedPlaybackChannels.size > 0 && !isSpecificEvent) {
                 videoSrc = Array.from(selectedPlaybackChannels).join(',');
             }
-            const minSim = parseFloat(document.getElementById('filter-min-sim')?.value) || 0.0;
+            const minSim = isSpecificEvent ? 0.0 : (parseFloat(document.getElementById('filter-min-sim')?.value) || 0.0);
             const topK = parseInt(document.getElementById('filter-topk')?.value) || 24;
             const srcType = document.getElementById('source-type-select')?.value || 'video_file';
-            const selectedCodes = (specificEventIds && specificEventIds.length > 0)
+            const selectedCodes = isSpecificEvent
                 ? []
                 : ((typeof selectedPlaybackEventTags !== 'undefined' && selectedPlaybackEventTags.size > 0) 
                     ? Array.from(selectedPlaybackEventTags) 
                     : []);
 
-            // Strict 2.5s AbortController timeout to guarantee instant UI response
+            // 5.0s AbortController timeout to guarantee instant UI response
             const abortCtrl = new AbortController();
-            const timeoutTimer = setTimeout(() => abortCtrl.abort('timeout'), 2500);
+            const timeoutTimer = setTimeout(() => abortCtrl.abort('timeout'), 5000);
 
             try {
                 const res = await fetch('/api/vss/search', {
@@ -8414,13 +8415,37 @@ user=None`;
 
         // Bấm vào chip sự kiện #14752 trong chat để tìm và phát clip trực tiếp
         async function searchAndPlayEvent(eventId) {
+            const cleanId = String(eventId || '').replace(/\D/g, '');
+            if (!cleanId) return;
+
             const searchInput = document.getElementById('search-input');
-            if (searchInput) searchInput.value = `#${eventId}`;
-            await fetchAndRenderVideos(`#${eventId}`, false, null, [parseInt(eventId)]);
+            if (searchInput) searchInput.value = `#${cleanId}`;
+
+            // 1. Lấy thông tin sự kiện và mở video modal ngay lập tức
+            try {
+                const res = await fetch(`/api/events/${cleanId}`);
+                if (res.ok) {
+                    const ev = await res.json();
+                    if (ev && !ev.error) {
+                        const title = `Cam ${String(ev.channel || 1).padStart(2, '0')} - ${ev.event_code || 'Sự kiện'} (#${cleanId})`;
+                        const clipUrl = ev.clip_url || (ev.clip_filename ? `/clips/${ev.clip_filename.replace(/\\/g, '/')}` : '');
+                        if (clipUrl) {
+                            openVideoModal(title, clipUrl, parseInt(cleanId));
+                        }
+                    }
+                }
+            } catch (directErr) {
+                console.warn('[searchAndPlayEvent] Direct event fetch warning:', directErr);
+            }
+
+            // 2. Đồng bộ hiển thị card kết quả ở danh sách bên trái
+            await fetchAndRenderVideos(`#${cleanId}`, false, null, [parseInt(cleanId)]);
+
+            // 3. Fallback: Nếu modal chưa mở được ở bước 1, mở từ search result
             if (window.latestSearchResults && window.latestSearchResults.length > 0) {
-                const target = window.latestSearchResults.find(x => String(x.event_id) === String(eventId)) || window.latestSearchResults[0];
-                if (target) {
-                    openVideoModal(target.title, target.video_url);
+                const target = window.latestSearchResults.find(x => String(x.event_id) === String(cleanId)) || window.latestSearchResults[0];
+                if (target && target.video_url) {
+                    openVideoModal(target.title, target.video_url, target.event_id);
                 }
             }
         }

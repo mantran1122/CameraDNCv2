@@ -1009,7 +1009,7 @@ def _find_local_fallback_clip(channel: int = 1, event: Optional[Dict[str, Any]] 
             return rel_path
 
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        ok = video_clipper.generate_synthetic_anomaly_clip(
+        video_clipper.generate_synthetic_anomaly_clip(
             str(target_path),
             ch,
             ev_type,
@@ -1017,7 +1017,7 @@ def _find_local_fallback_clip(channel: int = 1, event: Optional[Dict[str, Any]] 
             ev_ts,
             duration_sec=max(4, min(6, int(getattr(config, "CLIP_DURATION_SEC", 5)))),
         )
-        if ok and target_path.is_file() and target_path.stat().st_size > 1024:
+        if target_path.is_file() and target_path.stat().st_size > 1024:
             return rel_path
     except Exception as exc:
         print(f"[PerCameraClipFallback Error ch={ch}]: {exc}")

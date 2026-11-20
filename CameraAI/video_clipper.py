@@ -163,6 +163,7 @@ def generate_synthetic_anomaly_clip(
         writer.close()
     elif cv_out is not None:
         cv_out.release()
+    return os.path.exists(output_path) and os.path.getsize(output_path) > 1024
 
 def clip_event_video(
     channel: int,
