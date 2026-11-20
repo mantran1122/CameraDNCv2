@@ -848,13 +848,13 @@ async def serve_admin_logo_truong():
 @app.get("/favicon.ico")
 @app.get("/admin/favicon.ico")
 async def serve_admin_favicon():
+    fav_path = quasar_spa_dir / "favicon.ico"
+    if fav_path.is_file():
+        return FileResponse(fav_path, media_type="image/x-icon")
     logo_path = Path(__file__).resolve().parent / "static" / "logo_don.png"
     if logo_path.is_file():
         return FileResponse(logo_path, media_type="image/png")
-    fav_path = quasar_spa_dir / "favicon.ico"
-    if fav_path.is_file():
-        return FileResponse(fav_path)
-    return FileResponse(logo_path)
+    return FileResponse(fav_path)
 
 
 @app.get("/admin", response_class=HTMLResponse)
