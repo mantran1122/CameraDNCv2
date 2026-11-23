@@ -27,12 +27,17 @@ _load_env_files_safely()
 def _detect_clips_dir() -> Path:
     env_dir = os.getenv("CAMERAAI_CLIPS_DIR", "").strip()
     if env_dir:
-        try:
-            # An explicit cache path may not exist on the first startup yet.
-            path = Path(env_dir).expanduser()
-            return path if path.is_absolute() else BASE_DIR / path
-        except Exception:
-            pass
+        # If env_dir points to an unmounted /mnt/nas_camera_clips path, fall back to storage/clips
+        # to prevent writing gigabytes of video into the container's overlayfs layer.
+        if "/mnt/nas_camera_clips" in env_dir and not os.path.ismount("/mnt/nas_camera_clips"):
+            print("[Storage Warning] /mnt/nas_camera_clips is not a mounted NAS filesystem! Using host-mounted storage/clips.")
+        else:
+            try:
+                # An explicit cache path may not exist on the first startup yet.
+                path = Path(env_dir).expanduser()
+                return path if path.is_absolute() else BASE_DIR / path
+            except Exception:
+                pass
     for candidate in [
         Path("Z:/dataCameraAI"),
         Path(r"\\192.168.100.3\Common\dataCameraAI"),
