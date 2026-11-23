@@ -790,9 +790,17 @@ def purge_expired_metadata(retention_days: Optional[int] = None) -> dict:
     return summary
 
 def metadata_cleanup_loop() -> None:
+    from clip_capture_worker import ensure_disk_space
     while not metadata_cleanup_stop.is_set():
-        purge_expired_metadata()
-        metadata_cleanup_stop.wait(6 * 60 * 60)
+        try:
+            # 1. Disk Space Guard: Enforce at least 5GB free space on disk
+            ensure_disk_space(min_free_gb=5.0, target_free_gb=8.0)
+            # 2. Calendar-based metadata retention
+            purge_expired_metadata()
+        except Exception as exc:
+            print(f"[Cleanup Loop Notice] {exc}")
+        # Run proactive cleanup every 10 minutes (prevents disk bloat completely)
+        metadata_cleanup_stop.wait(10 * 60)
 
 def postgres_sync_loop() -> None:
     while not postgres_sync_stop.is_set():

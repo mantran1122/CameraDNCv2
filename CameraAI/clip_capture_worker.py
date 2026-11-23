@@ -2,6 +2,7 @@
 
 import concurrent.futures
 import queue
+import shutil
 import threading
 import time
 from datetime import datetime
@@ -12,6 +13,65 @@ import config
 import database
 import video_clipper
 from clip_storage import build_clip_reference, mirror_clip, resolve_clip_path, storage_timestamp
+
+
+def ensure_disk_space(min_free_gb: float = 4.0, target_free_gb: float = 7.0) -> bool:
+    """
+    Guarantees the host filesystem NEVER exhausts space.
+    If free disk space is below min_free_gb, automatically deletes the oldest
+    unprotected video clips in config.CLIPS_DIR until target_free_gb is available.
+    Returns True if safe to capture, False if critically low (< 1.5 GB).
+    """
+    try:
+        clips_dir = Path(config.CLIPS_DIR).resolve()
+        if not clips_dir.exists():
+            clips_dir.mkdir(parents=True, exist_ok=True)
+        stat = shutil.disk_usage(clips_dir)
+        free_gb = stat.free / (1024 ** 3)
+        if free_gb >= min_free_gb:
+            return True
+
+        print(f"[DISK GUARD] ⚠️ Low disk space ({free_gb:.2f} GB < {min_free_gb} GB). Emergency purging oldest clips...")
+        protected_clips = set()
+        try:
+            protected_clips = database.get_protected_clip_filenames()
+        except Exception:
+            pass
+
+        all_clips = []
+        for p in clips_dir.rglob("*.mp4"):
+            try:
+                if p.name == "sample_valid.mp4" or p.name in protected_clips:
+                    continue
+                rel = p.relative_to(clips_dir).as_posix()
+                if rel in protected_clips:
+                    continue
+                all_clips.append((p.stat().st_mtime, p))
+            except Exception:
+                continue
+
+        all_clips.sort(key=lambda x: x[0])  # Oldest first
+        purged = 0
+        freed_bytes = 0
+
+        for _, clip_path in all_clips:
+            try:
+                sz = clip_path.stat().st_size
+                clip_path.unlink(missing_ok=True)
+                purged += 1
+                freed_bytes += sz
+                cur_free = shutil.disk_usage(clips_dir).free / (1024 ** 3)
+                if cur_free >= target_free_gb:
+                    break
+            except Exception:
+                continue
+
+        cur_free_gb = shutil.disk_usage(clips_dir).free / (1024 ** 3)
+        print(f"[DISK GUARD] ✅ Purged {purged} old clips ({freed_bytes / (1024**2):.1f} MB freed). Free space now: {cur_free_gb:.2f} GB")
+        return cur_free_gb >= 1.5
+    except Exception as e:
+        print(f"[DISK GUARD Warning] Error during disk check: {e}")
+        return True
 
 
 class ClipCaptureWorker:
@@ -118,6 +178,16 @@ class ClipCaptureWorker:
         delay = max(0.0, min(1.0, 1.0 - age_sec))
         if delay > 0:
             time.sleep(delay)
+
+        # Disk Guard: Check free disk space before cutting clip to protect OS & DB
+        if not ensure_disk_space(min_free_gb=4.0, target_free_gb=7.0):
+            print(f"[DISK GUARD] 🛑 Low disk space (<1.5GB)! Skipped clip capture for alert={event_id} to protect system.")
+            database.update_audio_analysis(
+                event_id,
+                status="video_skipped",
+                error_message="Tạm dừng trích xuất clip do ổ đĩa máy chủ sắp đầy.",
+            )
+            return
 
         print(f"[CLIP] alert={event_id} capturing 10s evidence")
         filename = build_clip_reference(event["channel"], storage_timestamp(), event_id)
