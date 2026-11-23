@@ -8727,7 +8727,16 @@ user=None`;
                     body: JSON.stringify({ query: queryText, channel: ch, top_k: topKVal })
                 });
 
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        const authErr = new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục sử dụng Vision Agent.');
+                        authErr.status = 401;
+                        throw authErr;
+                    }
+                    const serverErr = new Error(`Máy chủ phản hồi mã lỗi HTTP ${res.status}. Vui lòng thử lại hoặc kiểm tra kết nối Server AI.`);
+                    serverErr.status = res.status;
+                    throw serverErr;
+                }
                 const data = await res.json();
                 const replyText = data.reply || 'Vision Agent đã nhận được thông tin.';
                 const reasoningText = data.reasoning || '';
@@ -8814,16 +8823,23 @@ user=None`;
                 }
                 console.error('[Chat Error]:', err);
                 syncWorkflowStage('error', 'LỖI KẾT NỐI SERVER AI');
+                const isAuth = err && err.status === 401;
+                const errMessage = (err && err.message) ? err.message : 'Không thể kết nối Vision Agent Server AI. Vui lòng thử lại.';
                 const thinkingEl = document.getElementById(thinkingId);
                 if (thinkingEl) {
+                    const actionButton = isAuth
+                        ? `<div style="margin-top: 0.5rem;"><a href="/login" style="display: inline-block; padding: 0.35rem 0.75rem; background: #2563eb; color: #ffffff; border-radius: 4px; text-decoration: none; font-size: 0.75rem; font-weight: 600;">Đăng nhập lại</a></div>`
+                        : `<div style="margin-top: 0.35rem; color: #94a3b8; font-size: 0.75rem;">Kiểm tra trạng thái tiến trình Uvicorn hoặc kết nối Server AI.</div>`;
+
                     thinkingEl.outerHTML = `
                         <div class="chat-msg-row">
                             <div class="bot-avatar-box">
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                             </div>
                             <div class="assistant-msg-content-wrap">
-                                <div style="color: #ef4444; font-size: 0.8125rem; background: #1c1917; padding: 0.75rem; border-radius: 6px; border: 1px solid #7f1d1d;">
-                                    Không thể kết nối Vision Agent Server AI. Vui lòng thử lại.
+                                <div style="color: #ef4444; font-size: 0.8125rem; background: #1c1917; padding: 0.75rem; border-radius: 6px; border: 1px solid #7f1d1d; line-height: 1.5;">
+                                    ${escapeHtml(errMessage)}
+                                    ${actionButton}
                                 </div>
                             </div>
                         </div>
@@ -9843,7 +9859,16 @@ user=None`;
                 });
                 clearTimeout(timer);
 
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        const authErr = new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục sử dụng Vision Agent.');
+                        authErr.status = 401;
+                        throw authErr;
+                    }
+                    const serverErr = new Error(`Máy chủ phản hồi mã lỗi HTTP ${res.status}. Vui lòng thử lại hoặc kiểm tra kết nối Server AI.`);
+                    serverErr.status = res.status;
+                    throw serverErr;
+                }
                 const data = await res.json();
                 const elapsedSec = ((performance.now() - tStart) / 1000).toFixed(1);
 
