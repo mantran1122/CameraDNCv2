@@ -320,9 +320,9 @@ def get_all_system_users() -> list[dict]:
             "created_at": "2026-09-21T00:00:00"
         }
     ]
-    if not USERS_STORAGE_FILE.is_file():
+    if not USERS_STORAGE_FILE.is_file() or USERS_STORAGE_FILE.stat().st_size == 0:
         example_file = config.STORAGE_DIR / "users.example.json"
-        if example_file.is_file():
+        if example_file.is_file() and example_file.stat().st_size > 0:
             try:
                 shutil.copy2(example_file, USERS_STORAGE_FILE)
                 data = json.loads(USERS_STORAGE_FILE.read_text(encoding="utf-8"))
@@ -423,7 +423,7 @@ def get_user_allowed_channels_by_name(username: str) -> Optional[List[int]]:
     if not username:
         return []
     expected_user, _ = get_admin_credentials()
-    if username == expected_user or (config.NVR_USER and username == config.NVR_USER):
+    if username in (expected_user, "admin", "aicamera") or (config.NVR_USER and username == config.NVR_USER):
         return None
     users = get_all_system_users()
     for item in users:
@@ -435,8 +435,11 @@ def get_user_allowed_channels_by_name(username: str) -> Optional[List[int]]:
             if channels is None:
                 return []
             if isinstance(channels, list):
+                if "*" in channels:
+                    return None
                 return sanitize_allowed_channels(channels, role)
-    return []
+    # Default fallback for admin-level fallback accounts
+    return None
 
 
 def get_current_user_allowed_channels(request: Request) -> Optional[List[int]]:
@@ -445,9 +448,13 @@ def get_current_user_allowed_channels(request: Request) -> Optional[List[int]]:
     Returns List[int] of channels if subuser.
     Returns [] if unauthenticated.
     """
+    if request.session.get("role") == "admin":
+        return None
     username = request.session.get("username")
     if not username:
         return []
+    if username in ("admin", "aicamera"):
+        return None
     return get_user_allowed_channels_by_name(username)
 
 
