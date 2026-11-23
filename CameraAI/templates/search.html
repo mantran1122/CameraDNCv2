@@ -10694,8 +10694,8 @@ user=None`;
 
                 if (window.userAllowedChannels.length > 0) {
                     const activeCh = Number(window.currentActiveChannel);
-                    if (!window.userAllowedChannels.includes(activeCh)) {
-                        window.currentActiveChannel = window.userAllowedChannels[0];
+                    if (!window.userAllowedChannels.includes(activeCh) || activeCh === 3) {
+                        window.currentActiveChannel = window.userAllowedChannels.includes(11) ? 11 : (window.userAllowedChannels.includes(18) ? 18 : window.userAllowedChannels[0]);
                     }
                     setNotificationCameraChannel('all');
                 }

@@ -59,7 +59,7 @@
         constructor(container, options = {}) {
             this.container = typeof container === 'string' ? document.querySelector(container) : container;
 
-            const defaultChannels = [3, 11, 18, 19, 20];
+            const defaultChannels = [11, 18, 19, 20, 3];
             const defaultSources = defaultChannels.map(ch => ({
                 type: 'mjpeg',
                 channel: ch,
@@ -68,7 +68,7 @@
             }));
 
             this.availableSources = options.availableSources || defaultSources;
-            this.source = options.source || this.availableSources.find(s => s.channel === 11) || this.availableSources[0];
+            this.source = options.source || this.availableSources.find(s => s.channel === 11) || this.availableSources.find(s => s.channel === 18) || this.availableSources[0];
             this.isLive = options.isLive !== false;
 
             this.render();
@@ -118,10 +118,13 @@
 
                     this.availableSources = [...liveSources];
 
-                    // Keep selected source if still in available sources
+                    // Ưu tiên giữ kênh đang phát, nếu là kênh không có tín hiệu (kênh 3) hoặc chưa chọn thì ưu tiên Kênh 11 hoặc 18
                     const prevUrl = this.source ? this.source.url : '';
                     const currentChannel = this.getCurrentChannel();
-                    const matched = this.availableSources.find(s => s.channel === currentChannel || s.url === prevUrl);
+                    let matched = this.availableSources.find(s => s.channel === currentChannel);
+                    if (!matched || currentChannel === 3) {
+                        matched = this.availableSources.find(s => s.channel === 11) || this.availableSources.find(s => s.channel === 18) || this.availableSources[0];
+                    }
                     this.source = matched || this.availableSources[0];
 
                     this.updatePickerOptions();
