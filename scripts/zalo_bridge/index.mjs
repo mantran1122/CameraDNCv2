@@ -536,6 +536,30 @@ async function resolveVideoFile(payload) {
     return null;
 }
 
+// Tự động dọn dẹp các clip đệm tạm thời trong data/clips để tránh phình đĩa
+function cleanupTempClips() {
+    try {
+        const outDir = path.resolve(DATA_DIR, "clips");
+        if (!fs.existsSync(outDir)) return;
+        const now = Date.now();
+        const files = fs.readdirSync(outDir);
+        for (const file of files) {
+            const filePath = path.resolve(outDir, file);
+            try {
+                const stats = fs.statSync(filePath);
+                // Xóa mọi file clip tạm cũ hơn 5 phút (300,000 ms)
+                if (now - stats.mtimeMs > 5 * 60 * 1000) {
+                    fs.unlinkSync(filePath);
+                }
+            } catch (e) {}
+        }
+    } catch (err) {
+        console.warn("[ZaloBridge] Lỗi dọn dẹp clip tạm:", err.message);
+    }
+}
+setInterval(cleanupTempClips, 5 * 60 * 1000);
+cleanupTempClips();
+
 // Bộ đệm chống gửi trùng lặp webhook trong cửa sổ 20 giây
 const recentWebhooks = new Map();
 
@@ -630,6 +654,12 @@ app.post("/webhook", async (req, res) => {
                     await Promise.race([sendVideoPromise, timeoutPromise]);
                     console.log(`[ZaloBridge] ✅ Đã gửi cảnh báo kèm VIDEO MP4 (${fileSizeMB} MB) vào nhóm Zalo (${targetId})!`);
                     videoSent = true;
+                    // Tự động dọn dẹp file đệm tạm thời sau khi gửi thành công
+                    if (localVideoFile && localVideoFile.includes(path.resolve(DATA_DIR, "clips"))) {
+                        setTimeout(() => {
+                            try { if (fs.existsSync(localVideoFile)) fs.unlinkSync(localVideoFile); } catch (e) {}
+                        }, 30000);
+                    }
                     return res.json({
                         status: "success",
                         message: "Đã gửi cảnh báo đỏ kèm VIDEO MP4 vào Zalo Group thành công!",
