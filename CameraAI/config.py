@@ -24,13 +24,23 @@ def _load_env_files_safely() -> None:
 
 _load_env_files_safely()
 # Keep database/config local; video evidence is saved directly to NAS.
+def _is_separate_nas_mount(mount_path: str = "/mnt/nas_camera_clips") -> bool:
+    try:
+        if not os.path.exists(mount_path):
+            return False
+        if not os.path.ismount(mount_path):
+            return False
+        return os.stat(mount_path).st_dev != os.stat("/").st_dev
+    except Exception:
+        return False
+
 def _detect_clips_dir() -> Path:
     env_dir = os.getenv("CAMERAAI_CLIPS_DIR", "").strip()
     if env_dir:
-        # If env_dir points to an unmounted /mnt/nas_camera_clips path, fall back to storage/clips
-        # to prevent writing gigabytes of video into the container's overlayfs layer.
-        if "/mnt/nas_camera_clips" in env_dir and not os.path.ismount("/mnt/nas_camera_clips"):
-            print("[Storage Warning] /mnt/nas_camera_clips is not a mounted NAS filesystem! Using host-mounted storage/clips.")
+        # If env_dir points to an unmounted /mnt/nas_camera_clips path or same root filesystem,
+        # fall back to storage/clips to prevent writing gigabytes into container overlayfs.
+        if "/mnt/nas_camera_clips" in env_dir and not _is_separate_nas_mount("/mnt/nas_camera_clips"):
+            print("[Storage Warning] /mnt/nas_camera_clips is not a separate mounted NAS filesystem! Using host-mounted storage/clips.")
         else:
             try:
                 # An explicit cache path may not exist on the first startup yet.
