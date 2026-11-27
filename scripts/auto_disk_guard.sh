@@ -115,7 +115,10 @@ if command -v docker &> /dev/null; then
         done
     fi
 
-    # Prune dangling docker build cache and images
+    # Prune dangling docker build cache, stopped containers, and unused old images
+    docker container prune -f > /dev/null 2>&1 || true
+    docker image prune -a -f --filter "until=24h" > /dev/null 2>&1 || true
+    docker builder prune -a -f > /dev/null 2>&1 || true
     docker system prune -f --volumes=false > /dev/null 2>&1 || true
 fi
 
